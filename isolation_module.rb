@@ -273,6 +273,11 @@ class FailureMonitor
         # [node observing outage, target] -> [node1 still connected, node2... ]
         srcdst2stillconnected = {}
 
+        # [node observing outage, target] -> nodes with connectivity
+        srcdst2formatted_connected = {}
+        # [node observing outage, target] -> nodes without connectivity
+        srcdst2formatted_unconnected = {}
+
         target2observingnode2rounds.each do |target, observingnode2rounds|
            if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
                   observingnode2rounds.values.select { |rounds| rounds >= @@rounds_bound }.size >= @@vp_bound
@@ -300,8 +305,6 @@ class FailureMonitor
                     srcdst2formatted_connected[[src,target]] = formatted_connected
                     srcdst2formatted_unconnected[[src,target]] = formatted_unconnected
                  end
-
-                 srcdst2
               end
            end
         end
@@ -381,7 +384,7 @@ class FailureDispatcher
     end
 
     # precondition: stillconnected are able to reach dst
-    def isolate_outages((srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
+    def isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
         # first filter out any outages where no nodes are actually registered
         # with the controller
         $stderr.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"

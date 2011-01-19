@@ -102,8 +102,8 @@ class Emailer < ActionMailer::Base
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
         body        :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
-                    :spoofers_w_connectivity => spoofers_w_connectivity.join(', '),
-                    :formatted_unconnected => formatted_unconnected.join(', '),
+                    :spoofers_w_connectivity => spoofers_w_connectivity,
+                    :formatted_unconnected => formatted_unconnected,
                     :destination_pingable => destination_pingable,
                     :pings_towards_src => pings_towards_src,
                     :normal_forward_path => normal_forward_path,
