@@ -82,13 +82,13 @@ class Emailer < ActionMailer::Base
         recipients  "revtr@cs.washington.edu"
         body        :vps => vps.join("<br />"), :issue => issue
     end
-    def outage_detected(target, disconnected, connected, never_seen,
+    def outage_detected(target, dataset, disconnected, connected, never_seen,
                         problems_at_the_source, outdated_nodes,
                         not_sshable, testing=false)
         subject     "Outage detected: #{target}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
-        body        :target => target, :disconnected => disconnected,
+        body        :target => target, :dataset => dataset, :disconnected => disconnected,
                     :connected => connected, :never_seen => never_seen,
                     :problems_at_the_source => problems_at_the_source,
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable

@@ -114,17 +114,27 @@ module SpoofedTR
 
         $LOG.puts "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
         
+        dest2sortedttlrtrs = {}
         dest2ttl2rtrs.keys.each do |dest|
             # get rid of extraneous hole punches
             dest2ttl2rtrs[dest].delete(0)
+
             # turn sets into arrays
             dest2ttl2rtrs[dest].each do |ttl, rtrs|
                dest2ttl2rtrs[dest][ttl] = rtrs.to_a 
             end
+
+            # convert into [ttl, rtrs] pairs
+            sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
+            # get rid of redundant destination ttls at the end
+            while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? dest and sortedttlrtrs[-2][1].include? dest
+                sortedttlrtrs = sortedttlrtrs[0..-2]
+            end
+            dest2sortedttlrtrs[dest] = sortedttlrtrs
         end
 
-        $LOG.puts "parse_path(), dest2ttl2rtrs converting to arrays #{dest2ttl2rtrs.inspect}"
+        $LOG.puts "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
 
-        dest2ttl2rtrs
+        dest2sortedttlrtrs
    end
 end

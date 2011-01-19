@@ -23,11 +23,11 @@ module FailureIsolation
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
     # XXX terrible terrible
-    FailureIsolation::CloudfrontTargets = [ "204.246.165.221", "204.246.169.63", "216.137.33.1",
+    FailureIsolation::CloudfrontTargets = Set.new([ "204.246.165.221", "204.246.169.63", "216.137.33.1",
         "216.137.35.21", "216.137.37.156", "216.137.39.152", "216.137.41.78",
         "216.137.43.189", "216.137.45.33", "216.137.47.127", "216.137.53.96",
         "216.137.55.170", "216.137.57.207", "216.137.59.4", "216.137.61.174",
-        "216.137.63.221" ]
+        "216.137.63.221" ])
 
     FailureIsolation::TargetSet = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
 
@@ -45,13 +45,29 @@ module FailureIsolation
 
     FailureIsolation::CachedRevtrTool = "~/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
 
-    FailureIsolation::DataSetDir = "/homes/network/revtr/spoofed_traceroute/datasets"
+    FailureIsolation::TargetBlacklist = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
+
+    FailureIsolation::DataSetDir ="/homes/network/revtr/spoofed_traceroute/datasets"
     # targets taken from Harsha's most well connected PoPs
-    FailureIsolation::HarshaPoPs = "#{FailureIsolation::DataSetDir}/responsive_corerouters.txt"
+    FailureIsolation::HarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_corerouters.txt").split("\n"))
     # targets taken from routers on paths beyond Harsha's most well connected PoPs
-    FailureIsolation::BeyondHarshaPoPs = "#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt"
+    FailureIsolation::BeyondHarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt").split("\n"))
     # targets taken from spoofers.hosts
-    FailureIsolation::SpooferTargets = "#{FailureIsolation::DataSetDir}/one_spoofer_per_site_ips.txt"
+    FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/one_spoofer_per_site_ips.txt").split("\n"))
+
+    def FailureIsolation::get_dataset(dst)
+        if FailureIsolation::HarshaPoPs.include? dst
+            return "Harsha's most well-connected PoPs"
+        elsif FailureIsolation::BeyondHarshaPoPs.include? dst
+            return "Routers on paths beyond Harsha's PoPs"
+        elsif FailureIsolation::CloudfrontTargets.include? dst
+            return "CloudFront"
+        elsif FailureIsolation::SpooferTargets.include? dst
+            return "PL/mlab nodes"
+        else
+            return "Unkown"
+        end
+    end
 end
 
 class FailureMonitor
@@ -62,7 +78,7 @@ class FailureMonitor
         # TODO: handle these with optparse
         @@timestamp_bound = 605
         @@rounds_bound = 8
-        @@vp_bound = 3
+        @@vp_bound = 2
         # if more than 70% of a node's targets are unreachable, we ignore the
         # node
         @@source_specific_problem_threshold = 0.50
@@ -120,6 +136,8 @@ class FailureMonitor
         FileUtils.mkdir_p(FailureIsolation::PingMonitorRepo) 
 
         loop do
+            @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
+
             system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
 
@@ -129,9 +147,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            downtarget2observingnodes_stillconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2stillconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(downtarget2observingnodes_stillconnected)
+            @dispatcher.isolate_outages(srcdst2stillconnected)
 
             $LOG.puts "round #{@current_round} completed"
             @current_round += 1
@@ -221,6 +239,7 @@ class FailureMonitor
      
         node2targetstate.each do |node, target_state|
             target_state.each do |target, rounds|
+               next if @target_blacklist.include? target
                # XXX For backwards compatibility...
                rounds = rounds[0] if rounds.is_a?(Array)
 
@@ -263,9 +282,10 @@ class FailureMonitor
               formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1]} minutes]"}
               formatted_never_seen = target2neverseen[target]
 
-              # probably a better way to do this..., but...
-              Emailer.deliver_outage_detected(target, formatted_unconnected, formatted_connected,
-                                              formatted_never_seen, formatted_problems_at_the_source,
+              dataset = FailureIsolation::get_dataset(target)
+              Emailer.deliver_outage_detected(DNS::resolve_dns(target, target), dataset, formatted_unconnected,
+                                              formatted_connected, formatted_never_seen, 
+                                              formatted_problems_at_the_source,
                                               formatted_outdated_nodes, formatted_not_sshable)
 
               $LOG.puts "Tried to send an outage-detected email for #{target}"
@@ -273,13 +293,54 @@ class FailureMonitor
               if !@target2lastisolationattempt.include?(target) or (@current_round - @target2lastisolationattempt[target] > @@isolation_interval)
                  @target2lastisolationattempt[target] = @current_round
 
-                 observingnode2rounds.each do |src|
+                 observingnode2rounds.keys.each do |src|
                     srcdst2stillconnected[[src,target]] = target2stillconnected[target]
                  end
               end
            end
         end
         srcdst2stillconnected
+    end
+end
+
+# TODO: encapsulate all hops in this way so that I don't have to do that nasty
+# nasty << business
+class HistoricalForwardHop
+    attr_accessor :ttl, :ip, :dns, :reverse_path, :ping_responsive
+    def initialize(ttl, ip)
+        @ttl = ttl
+        @ip = ip
+        @dns = DNS::resolve_dns(ip, ip) 
+        @reverse_path = []
+        @ping_responsive = false
+    end
+
+    def to_s()
+       s = "#{@ttl}.  #{@dns} (pingable from S?: #{@ping_responsive})"
+       s << "\n  <ul type=none>\n"
+       reverse_path.each do |hop|
+           s << "    <li> #{hop}</li>\n"
+       end
+       s << "  </ul>\n"
+       s
+    end
+end
+
+class ReverseHop
+    attr_accessor :ip, :formatted, :ping_responsive
+    def initialize(formatted)
+        $stderr.puts "formatted was nil!" if formatted.nil?
+        @formatted = formatted
+        # could be a true hop, or could be "No matches in the past 1440 minutes!"
+        match = formatted.scan(/\d+.*\((.*)\).*/)
+        #                              hmmmm, hackkkk
+        @ip, @valid_ip = (match.empty?) ? ["0.0.0.0", false] : [match[0][0], true]
+    end
+
+    def to_s()
+        s = (formatted.nil?) ? "" : formatted.clone
+        s << " (pingable from S?: #{@ping_responsive})" if @valid_ip
+        s
     end
 end
 
@@ -297,11 +358,7 @@ class FailureDispatcher
         @mutex = Mutex.new
         @rtrSvc = connect_to_drb
 
-        @harsha_targets = Set.new(IO.read(FailureIsolation::HarshaPoPs).split("\n"))
-        @beyond_harsha_targets = Set.new(IO.read(FailureIsolation::BeyondHarshaPoPs).split("\n"))
-        @spoofer_targets = Set.new(IO.read(FailureIsolation::SpooferTargets).split("\n"))
-        @cloudfront_targets = Set.new(FailureIsolation::CloudfrontTargets)
-
+        
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
         Thread.new do
@@ -352,22 +409,37 @@ class FailureDispatcher
 
     private
 
+    def get_cached_revtr(src,dst)
+        $stderr.puts "get_cached_revtr(#{src}, #{dst})"
+        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted) }
+    end
+
     def analyze_results(src, dst, spoofers_w_connectivity, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
         forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
         reverse_problem = pings_towards_src.empty?
 
-        historical_tr_ttlhoptuples, historical_trace_timestamp = retrieve_historical_tr(src, dst)
+        # HistoricalForwardHop objects
+        historical_tr_hops, historical_trace_timestamp = retrieve_historical_tr(src, dst)
 
-        cached_revtr_array = `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n")
+        historical_tr_hops.each do |hop|
+            # XXX thread out on this to make it faster? Ask Dave for a faster
+            # way?
+            hop.reverse_path = get_cached_revtr(src, hop.ip)
+        end
 
-        revtr_array = issue_spoofed_revtr(src, dst)
+        spoofed_revtr_hops = issue_spoofed_revtr(src, dst)
+
+        cached_revtr_hops = get_cached_revtr(src, dst)
 
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source. Send pings, and append the results to
         # the strings in the arrays (terrible, terrible, terrible)
-        ping_responsive = issue_pings(src, dst, historical_tr_ttlhoptuples, revtr_array, cached_revtr_array)
+        ping_responsive = issue_pings(src, dst, historical_tr_hops, 
+                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
+                                      cached_revtr_hops)
+
         # sometims we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include? dst
@@ -407,15 +479,14 @@ class FailureDispatcher
             direction = "both paths seem to be working...?"
         end
 
-        dataset = get_dataset(dst)
+        dataset = FailureIsolation::get_dataset(dst)
 
-        Emailer.deliver_isolation_results(src, resolve_dns(dst, dst), dataset, direction, spoofers_w_connectivity, 
+        Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, spoofers_w_connectivity, 
                                           destination_pingable, pings_towards_src,
                                           format_ttlhops(tr_ttlhoptuples), 
                                           format_ttlhops(spoofed_tr_ttlhopstuples),
-                                          format_ttlhops_w_reachability(historical_tr_ttlhoptuples, ping_responsive),
-                                          historical_trace_timestamp,
-                                          revtr_array, cached_revtr_array, testing)
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
 
         $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
     end
@@ -459,39 +530,15 @@ class FailureDispatcher
     #   -
     #   -
 
-    def get_dataset(dst)
-        if @harsha_targets.include? dst
-            return "Harsha's most well-connected PoPs"
-        elsif @beyond_harsha_targets.include? dst
-            return "Routers on paths beyond Harsha's PoPs"
-        elsif @cloudfront_targets.include? dst
-            return "CloudFront"
-        elsif @spoofer_targets.include? dst
-            return "PL/mlab nodes"
-        else
-            return "Unkown"
-        end
-    end
-
     def format_ttlhops(ttlhops)
         ttlhops.map do |ttlhops| 
             ttl, hops = ttlhops
             hops = [hops] unless hops.is_a?(Array) or hops.is_a?(Set)
-            resolved_hops = hops.map { |hop| resolve_dns(hop, hop) }.join ', '
+            resolved_hops = hops.map { |hop| DNS::resolve_dns(hop, hop) }.join ', '
             "#{ttl}.  #{resolved_hops}"
         end
     end
-
-    # XXX redundannnnnnttttt
-    def format_ttlhops_w_reachability(ttlhops, reachable)
-        ttlhops.map do |ttlhops|
-            ttl, hops = ttlhops
-            hops = [hops] unless hops.is_a?(Array)
-            resolved_hops = hops.map { |hop| "#{resolve_dns(hop, hop)} (pingable from S?: #{reachable.include? hop})" }.join ', '
-            "#{ttl}.  #{resolved_hops}"
-        end
-    end
-
+    
     def retrieve_historical_tr(src, dst)
         if @node2target2trace.include? src and @node2target2trace[src].include? dst
             historical_tr_ttlhoptuples = @node2target2trace[src][dst]
@@ -503,7 +550,7 @@ class FailureDispatcher
 
         $LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
-        [historical_tr_ttlhoptuples, historical_trace_timestamp]
+        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1]) }, historical_trace_timestamp]
     end
 
     def issue_pings_towards_srcs(srcdst2stillconnected)
@@ -528,18 +575,18 @@ class FailureDispatcher
 
     def issue_spoofed_traceroutes(srcdst2stillconnected)
         $LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
-        srcdst2ttl2rtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
+        srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
 
         srcdst2spoofed_tr_ttlhopstuples = {}
 
-        $LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2ttl2rtrs.inspect}"
+        $LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2sortedttlrtrs.inspect}"
 
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
-            if srcdst2ttl2rtrs.nil? || srcdst2ttl2rtrs[srcdst].nil?
+            if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
                 srcdst2spoofed_tr_ttlhopstuples[srcdst] = []
             else
-                srcdst2spoofed_tr_ttlhopstuples[srcdst] = srcdst2ttl2rtrs[srcdst].to_a.sort_by { |ttlhops| ttlhops[0] }
+                srcdst2spoofed_tr_ttlhopstuples[srcdst] = srcdst2sortedttlrtrs[srcdst]
             end
         end
 
@@ -585,76 +632,38 @@ class FailureDispatcher
             spoofed_revtr = [revtr]
         else
             # XXX string -> array -> string. meh.
-            spoofed_revtr = revtr.get_revtr_string.split("\n")
+            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted) }
         end
 
-        $LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
+        #$LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
         
         spoofed_revtr
     end
 
-    # take the string form, and turn it into sorted ttlhoptuples
-    # ideally we wouldn't be doing string processing like this...
-    # TODO: add this functionality to the ReverseTraceroute class
-    def extract_hops_from_revtr_string_array(revtr)
-        hop2string = {} 
-        revtr.each do |line|
-            next unless line.is_a?(String) # if it's a symbol, the revtr failed
-            
-            # 1 netrom.demarc.cogentco.com (38.101.50.62) dst
-            match = line.scan(/\d+.*\((.*)\).*/)
-            next if match.empty?
-            hop2string[match[0][0]] = line
-        end
-
-        hop2string
-    end
-
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
-    # are pingeable from the source. Send pings, and append the results to
-    # the strings in the revtr arrays (terrible, terrible, terrible). For now,
-    # we don't append strings to the forward traceroute arrays
-    def issue_pings(source, dest, historical_tr_ttlhoptuples, revtr_array, cached_revtr_array)
-        # hop -> string in the historical_tr_ttlhoptuples array
-        historical_tr_hops = historical_tr_ttlhoptuples.map { |ttlhop| ttlhop[1] }
-
-        # hop -> string in the revtr_array
-        rtr_to_string = extract_hops_from_revtr_string_array(revtr_array)
-
-        # hop -> string in the cached_revtr_array
-        historical_rtr_to_string = extract_hops_from_revtr_string_array(cached_revtr_array)
-
-        all_targets = Set.new(historical_tr_hops + rtr_to_string.keys + historical_rtr_to_string.keys)
+    # are pingeable from the source. Send pings, update
+    # hop.ping_responsive, and return the responsive pings
+    def issue_pings(source, dest, historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
+        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops]
+        all_targets = Set.new
+        all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
         all_targets.add dest
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
         $stderr.puts "Responsive to ping: #{responsive.inspect}"
 
-        all_targets.each do |hop|
-            pingable = responsive.include? hop
-
-            if rtr_to_string.include? hop
-                right_justify(rtr_to_string[hop], pingable)
-            end
-
-            if historical_rtr_to_string.include? hop
-               right_justify(historical_rtr_to_string[hop], pingable)
-            end
+        # update reachability
+        all_hop_sets.each do |hop_set|
+            hop_set.each { |hop| hop.ping_responsive = responsive.include? hop.ip }
         end
 
         responsive
     end
+end
 
-    def right_justify(str_pointer, pingable)
-        # this is a terrible terrible hack. We want to justify all of the
-        # columns in the email. We can't use rjust, since there is no
-        # rjust! version that mutates the string. << mutates the string,
-        # so we << in the right number of spaces, then we put in the
-        # "(pingable?: )" part.
-        str_pointer << "&nbsp;&nbsp;&nbsp;(pingable from S?: #{pingable})"
-    end
-
-    def get_addr(dst)
+require 'resolv'
+module DNS
+    def DNS::get_addr(dst)
         begin
             dst_ip=Resolv.getaddress(dst)
         rescue
@@ -662,7 +671,7 @@ class FailureDispatcher
         end
     end
 
-    def resolve_dns(dst, dst_ip)
+    def DNS::resolve_dns(dst, dst_ip)
         ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst} (#{dst})" : "#{dst} (#{dst_ip})")
     end
 end
