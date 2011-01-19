@@ -62,7 +62,7 @@ class FailureMonitor
         # TODO: handle these with optparse
         @@timestamp_bound = 605
         @@rounds_bound = 8
-        @@vp_bound = 2
+        @@vp_bound = 3
         # if more than 70% of a node's targets are unreachable, we ignore the
         # node
         @@source_specific_problem_threshold = 0.50
@@ -129,7 +129,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            downtarget2observingnodes_stillconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+
+            @dispatcher.isolate_outages(downtarget2observingnodes_stillconnected)
 
             $LOG.puts "round #{@current_round} completed"
             @current_round += 1
@@ -249,6 +251,9 @@ class FailureMonitor
         formatted_outdated_nodes = @outdated_nodes.to_a.map { |x| "#{x[0]} [#{x[1]} minutes]" }
         formatted_not_sshable = @not_sshable.to_a
 
+        # [node observing outage, target] -> [node1 still connected, node2... ]
+        srcdst2stillconnected = {}
+
         target2observingnode2rounds.each do |target, observingnode2rounds|
            if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
                   observingnode2rounds.values.select { |rounds| rounds >= @@rounds_bound }.size >= @@vp_bound
@@ -268,12 +273,13 @@ class FailureMonitor
               if !@target2lastisolationattempt.include?(target) or (@current_round - @target2lastisolationattempt[target] > @@isolation_interval)
                  @target2lastisolationattempt[target] = @current_round
 
-                 observingnode2rounds.keys.each do |node|
-                     Thread.new { @dispatcher.isolate_outage(node, target, target2stillconnected[target]) }
+                 observingnode2rounds.each do |src|
+                    srcdst2stillconnected[[src,target]] = target2stillconnected[target]
                  end
               end
            end
         end
+        srcdst2stillconnected
     end
 end
 
@@ -314,33 +320,49 @@ class FailureDispatcher
         end
     end
 
-    # receive spoofed reverse traceroute results asynchronously from Dave
-    def send_results(src, dst, results)
-        $LOG.puts "send_results: #{source.inspect} #{dst.inspect} #{results.inspect}"
+    # precondition: stillconnected are able to reach dst
+    def isolate_outages(srcdst2stillconnected, testing=false) # this testing flag is terrrrible
+        # first filter out any outages where no nodes are actually registered
+        # with the controller
+        $stderr.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        registered_vps = @controller.hosts.clone
+        srcdst2stillconnected.delete_if do |srcdst, still_connected|
+            !registered_vps.include?(srcdst[0]) || (registered_vps & still_connected).empty?
+        end
+        $stderr.puts "after filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+
+        return if srcdst2stillconnected.empty? # optimization
+
+        # quickly isolate the directions of the failures
+        srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
+        $stderr.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
+        
+        # we check the forward direction by issuing spoofed traceroutes (rather than pings)
+        srcdst2spoofed_tr_ttlhopstuples = issue_spoofed_traceroutes(srcdst2stillconnected)
+        $stderr.puts "srcdst2spoofed_tr_ttlhopstuples: #{srcdst2spoofed_tr_ttlhopstuples.inspect}"
+
+        # thread out on each src, dst
+        srcdst2stillconnected.keys.each do |srcdst|
+            src, dst = srcdst
+            Thread.new do
+                analyze_results(src, dst, srcdst2stillconnected[srcdst], srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst], testing)
+            end
+        end
     end
 
-    # precondition: spoofers_w_connectivity are able to reach dst
-    def isolate_outage(src, dst, spoofers_w_connectivity, testing=false)
-        registered_vps = @controller.hosts.clone
-        return unless registered_vps.include?(src) && !(registered_vps & spoofers_w_connectivity).empty?
+    private
 
-        # TODO: one thread for each direction
-        targets = [dst]
+    def analyze_results(src, dst, spoofers_w_connectivity, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
+        $stderr.puts "analyze_results: #{src}, #{dst}"
 
-        # quickly isolate the direction(s) of failure
-        pings_towards_src = issue_pings_towards_src(src, targets, spoofers_w_connectivity)
-        reverse_problem = pings_towards_src.empty?
-
-        # we check the forward direction by issuing a spoofed traceroute (rather than pings)
-        spoofed_tr_ttlhopstuples = issue_spoofed_traceroute(src, targets, spoofers_w_connectivity)
-        $stderr.puts "spoofed_tr_ttlhopstuples: #{spoofed_tr_ttlhopstuples.inspect}"
         forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
+        reverse_problem = pings_towards_src.empty?
 
         historical_tr_ttlhoptuples, historical_trace_timestamp = retrieve_historical_tr(src, dst)
 
-        revtr_array = issue_spoofed_revtr(src, dst)
-
         cached_revtr_array = `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n")
+
+        revtr_array = issue_spoofed_revtr(src, dst)
 
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source. Send pings, and append the results to
@@ -350,7 +372,8 @@ class FailureDispatcher
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include? dst
 
-        tr_ttlhoptuples = issue_normal_traceroute(src, targets)
+        # maybe not threadsafe, but fuckit
+        tr_ttlhoptuples = issue_normal_traceroute(src, [dst])
 
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
@@ -394,7 +417,7 @@ class FailureDispatcher
                                           historical_trace_timestamp,
                                           revtr_array, cached_revtr_array, testing)
 
-        $stderr.puts "Attempted to send isolation_results email for #{src} #{dst}..."
+        $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
     end
 
     # output format:
@@ -435,7 +458,6 @@ class FailureDispatcher
     #   -     (still reachable for each hop?)
     #   -
     #   -
-    private
 
     def get_dataset(dst)
         if @harsha_targets.include? dst
@@ -484,37 +506,44 @@ class FailureDispatcher
         [historical_tr_ttlhoptuples, historical_trace_timestamp]
     end
 
-    # precondition: targets is a single element array
-    def issue_pings_towards_src(src, targets, spoofers_w_connectivity)
-        dst = targets[0] # hmmmm
-
+    def issue_pings_towards_srcs(srcdst2stillconnected)
         # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_spoofed_pings(src, targets, spoofers_w_connectivity, true)
-        $LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_ping_results: #{spoofed_ping_results.inspect}"
+        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2stillconnected)
 
-        if spoofed_ping_results.nil? || spoofed_ping_results[dst].nil? || spoofed_ping_results[dst][src].nil?
-            pings_towards_src = [] 
-        else
-            pings_towards_src = spoofed_ping_results[dst][src]
+        $LOG.puts "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
+
+        srcdst2pings_towards_src = {}
+
+        srcdst2stillconnected.keys.each do |srcdst|
+            src, dst = srcdst
+            if spoofed_ping_results.nil? || spoofed_ping_results[dst].nil? || spoofed_ping_results[dst][src].nil?
+                srcdst2pings_towards_src[srcdst] = []
+            else
+                srcdst2pings_towards_src[srcdst] = spoofed_ping_results[dst][src]
+            end
         end
 
-        pings_towards_src
+        srcdst2pings_towards_src
     end
 
-    # precondition: targets is a single element array
-    def issue_spoofed_traceroute(src, targets, spoofers_w_connectivity)
-        traceroute_results = @registrar.client_spoofed_traceroute(src, targets, spoofers_w_connectivity, true)
-        dst = targets[0] # ugghh...
+    def issue_spoofed_traceroutes(srcdst2stillconnected)
+        $LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        srcdst2ttl2rtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
 
-        $LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_traceroute_results: #{traceroute_results.inspect}"
+        srcdst2spoofed_tr_ttlhopstuples = {}
 
-        if traceroute_results.nil? || traceroute_results[dst].nil?
-            spoofed_tr_ttlhopstuples = {}
-        else
-            spoofed_tr_ttlhopstuples = traceroute_results[dst].to_a.sort_by { |tuple| tuple[0] }
+        $LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2ttl2rtrs.inspect}"
+
+        srcdst2stillconnected.keys.each do |srcdst|
+            src, dst = srcdst
+            if srcdst2ttl2rtrs.nil? || srcdst2ttl2rtrs[srcdst].nil?
+                srcdst2spoofed_tr_ttlhopstuples[srcdst] = []
+            else
+                srcdst2spoofed_tr_ttlhopstuples[srcdst] = srcdst2ttl2rtrs[srcdst].to_a.sort_by { |ttlhops| ttlhops[0] }
+            end
         end
 
-        spoofed_tr_ttlhopstuples
+        srcdst2spoofed_tr_ttlhopstuples
     end
 
     # precondition: targets is a single element array
@@ -599,6 +628,7 @@ class FailureDispatcher
         all_targets.add dest
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
+        $stderr.puts "Responsive to ping: #{responsive.inspect}"
 
         all_targets.each do |hop|
             pingable = responsive.include? hop
@@ -638,7 +668,6 @@ class FailureDispatcher
 end
 
 if __FILE__ == $0
-    exit # XXX
     begin
        dispatcher = FailureDispatcher.new
        monitor = FailureMonitor.new(dispatcher)

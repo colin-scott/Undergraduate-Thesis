@@ -166,6 +166,14 @@ class Registrar
         end
     end
 
+    def batch_spoofed_traceroute(srcdst2stillconnected)
+        SpoofedTR::sendBatchProbes(srcdst2stillconnected, @controller)
+    end
+
+    def receive_batched_spoofed_pings(srcdst2stillconnected)
+        SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
+    end
+
     # sends out spoofed pings from all other nodes as this source 
     # This is only temporary so that we can play around with outages by hand before
     # we build the full blown system
