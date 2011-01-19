@@ -339,7 +339,7 @@ class ReverseHop
 
     def to_s()
         s = (formatted.nil?) ? "" : formatted.clone
-        s << " (pingable from S?: #{@ping_responsive})" if @valid_ip
+        s << " (pingable from S?: #{@ping_responsive})" if @valid_ip and !@ping_responsive.nil?
         s
     end
 end
