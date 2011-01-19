@@ -147,9 +147,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2stillconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(srcdst2stillconnected)
+            @dispatcher.isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected)
 
             $LOG.puts "round #{@current_round} completed"
             @current_round += 1
@@ -295,16 +295,20 @@ class FailureMonitor
 
                  observingnode2rounds.keys.each do |src|
                     srcdst2stillconnected[[src,target]] = target2stillconnected[target]
+                    # TODO: encapsulate these into objects rather than passing
+                    # formatted/unformatted hash maps around
+                    srcdst2formatted_connected[[src,target]] = formatted_connected
+                    srcdst2formatted_unconnected[[src,target]] = formatted_unconnected
                  end
+
+                 srcdst2
               end
            end
         end
-        srcdst2stillconnected
+        [srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected]
     end
 end
 
-# TODO: encapsulate all hops in this way so that I don't have to do that nasty
-# nasty << business
 class HistoricalForwardHop
     attr_accessor :ttl, :ip, :dns, :reverse_path, :ping_responsive
     def initialize(ttl, ip)
@@ -358,7 +362,6 @@ class FailureDispatcher
         @mutex = Mutex.new
         @rtrSvc = connect_to_drb
 
-        
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
         Thread.new do
@@ -378,7 +381,7 @@ class FailureDispatcher
     end
 
     # precondition: stillconnected are able to reach dst
-    def isolate_outages(srcdst2stillconnected, testing=false) # this testing flag is terrrrible
+    def isolate_outages((srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
         # first filter out any outages where no nodes are actually registered
         # with the controller
         $stderr.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
@@ -402,7 +405,8 @@ class FailureDispatcher
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
             Thread.new do
-                analyze_results(src, dst, srcdst2stillconnected[srcdst], srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst], testing)
+                analyze_results(src, dst, srcdst2stillconnected[srcdst], srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
+                                srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst], testing)
             end
         end
     end
@@ -414,7 +418,7 @@ class FailureDispatcher
         `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted) }
     end
 
-    def analyze_results(src, dst, spoofers_w_connectivity, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
+    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
         forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
@@ -481,8 +485,8 @@ class FailureDispatcher
 
         dataset = FailureIsolation::get_dataset(dst)
 
-        Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, spoofers_w_connectivity, 
-                                          destination_pingable, pings_towards_src,
+        Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
                                           format_ttlhops(tr_ttlhoptuples), 
                                           format_ttlhops(spoofed_tr_ttlhopstuples),
                                           historical_tr_hops, historical_trace_timestamp,

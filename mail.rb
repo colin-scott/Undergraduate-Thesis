@@ -94,7 +94,7 @@ class Emailer < ActionMailer::Base
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
     def isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
-                          destination_pingable, pings_towards_src,
+                          formatted_unconnected, destination_pingable, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
                           spoofed_revtr, cached_revtr, testing=false)
@@ -103,6 +103,7 @@ class Emailer < ActionMailer::Base
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
         body        :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
                     :spoofers_w_connectivity => spoofers_w_connectivity.join(', '),
+                    :formatted_unconnected => formatted_unconnected.join(', '),
                     :destination_pingable => destination_pingable,
                     :pings_towards_src => pings_towards_src,
                     :normal_forward_path => normal_forward_path,
