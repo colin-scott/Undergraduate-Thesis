@@ -128,7 +128,8 @@ module SpoofedTR
             sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
             # get rid of redundant destination ttls at the end
             $stderr.puts "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
-            while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? dest and sortedttlrtrs[-2][1].include? dest
+            target = dest.is_a?(Array) ? dest[1] : dest   # sometimes dest is really srcdst.... XXX
+            while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? target and sortedttlrtrs[-2][1].include? target 
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end
             dest2sortedttlrtrs[dest] = sortedttlrtrs

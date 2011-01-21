@@ -2,27 +2,16 @@
 
 require 'drb'
 require 'drb/acl'
+require 'net/http'
 require '../spooftr_config'
 
-class RevtrSink
-    def initialize
-       acl=ACL.new(%w[deny all
-					allow *.cs.washington.edu
-					allow localhost
-					allow 127.0.0.1
-					])
-
-		@drb=DRb.start_service nil, self, acl
-
-	    system %{ssh #{$SERVER} "echo #{@drb.uri} > ~revtr/www/vps/failure_isolation/isolation_module.txt;\
-                                 chmod g+w ~revtr/www/vps/failure_isolation/isolation_module.txt"}
-        puts "DRb started at #{@drb.uri}"
-    end
-
-    def send_results(source, dest, results)
-        puts "send_results(): #{source.inspect} #{dest.inspect} #{results.inspect}"
-    end
+uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
+uri = Net::HTTP.get_response(URI.parse(uri_location)).body
+rtrSvc = DRbObject.new nil, uri
+srcdst = (ARGV.empty?) ? [["planetlab-node3.it-sudparis.eu", "78.90.86.133"]] : [[ARGV.shit, ARGV.shift]]
+begin
+    puts rtrSvc.get_reverse_paths(srcdst)
+rescue DRb::DRbConnError => e
+    puts "Caught exception #{e}!"
 end
 
-sink = RevtrSink.new
-DRb.thread.join

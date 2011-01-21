@@ -55,6 +55,9 @@ module FailureIsolation
     # targets taken from spoofers.hosts
     FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/one_spoofer_per_site_ips.txt").split("\n"))
 
+    FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
+    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results"
+
     def FailureIsolation::get_dataset(dst)
         if FailureIsolation::HarshaPoPs.include? dst
             return "Harsha's most well-connected PoPs"
@@ -278,9 +281,13 @@ class FailureMonitor
         # [node observing outage, target] -> nodes without connectivity
         srcdst2formatted_unconnected = {}
 
+        now = Time.new
+
         target2observingnode2rounds.each do |target, observingnode2rounds|
            if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
-                  observingnode2rounds.values.select { |rounds| rounds >= @@rounds_bound }.size >= @@vp_bound
+                  observingnode2rounds.values.select { |rounds| rounds >= @@rounds_bound }.size >= @@vp_bound and
+                  !target2stillconnected[target].find { |node| (now - @nodetarget2lastoutage[[node, target]]) / 60 > @@rounds_bound }.nil?
+
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
               formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
@@ -288,6 +295,12 @@ class FailureMonitor
               formatted_never_seen = target2neverseen[target]
 
               dataset = FailureIsolation::get_dataset(target)
+
+              log_outage_detected(target, dataset, formatted_unconnected,
+                                              formatted_connected, formatted_never_seen, 
+                                              formatted_problems_at_the_source,
+                                              formatted_outdated_nodes, formatted_not_sshable)
+
               Emailer.deliver_outage_detected(DNS::resolve_dns(target, target), dataset, formatted_unconnected,
                                               formatted_connected, formatted_never_seen, 
                                               formatted_problems_at_the_source,
@@ -309,6 +322,11 @@ class FailureMonitor
            end
         end
         [srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected]
+    end
+
+    def log_outage_detected(*args)
+        t = Time.new
+        File.open(FailureIsolation::OutageNotifications+"/#{args[0]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
     end
 end
 
@@ -376,11 +394,15 @@ class FailureDispatcher
     end
 
     def connect_to_drb()
-        @mutex.synchronize do
-            uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
-            uri = Net::HTTP.get_response(URI.parse(uri_location)).body
-            rtrSvc = DRbObject.new nil, uri
+        if !@mutex.locked?
+            @mutex.synchronize do
+                uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
+                uri = Net::HTTP.get_response(URI.parse(uri_location)).body
+                rtrSvc = DRbObject.new nil, uri
+            end
         end
+
+        rtrSvc
     end
 
     # precondition: stillconnected are able to reach dst
@@ -488,12 +510,24 @@ class FailureDispatcher
 
         dataset = FailureIsolation::get_dataset(dst)
 
-        Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, formatted_connected, 
+        formatted_tr_ttlhops = format_ttlhops(tr_ttlhoptuples)
+        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
+
+        if(!destination_pingable)
+            Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
-                                          format_ttlhops(tr_ttlhoptuples), 
-                                          format_ttlhops(spoofed_tr_ttlhopstuples),
+                                          formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
+        end
+
+        if(!testing)
+            log_isolation_results(src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+        end
 
         $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
     end
@@ -620,6 +654,8 @@ class FailureDispatcher
     def issue_spoofed_revtr(src, dst)
         begin
             srcdst2revtr = @rtrSvc.get_reverse_paths([[src, dst]])
+        rescue DRb::DRbConnError => e
+            return [:drb_exception]
         rescue Exception => e
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             @drb = connect_to_drb()  # this is going to happen multiple times if more than one thread calls throws an exception...
@@ -665,6 +701,11 @@ class FailureDispatcher
         end
 
         responsive
+    end
+
+    def log_isolation_results(*args)
+        t = Time.new
+        File.open(FailureIsolation::IsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
     end
 end
 
