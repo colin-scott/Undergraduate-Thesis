@@ -118,6 +118,14 @@ class Emailer < ActionMailer::Base
         recipients  "cs@cs.washington.edu"
         body        :exception => exception
     end
+    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable)
+        subject     "faulty monitoring node report"
+        from        "failures@cs.washington.edu"
+        recipients  "failures@cs.washington.edu"
+        body         :outdated_nodes => outdated_nodes,
+                     :problems_at_the_source => problems_at_the_source,
+                     :not_sshable => not_sshable
+    end
 end
 
 def email_and_die

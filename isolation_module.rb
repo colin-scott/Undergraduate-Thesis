@@ -14,7 +14,7 @@ require '../spooftr_config.rb' # XXX don't hardcode...
 
 # XXX Don't hardcode!!!
 $pptasks = "~ethan/scripts/pptasks"
-$default_period = 350
+$default_period_seconds = 620
 Thread.abort_on_exception = true
 
 module FailureIsolation
@@ -80,11 +80,14 @@ class FailureMonitor
 
         # TODO: handle these with optparse
         @@timestamp_bound = 605
-        @@rounds_bound = 8
+        @@upper_rounds_bound = 120
+        @@lower_rounds_bound = 4
         @@vp_bound = 2
         # if more than 70% of a node's targets are unreachable, we ignore the
         # node
-        @@source_specific_problem_threshold = 0.50
+        @@source_specific_problem_threshold = 0.35
+        # how often we send out faulty_node_audit reports
+        @@node_audit_period = 60*60*24 / $default_period_seconds
 
         @target_set_size = 0
 
@@ -121,8 +124,8 @@ class FailureMonitor
 
         # so that we don't probe the hell out of failed routers
         # target -> time
-        @target2lastisolationattempt = {}
-        @@isolation_interval = 6 # we isolate at most every 6*5 = 30 minutes
+        @nodetarget2lastisolationattempt = {}
+        @@isolation_interval = 6 # we isolate at most every 6*10.33 =~ 60 minutes
 
         @current_round = 0
     end
@@ -156,6 +159,8 @@ class FailureMonitor
 
             $LOG.puts "round #{@current_round} completed"
             @current_round += 1
+            
+            audit_faulty_nodes if (current_round % ) == 0
 
             sleep period
         end
@@ -213,6 +218,12 @@ class FailureMonitor
         end
 
         node2targetstate
+    end
+
+    def audit_faulty_nodes()
+        Emailer.deliver_faulty_node_report(@outdated_nodes,
+                                           @problems_at_the_source,
+                                           @not_sshable)
     end
 
     def update_auxiliary_state(node2targetstate)
@@ -285,8 +296,9 @@ class FailureMonitor
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
            if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
-                  observingnode2rounds.values.select { |rounds| rounds >= @@rounds_bound }.size >= @@vp_bound and
-                  !target2stillconnected[target].find { |node| (now - @nodetarget2lastoutage[[node, target]]) / 60 > @@rounds_bound }.nil?
+                  observingnode2rounds.delete_if { |node, rounds| rounds >= @@lower_rounds_bound }.size >= @@vp_bound and
+                  observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and
+                  !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil?
 
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
@@ -301,23 +313,27 @@ class FailureMonitor
                                               formatted_problems_at_the_source,
                                               formatted_outdated_nodes, formatted_not_sshable)
 
-              Emailer.deliver_outage_detected(DNS::resolve_dns(target, target), dataset, formatted_unconnected,
-                                              formatted_connected, formatted_never_seen, 
-                                              formatted_problems_at_the_source,
-                                              formatted_outdated_nodes, formatted_not_sshable)
+              #Emailer.deliver_outage_detected(DNS::resolve_dns(target, target), dataset, formatted_unconnected,
+              #                                formatted_connected, formatted_never_seen, 
+              #                                formatted_problems_at_the_source,
+              #                                formatted_outdated_nodes, formatted_not_sshable)
 
               $LOG.puts "Tried to send an outage-detected email for #{target}"
-               
-              if !@target2lastisolationattempt.include?(target) or (@current_round - @target2lastisolationattempt[target] > @@isolation_interval)
-                 @target2lastisolationattempt[target] = @current_round
 
-                 observingnode2rounds.keys.each do |src|
-                    srcdst2stillconnected[[src,target]] = target2stillconnected[target]
-                    # TODO: encapsulate these into objects rather than passing
-                    # formatted/unformatted hash maps around
-                    srcdst2formatted_connected[[src,target]] = formatted_connected
-                    srcdst2formatted_unconnected[[src,target]] = formatted_unconnected
-                 end
+              # don't issue isolation measurements for nodes which have
+              # already issued measuremnt for this target in the last
+              # @@isolation_interval rounds
+              observingnode2rounds.delete_if { |node, rounds| @nodetarget2lastisolationattempt.include?([node,target]) and 
+                  (@current_round - @nodetarget2lastisolationattempt[[node,target]] <= @@isolation_interval) }
+
+
+              observingnode2rounds.keys.each do |src|
+                 @nodetarget2lastisolationattempt[[src,target]] = @current_round
+                 srcdst2stillconnected[[src,target]] = target2stillconnected[target]
+                 # TODO: encapsulate these into objects rather than passing
+                 # formatted/unformatted hash maps around
+                 srcdst2formatted_connected[[src,target]] = formatted_connected
+                 srcdst2formatted_unconnected[[src,target]] = formatted_unconnected
               end
            end
         end
@@ -381,7 +397,8 @@ class FailureDispatcher
 					])
 
         @mutex = Mutex.new
-        @rtrSvc = connect_to_drb
+        connect_to_drb # sets @rtrSvc
+        @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
@@ -394,19 +411,20 @@ class FailureDispatcher
     end
 
     def connect_to_drb()
-        if !@mutex.locked?
-            @mutex.synchronize do
+        @mutex.synchronize do
+            if !@have_retried_connection
+                @have_retried_connection = true
                 uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
                 uri = Net::HTTP.get_response(URI.parse(uri_location)).body
-                rtrSvc = DRbObject.new nil, uri
+                @rtrSvc = DRbObject.new nil, uri
             end
         end
-
-        rtrSvc
     end
 
     # precondition: stillconnected are able to reach dst
     def isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
+        @have_retried_connection = false
+
         # first filter out any outages where no nodes are actually registered
         # with the controller
         $stderr.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
@@ -471,7 +489,7 @@ class FailureDispatcher
 
         # sometims we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include? dst
+        destination_pingable = ping_responsive.include? dst || (!tr_ttlhoptuples.empty? && tr_ttlhoptuples[-1][1] == dst)
 
         # maybe not threadsafe, but fuckit
         tr_ttlhoptuples = issue_normal_traceroute(src, [dst])
@@ -513,7 +531,13 @@ class FailureDispatcher
         formatted_tr_ttlhops = format_ttlhops(tr_ttlhoptuples)
         formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
 
-        if(!destination_pingable)
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr_ttlhoptuples.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
+
+        #                                    TODO: Turn this into a global constant 
+        if(!destination_pingable && direction != "both paths seem to be working...?" &&
+                !forward_measurements_empty)
             Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
@@ -655,10 +679,11 @@ class FailureDispatcher
         begin
             srcdst2revtr = @rtrSvc.get_reverse_paths([[src, dst]])
         rescue DRb::DRbConnError => e
-            return [:drb_exception]
+            connect_to_drb()
+            return [:drb_connection_refused]
         rescue Exception => e
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
-            @drb = connect_to_drb()  # this is going to happen multiple times if more than one thread calls throws an exception...
+            connect_to_drb()
             return [:drb_exception]
         end
 
@@ -669,8 +694,9 @@ class FailureDispatcher
         end
                 
         revtr = srcdst2revtr[[src,dst]]
+        revtr = revtr.to_sym if revtr.is_a?(String) # dave switched on me...
         
-        if revtr.is_a?(Symbol) 
+        if revtr.is_a?(Symbol)
             # The request failed -- the symbol tells us the cause of the failure
             spoofed_revtr = [revtr]
         else
@@ -732,7 +758,7 @@ if __FILE__ == $0
        Signal.trap("TERM") { monitor.persist_state; exit }
        Signal.trap("KILL") { monitor.persist_state; exit }
 
-       monitor.start_pull_cycle((ARGV.empty?) ? $default_period : ARGV.shift.to_i)
+       monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
     rescue Exception => e
        Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
        monitor.persist_state
