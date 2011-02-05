@@ -55,7 +55,7 @@ module FailureIsolation
     # targets taken from routers on paths beyond Harsha's most well connected PoPs
     FailureIsolation::BeyondHarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt").split("\n"))
     # targets taken from spoofers.hosts
-    FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/one_spoofer_per_site_ips.txt").split("\n"))
+    FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/up_spoofers.ips").split("\n"))
 
     FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
     FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results"
@@ -404,7 +404,7 @@ class ReverseHop < Hop
 
     def to_s()
         s = (@formatted.nil?) ? "" : @formatted.clone
-        s << " [ASN: #{@asn}]"
+        s << " [ASN: #{@asn}]" if @valid_ip
         s << " (pingable from S?: #{@ping_responsive})" if @valid_ip and !@ping_responsive.nil?
         s << " [historically pingable?: #{@last_responsive or "false"}]" if @valid_ip
         s
@@ -486,6 +486,10 @@ class FailureDispatcher
         # quickly isolate the directions of the failures
         srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
         $stderr.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
+
+        # if we control one of the targets, send out spoofed traceroutes in
+        # the opposite direction for ground truth information
+        check4targetswecontrol!(srcdst2stillconnected)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         srcdst2spoofed_tr_ttlhopstuples = issue_spoofed_traceroutes(srcdst2stillconnected)
@@ -502,6 +506,9 @@ class FailureDispatcher
     end
 
     private
+
+    def check4targetswecontrol!(srcdst2stillconnected)
+    end
 
     def get_cached_revtr(src,dst)
         $stderr.puts "get_cached_revtr(#{src}, #{dst})"
