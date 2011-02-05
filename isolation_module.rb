@@ -10,6 +10,8 @@ require 'time'
 require 'fileutils'
 require 'thread'
 require 'reverse_traceroute_cache'
+require 'BgpInfo'
+require 'db_interface'
 require '../spooftr_config.rb' # XXX don't hardcode...
 
 # XXX Don't hardcode!!!
@@ -79,6 +81,7 @@ class FailureMonitor
         @email = email
 
         # TODO: handle these with optparse
+        @@minutes_per_round = 2
         @@timestamp_bound = 605
         @@upper_rounds_bound = 120
         @@lower_rounds_bound = 4
@@ -87,7 +90,7 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
         # how often we send out faulty_node_audit reports
-        @@node_audit_period = 60*60*24 / $default_period_seconds
+        @@node_audit_period = 60*60*24 / $default_period_seconds / 3
 
         @target_set_size = 0
 
@@ -160,7 +163,7 @@ class FailureMonitor
             $LOG.puts "round #{@current_round} completed"
             @current_round += 1
             
-            audit_faulty_nodes if (current_round % ) == 0
+            audit_faulty_nodes if (@current_round % @@node_audit_period) == 0
 
             sleep period
         end
@@ -281,7 +284,7 @@ class FailureMonitor
 
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         formatted_problems_at_the_source = @problems_at_the_source.to_a.map { |x| "#{x[0]} [#{x[1]*100}%]" }
-        formatted_outdated_nodes = @outdated_nodes.to_a.map { |x| "#{x[0]} [#{x[1]} minutes]" }
+        formatted_outdated_nodes = @outdated_nodes.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]" }
         formatted_not_sshable = @not_sshable.to_a
 
         # [node observing outage, target] -> [node1 still connected, node2... ]
@@ -296,14 +299,14 @@ class FailureMonitor
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
            if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
-                  observingnode2rounds.delete_if { |node, rounds| rounds >= @@lower_rounds_bound }.size >= @@vp_bound and
+                  observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and
                   !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil?
 
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
               formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
-              formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1]} minutes]"}
+              formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
               formatted_never_seen = target2neverseen[target]
 
               dataset = FailureIsolation::get_dataset(target)
@@ -318,7 +321,7 @@ class FailureMonitor
               #                                formatted_problems_at_the_source,
               #                                formatted_outdated_nodes, formatted_not_sshable)
 
-              $LOG.puts "Tried to send an outage-detected email for #{target}"
+              # $LOG.puts "Tried to send an outage-detected email for #{target}"
 
               # don't issue isolation measurements for nodes which have
               # already issued measuremnt for this target in the last
@@ -346,18 +349,30 @@ class FailureMonitor
     end
 end
 
-class HistoricalForwardHop
-    attr_accessor :ttl, :ip, :dns, :reverse_path, :ping_responsive
-    def initialize(ttl, ip)
+class Hop
+    attr_accessor :ip, :ttl, :ping_responsive, :last_responsive, :formatted
+
+    def initialize
+        @ping_responsive = false
+        @last_responsive = false
+    end
+
+    def <=>(other)
+        @ttl <=> other.ttl
+    end
+end
+
+class HistoricalForwardHop < Hop
+    attr_accessor :reverse_path
+    def initialize(ttl, ip, ipFormatter)
         @ttl = ttl
         @ip = ip
-        @dns = DNS::resolve_dns(ip, ip) 
+        @dns = ipFormatter.resolve_dns(ip, ip) 
         @reverse_path = []
-        @ping_responsive = false
     end
 
     def to_s()
-       s = "#{@ttl}.  #{@dns} (pingable from S?: #{@ping_responsive})"
+       s = "#{@ttl}.  #{@dns} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive or "false"}]"
        s << "\n  <ul type=none>\n"
        reverse_path.each do |hop|
            s << "    <li> #{hop}</li>\n"
@@ -367,20 +382,47 @@ class HistoricalForwardHop
     end
 end
 
-class ReverseHop
-    attr_accessor :ip, :formatted, :ping_responsive
-    def initialize(formatted)
+class ReverseHop < Hop
+    def initialize(formatted, bgpInfo)
         $stderr.puts "formatted was nil!" if formatted.nil?
         @formatted = formatted
         # could be a true hop, or could be "No matches in the past 1440 minutes!"
-        match = formatted.scan(/\d+.*\((.*)\).*/)
-        #                              hmmmm, hackkkk
-        @ip, @valid_ip = (match.empty?) ? ["0.0.0.0", false] : [match[0][0], true]
+        match = formatted.scan(/^(\d+) .*\((.*)\).*/)
+
+        if match.empty?
+            @ttl = -1
+            @ip = "0.0.0.0"
+            @valid_ip = false
+        else
+            @ttl = match[0][0]
+            @ip = match[0][1]
+            @valid_ip = true
+        end
+
+        @asn = bgpInfo.getASN(@ip)
     end
 
     def to_s()
-        s = (formatted.nil?) ? "" : formatted.clone
+        s = (@formatted.nil?) ? "" : @formatted.clone
+        s << " [ASN: #{@asn}]"
         s << " (pingable from S?: #{@ping_responsive})" if @valid_ip and !@ping_responsive.nil?
+        s << " [historically pingable?: #{@last_responsive or "false"}]" if @valid_ip
+        s
+    end
+end
+
+class ForwardHop < Hop
+    attr_accessor :reverse_path
+    def initialize(ttl, ip, ipFormatter)
+        @ttl = ttl
+        @ip = ip 
+        @formatted = ipFormatter.resolve_dns(ip, ip) 
+        @reverse_path = []
+    end
+
+    def to_s()
+        s = (@formatted.nil?) ? "" : @formatted.clone
+        s << " (pingable from S?: #{@ping_responsive})" if !@ping_responsive.nil?
         s
     end
 end
@@ -399,6 +441,11 @@ class FailureDispatcher
         @mutex = Mutex.new
         connect_to_drb # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
+
+        @bgpInfo = BgpInfo.new
+        @ipFormatter = IpFormatter.new(@bgpInfo)
+        
+        @db = DatabaseInterface.new
 
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
@@ -458,7 +505,7 @@ class FailureDispatcher
 
     def get_cached_revtr(src,dst)
         $stderr.puts "get_cached_revtr(#{src}, #{dst})"
-        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted) }
+        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted, @bgpInfo) }
     end
 
     def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
@@ -476,7 +523,7 @@ class FailureDispatcher
             hop.reverse_path = get_cached_revtr(src, hop.ip)
         end
 
-        spoofed_revtr_hops = issue_spoofed_revtr(src, dst)
+        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
 
         cached_revtr_hops = get_cached_revtr(src, dst)
 
@@ -487,12 +534,16 @@ class FailureDispatcher
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
 
-        # sometims we oddly find that the destination is pingable from the
-        # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include? dst || (!tr_ttlhoptuples.empty? && tr_ttlhoptuples[-1][1] == dst)
+        fetch_historical_pingability!(historical_tr_hops,
+                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
+                                      cached_revtr_hops)
 
         # maybe not threadsafe, but fuckit
         tr_ttlhoptuples = issue_normal_traceroute(src, [dst])
+
+        # sometimes we oddly find that the destination is pingable from the
+        # source after isolation measurements have completed
+        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr_ttlhoptuples)
 
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
@@ -535,14 +586,18 @@ class FailureDispatcher
         # source has no route
         forward_measurements_empty = (tr_ttlhoptuples.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
 
+        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr_ttlhoptuples)
+
         #                                    TODO: Turn this into a global constant 
-        if(!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty)
-            Emailer.deliver_isolation_results(src, DNS::resolve_dns(dst, dst), dataset, direction, formatted_connected, 
+        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
+                !forward_measurements_empty && !tr_reached_dst_AS))
+            Emailer.deliver_isolation_results(src, @ipFormatter.resolve_dns(dst, dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
+
+            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
         if(!testing)
@@ -550,10 +605,8 @@ class FailureDispatcher
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
                                           historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+                                          spoofed_revtr_hops, cached_revtr_hops)
         end
-
-        $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
     end
 
     # output format:
@@ -594,12 +647,31 @@ class FailureDispatcher
     #   -     (still reachable for each hop?)
     #   -
     #   -
+    #
+
+    def tr_reached_dst_AS?(dst, tr_ttlhoptuples)
+        dest_as = @bgpInfo.getASN(dst)
+        last_non_zero_hop = find_last_non_zero_hop_of_tr(tr_ttlhoptuples)
+        last_hop_as = (last_non_zero_hop.nil?) ? nil : @bgpInfo.getASN(last_non_zero_hop)
+        return !dest_as.nil? && !last_hop_as.nil? && dest_as == last_hop_as
+    end
+
+    def find_last_non_zero_hop_of_tr(ttlhoptuples)
+        last_hop = ttlhoptuples.reverse.find { |x| x[1] != "0.0.0.0" }
+        return (last_hop.nil?) ? nil : last_hop[1]
+    end
+
+    def normal_tr_reached?(dst, tr_ttlhoptuples)
+        normal_tr_reached = (!tr_ttlhoptuples.empty? && tr_ttlhoptuples[-1][1] == dst)
+        $stderr.puts "normal_tr_reached?: #{normal_tr_reached}"
+        normal_tr_reached
+    end
 
     def format_ttlhops(ttlhops)
         ttlhops.map do |ttlhops| 
             ttl, hops = ttlhops
             hops = [hops] unless hops.is_a?(Array) or hops.is_a?(Set)
-            resolved_hops = hops.map { |hop| DNS::resolve_dns(hop, hop) }.join ', '
+            resolved_hops = hops.map { |hop| @ipFormatter.resolve_dns(hop, hop) }.join ', '
             "#{ttl}.  #{resolved_hops}"
         end
     end
@@ -615,7 +687,7 @@ class FailureDispatcher
 
         $LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
-        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1]) }, historical_trace_timestamp]
+        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipFormatter) }, historical_trace_timestamp]
     end
 
     def issue_pings_towards_srcs(srcdst2stillconnected)
@@ -675,9 +747,9 @@ class FailureDispatcher
     end
 
     # XXX change me later to deal with revtrs from forward hops
-    def issue_spoofed_revtr(src, dst)
+    def issue_spoofed_revtr(src, dst, historical_hops)
         begin
-            srcdst2revtr = @rtrSvc.get_reverse_paths([[src, dst]])
+            srcdst2revtr = @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return [:drb_connection_refused]
@@ -701,7 +773,7 @@ class FailureDispatcher
             spoofed_revtr = [revtr]
         else
             # XXX string -> array -> string. meh.
-            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted) }
+            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @bgpInfo) }
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
@@ -729,6 +801,23 @@ class FailureDispatcher
         responsive
     end
 
+    public # XXX remove mee....
+    def fetch_historical_pingability!(historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
+        # TODO: redundannnnttt
+        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops]
+        all_targets = Set.new
+        all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
+
+        ip2lastresponsive = @db.fetch_pingability(all_targets.to_a)
+
+        $stderr.puts "fetch_historical_pingability(), ip2lastresponsive #{ip2lastresponsive.inspect}"
+
+        # update historical reachability
+        all_hop_sets.each do |hop_set|
+            hop_set.each { |hop| hop.last_responsive = ip2lastresponsive[hop.ip] }
+        end
+    end
+
     def log_isolation_results(*args)
         t = Time.new
         File.open(FailureIsolation::IsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
@@ -736,8 +825,12 @@ class FailureDispatcher
 end
 
 require 'resolv'
-module DNS
-    def DNS::get_addr(dst)
+class IpFormatter
+    def initialize(bgpInfo)
+        @bgpInfo = bgpInfo
+    end
+
+    def get_addr(dst)
         begin
             dst_ip=Resolv.getaddress(dst)
         rescue
@@ -745,8 +838,10 @@ module DNS
         end
     end
 
-    def DNS::resolve_dns(dst, dst_ip)
-        ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst} (#{dst})" : "#{dst} (#{dst_ip})")
+    def resolve_dns(dst, dst_ip)
+        dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst} (#{dst})" : "#{dst} (#{dst_ip})")
+        dns << " [ASN: #{@bgpInfo.getASN(dst)}]"
+        dns
     end
 end
 
