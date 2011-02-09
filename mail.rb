@@ -112,6 +112,29 @@ class Emailer < ActionMailer::Base
                     :historical_fpath_timestamp => historical_fpath_timestamp,
                     :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr
     end
+    def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
+                          formatted_unconnected, destination_pingable, pings_towards_src,
+                          normal_forward_path, spoofed_forward_path,
+                          dst_normal_forward_path, dst_spoofed_forward_path,
+                          historical_forward_path, historical_fpath_timestamp,
+                          spoofed_revtr, cached_revtr, testing=false)
+        subject     "Ground Truth Isolation Results #{src} #{dst}"
+        from        "failures@cs.washington.edu"
+        recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
+        body        :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
+                    :spoofers_w_connectivity => spoofers_w_connectivity,
+                    :formatted_unconnected => formatted_unconnected,
+                    :destination_pingable => destination_pingable,
+                    :pings_towards_src => pings_towards_src,
+                    :normal_forward_path => normal_forward_path,
+                    :spoofed_forward_path => spoofed_forward_path,
+                    :historical_forward_path => historical_forward_path,
+                    :historical_fpath_timestamp => historical_fpath_timestamp,
+                    :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
+                    :dst_normal_forward_path => dst_normal_forward_path,
+                    :dst_spoofed_forward_path => dst_spoofed_forward_path
+    end
+
     def isolation_exception(exception)
         subject     "Isolation Module Exception"
         from        "failures@cs.washington.edu"

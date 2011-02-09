@@ -49,16 +49,27 @@ module FailureIsolation
 
     FailureIsolation::TargetBlacklist = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
 
-    FailureIsolation::DataSetDir ="/homes/network/revtr/spoofed_traceroute/datasets"
+    def FailureIsolation::read_in_spoofer_hostnames()
+       ip2hostname = {}
+       File.foreach("#{$DATADIR}/up_spoofers_w_ips.txt") do |line|
+          hostname, ip = line.chomp.split  
+          ip2hostname[ip] = hostname
+       end
+       ip2hostname
+    end
+
+    FailureIsolation::DataSetDir = "/homes/network/revtr/spoofed_traceroute/datasets"
     # targets taken from Harsha's most well connected PoPs
     FailureIsolation::HarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_corerouters.txt").split("\n"))
     # targets taken from routers on paths beyond Harsha's most well connected PoPs
     FailureIsolation::BeyondHarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt").split("\n"))
     # targets taken from spoofers.hosts
     FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/up_spoofers.ips").split("\n"))
+    FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
     FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
     FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results"
+    FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
 
     def FailureIsolation::get_dataset(dst)
         if FailureIsolation::HarshaPoPs.include? dst
@@ -73,6 +84,7 @@ module FailureIsolation
             return "Unkown"
         end
     end
+
 end
 
 class FailureMonitor
@@ -210,7 +222,7 @@ class FailureMonitor
 
             failure_percentage = hash.size * 1.0 / @target_set_size
             if failure_percentage > @@source_specific_problem_threshold
-                @problems_at_the_source[node] = failure_percentage
+                @problems_at_the_source[node] = failure_percentage * 100
                 $LOG.puts "Problem at the source: #{node}"
                 next
             end
@@ -350,7 +362,7 @@ class FailureMonitor
 end
 
 class Hop
-    attr_accessor :ip, :ttl, :ping_responsive, :last_responsive, :formatted
+    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
 
     def initialize
         @ping_responsive = false
@@ -364,15 +376,17 @@ end
 
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
-    def initialize(ttl, ip, ipFormatter)
+    def initialize(ttl, ip, ipInfo)
         @ttl = ttl
         @ip = ip
-        @dns = ipFormatter.resolve_dns(ip, ip) 
+        @dns = ipInfo.resolve_dns(@ip, @ip) 
+        @asn = ipInfo.getASN(@ip)
+        @formatted = ipInfo.format(@ip, @dns, @asn)
         @reverse_path = []
     end
 
     def to_s()
-       s = "#{@ttl}.  #{@dns} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive or "false"}]"
+       s = "#{@ttl}.  #{@formatted} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive or "false"}]"
        s << "\n  <ul type=none>\n"
        reverse_path.each do |hop|
            s << "    <li> #{hop}</li>\n"
@@ -383,23 +397,36 @@ class HistoricalForwardHop < Hop
 end
 
 class ReverseHop < Hop
-    def initialize(formatted, bgpInfo)
+    def initialize(formatted, ipInfo)
         $stderr.puts "formatted was nil!" if formatted.nil?
         @formatted = formatted
         # could be a true hop, or could be "No matches in the past 1440 minutes!"
-        match = formatted.scan(/^(\d+) .*\((.*)\).*/)
+        match = formatted.scan(/^(\d+) (.*) \((.*)\).*/)
 
         if match.empty?
             @ttl = -1
+            @dns = ""
             @ip = "0.0.0.0"
             @valid_ip = false
         else
             @ttl = match[0][0]
-            @ip = match[0][1]
+            @dns = match[0][1]
+            @ip = match[0][2]
             @valid_ip = true
         end
 
-        @asn = bgpInfo.getASN(@ip)
+        # deal with the weird case where the IP is not included in the output
+        if @ip !~ /\d+\.\d+\.\d+\.\d+/
+            @dns = @ip
+            @ip = Resolv.getaddress(@ip) 
+        end
+
+        begin
+            @asn = ipInfo.getASN(@ip)
+        rescue Exception => e
+            # XXX for debugging purposes
+            Emailer.deliver_isolation_exception("formatted: #{formatted} \n#{e} \n#{e.backtrace.join("<br />")}") 
+        end
     end
 
     def to_s()
@@ -413,15 +440,33 @@ end
 
 class ForwardHop < Hop
     attr_accessor :reverse_path
-    def initialize(ttl, ip, ipFormatter)
-        @ttl = ttl
-        @ip = ip 
-        @formatted = ipFormatter.resolve_dns(ip, ip) 
+    def initialize(ttlhop, ipInfo)
+        @ttl = ttlhop[0]
+        @ip = ttlhop[1]
+        @dns = ipInfo.resolve_dns(@ip, @ip) 
+        @asn = ipInfo.getASN(@ip)
+        @formatted = ipInfo.format(@ip, @dns, @asn)
         @reverse_path = []
     end
 
     def to_s()
-        s = (@formatted.nil?) ? "" : @formatted.clone
+        s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
+        s << " (pingable from S?: #{@ping_responsive})" if !@ping_responsive.nil?
+        s
+    end
+end
+
+class SpoofedForwardHop < Hop
+    def initialize(ttlhops, ipInfo)
+        @ttl = ttlhops[0]
+        @ip = ttlhops[1][0]  # XXX for now, just take the first ip...
+        @dns = ipInfo.resolve_dns(@ip, @ip) 
+        @asn = ipInfo.getASN(@ip)
+        @formatted = ipInfo.format(@ip, @dns, @asn)
+    end
+
+    def to_s()
+        s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
         s << " (pingable from S?: #{@ping_responsive})" if !@ping_responsive.nil?
         s
     end
@@ -442,8 +487,7 @@ class FailureDispatcher
         connect_to_drb # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
-        @bgpInfo = BgpInfo.new
-        @ipFormatter = IpFormatter.new(@bgpInfo)
+        @ipInfo = IpInfo.new
         
         @db = DatabaseInterface.new
 
@@ -489,37 +533,65 @@ class FailureDispatcher
 
         # if we control one of the targets, send out spoofed traceroutes in
         # the opposite direction for ground truth information
-        check4targetswecontrol!(srcdst2stillconnected)
+        symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
-        srcdst2spoofed_tr_ttlhopstuples = issue_spoofed_traceroutes(srcdst2stillconnected)
+        srcdst2spoofed_tr_ttlhopstuples = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
         $stderr.puts "srcdst2spoofed_tr_ttlhopstuples: #{srcdst2spoofed_tr_ttlhopstuples.inspect}"
 
         # thread out on each src, dst
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
             Thread.new do
-                analyze_results(src, dst, srcdst2stillconnected[srcdst], srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
-                                srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst], testing)
+                if srcdst2dstsrc.include? srcdst
+                    dsthostname, srcip = srcdst2dstsrc[srcdst]
+                    analyze_results_with_symmetry(src, dst, dsthostname, srcip, srcdst2stillconnected[srcdst],
+                                    srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
+                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst],
+                                    srcdst2spoofed_tr_ttlhopstuples[srcdst2dstsrc[srcdst]], testing)
+                else
+                    analyze_results(src, dst, srcdst2stillconnected[srcdst],
+                                    srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
+                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst],
+                                    testing)
+                end
             end
         end
     end
 
     private
 
-    def check4targetswecontrol!(srcdst2stillconnected)
+    def check4targetswecontrol(srcdst2stillconnected, registered_hosts)
+       srcdst2dstsrc = {}
+       symmetric_srcdst2stillconnected = srcdst2stillconnected.clone
+       srcdst2stillconnected.each do |srcdst, stillconnected|
+            src, dst = srcdst
+            if FailureIsolation::SpooferTargets.include? dst
+                hostname = FailureIsolation::SpooferIP2Hostname[dst]
+                if registered_hosts.include? hostname
+                    swapped = [hostname, $pl_host2ip[src]]
+                    $stderr.puts "check4targetswecontrol(), swapped #{swapped.inspect} srcdst #{srcdst.inspect}"
+                    srcdst2dstsrc[srcdst] = swapped
+                    symmetric_srcdst2stillconnected[swapped] = stillconnected
+                end
+            end
+       end
+
+       [symmetric_srcdst2stillconnected, srcdst2dstsrc]
     end
 
     def get_cached_revtr(src,dst)
         $stderr.puts "get_cached_revtr(#{src}, #{dst})"
-        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted, @bgpInfo) }
+        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
     end
 
     def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
-        forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
         reverse_problem = pings_towards_src.empty?
+        forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
+
+        direction = infer_direction(reverse_problem, forward_problem)
 
         # HistoricalForwardHop objects
         historical_tr_hops, historical_trace_timestamp = retrieve_historical_tr(src, dst)
@@ -546,12 +618,123 @@ class FailureDispatcher
                                       cached_revtr_hops)
 
         # maybe not threadsafe, but fuckit
-        tr_ttlhoptuples = issue_normal_traceroute(src, [dst])
+        tr = issue_normal_traceroute(src, [dst])
 
         # sometimes we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr_ttlhoptuples)
+        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
 
+        dataset = FailureIsolation::get_dataset(dst)
+
+        # TODO: encapsulate tr_ttlhopstuples in an object so that .to_s does
+        # this automatically
+        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
+
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
+
+        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
+
+        #                                    TODO: Turn this into a global constant 
+        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
+                !forward_measurements_empty && !tr_reached_dst_AS))
+            Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          tr, formatted_spoofed_tr_ttlhops,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+
+            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+        end
+
+        if(!testing)
+            log_isolation_results(src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          tr, formatted_spoofed_tr_ttlhops,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops)
+        end
+    end
+
+    # XXX TERRIBLY REDUNDANT....
+    def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
+                                      formatted_connected, formatted_unconnected, pings_towards_src,
+                                      spoofed_tr_ttlhopstuples, dst_spoofed_tr_ttlhopstuples, testing=false)
+        $stderr.puts "analyze_results: #{src}, #{dst}"
+
+        reverse_problem = pings_towards_src.empty?
+        forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
+
+        direction = infer_direction(reverse_problem, forward_problem)
+
+        # HistoricalForwardHop objects
+        historical_tr_hops, historical_trace_timestamp = retrieve_historical_tr(src, dst)
+
+        historical_tr_hops.each do |hop|
+            # XXX thread out on this to make it faster? Ask Dave for a faster
+            # way?
+            hop.reverse_path = get_cached_revtr(src, hop.ip)
+        end
+
+        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
+
+        cached_revtr_hops = get_cached_revtr(src, dst)
+
+        # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
+        # are pingeable from the source. Send pings, and append the results to
+        # the strings in the arrays (terrible, terrible, terrible)
+        ping_responsive = issue_pings(src, dst, historical_tr_hops, 
+                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
+                                      cached_revtr_hops)
+
+        fetch_historical_pingability!(historical_tr_hops,
+                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
+                                      cached_revtr_hops)
+
+        # maybe not threadsafe, but fuckit
+        tr = issue_normal_traceroute(src, [dst])
+        dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
+
+        # sometimes we oddly find that the destination is pingable from the
+        # source after isolation measurements have completed
+        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
+
+        dataset = FailureIsolation::get_dataset(dst)
+
+        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
+        formatted_dst_spoofed_tr_ttlhops = format_ttlhops(dst_spoofed_tr_ttlhopstuples)
+
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
+
+        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
+
+        #                                    TODO: Turn this into a global constant 
+        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
+                !forward_measurements_empty && !tr_reached_dst_AS))
+            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          tr, formatted_spoofed_tr_ttlhops,
+                                          tr_dst, formatted_dst_spoofed_tr_ttlhops,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+
+            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+        end
+
+        if(!testing)
+            log_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          tr, formatted_spoofed_tr_ttlhops,
+                                          tr_dst, formatted_dst_spoofed_tr_ttlhops,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+        end
+    end
+
+    def infer_direction(reverse_problem, forward_problem)
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
             direction = "reverse path"
@@ -584,92 +767,23 @@ class FailureDispatcher
             direction = "both paths seem to be working...?"
         end
 
-        dataset = FailureIsolation::get_dataset(dst)
-
-        formatted_tr_ttlhops = format_ttlhops(tr_ttlhoptuples)
-        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
-
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
-        forward_measurements_empty = (tr_ttlhoptuples.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
-
-        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr_ttlhoptuples)
-
-        #                                    TODO: Turn this into a global constant 
-        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS))
-            Emailer.deliver_isolation_results(src, @ipFormatter.resolve_dns(dst, dst), dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
-                                          formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
-
-            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
-        end
-
-        if(!testing)
-            log_isolation_results(src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
-                                          formatted_tr_ttlhops, formatted_spoofed_tr_ttlhops,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops)
-        end
+        direction
     end
 
-    # output format:
-    #
-    # synopsis:
-    #    Source:
-    #    Destination:
-    #    Spoofers with connectivity:
-    #    Failed Router:
-    #    Direction: #{forward/reverse/bidirectional}
-    # ==========================================
-    # succesful receivers for #{target}:     
-    #   -
-    #   -
-    #   -
-    # ==========================================
-    # succesful spoofers for #{target}:
-    #   -
-    #   -
-    #   -
-    # ==========================================
-    # spoofed forward traceroute:
-    #   -     (reverse traceroute for each hop?)
-    #   -
-    #   -
-    # ==========================================
-    # historical forward traceroute:
-    #   -     (can still reach?)
-    #   -
-    #   -
-    # ==========================================
-    # spoofed reverse traceroute:
-    #   -     (can S ping each hop?)
-    #   -
-    #   -
-    # ==========================================
-    # historical reverse traceroute:
-    #   -     (still reachable for each hop?)
-    #   -
-    #   -
-    #
-
-    def tr_reached_dst_AS?(dst, tr_ttlhoptuples)
-        dest_as = @bgpInfo.getASN(dst)
-        last_non_zero_hop = find_last_non_zero_hop_of_tr(tr_ttlhoptuples)
-        last_hop_as = (last_non_zero_hop.nil?) ? nil : @bgpInfo.getASN(last_non_zero_hop)
+    def tr_reached_dst_AS?(dst, tr)
+        dest_as = @ipInfo.getASN(dst)
+        last_non_zero_hop = find_last_non_zero_hop_of_tr(tr)
+        last_hop_as = (last_non_zero_hop.nil?) ? nil : @ipInfo.getASN(last_non_zero_hop)
         return !dest_as.nil? && !last_hop_as.nil? && dest_as == last_hop_as
     end
 
-    def find_last_non_zero_hop_of_tr(ttlhoptuples)
-        last_hop = ttlhoptuples.reverse.find { |x| x[1] != "0.0.0.0" }
-        return (last_hop.nil?) ? nil : last_hop[1]
+    def find_last_non_zero_hop_of_tr(tr)
+        last_hop = tr.reverse.find { |hop| hop.ip != "0.0.0.0" }
+        return (last_hop.nil?) ? nil : last_hop.ip
     end
 
-    def normal_tr_reached?(dst, tr_ttlhoptuples)
-        normal_tr_reached = (!tr_ttlhoptuples.empty? && tr_ttlhoptuples[-1][1] == dst)
+    def normal_tr_reached?(dst, tr)
+        normal_tr_reached = (!tr.empty? && tr[-1].ip == dst)
         $stderr.puts "normal_tr_reached?: #{normal_tr_reached}"
         normal_tr_reached
     end
@@ -678,7 +792,7 @@ class FailureDispatcher
         ttlhops.map do |ttlhops| 
             ttl, hops = ttlhops
             hops = [hops] unless hops.is_a?(Array) or hops.is_a?(Set)
-            resolved_hops = hops.map { |hop| @ipFormatter.resolve_dns(hop, hop) }.join ', '
+            resolved_hops = hops.map { |hop| @ipInfo.format(hop) }.join ', '
             "#{ttl}.  #{resolved_hops}"
         end
     end
@@ -694,7 +808,8 @@ class FailureDispatcher
 
         $LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
-        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipFormatter) }, historical_trace_timestamp]
+        # XXX why is this a nested array?
+        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }, historical_trace_timestamp]
     end
 
     def issue_pings_towards_srcs(srcdst2stillconnected)
@@ -750,7 +865,7 @@ class FailureDispatcher
             tr_ttlhoptuples = dest2ttlhoptuples[dst]
         end
 
-        tr_ttlhoptuples
+        tr_ttlhoptuples.map { |ttlhop| ForwardHop.new(ttlhop, @ipInfo) }
     end
 
     # XXX change me later to deal with revtrs from forward hops
@@ -780,7 +895,7 @@ class FailureDispatcher
             spoofed_revtr = [revtr]
         else
             # XXX string -> array -> string. meh.
-            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @bgpInfo) }
+            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
@@ -808,7 +923,6 @@ class FailureDispatcher
         responsive
     end
 
-    public # XXX remove mee....
     def fetch_historical_pingability!(historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
         # TODO: redundannnnttt
         all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops]
@@ -829,12 +943,17 @@ class FailureDispatcher
         t = Time.new
         File.open(FailureIsolation::IsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
     end
+
+    def log_symmetric_isolation_results(*args)
+        t = Time.new
+        File.open(FailureIsolation::SymmetricIsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
+    end
 end
 
 require 'resolv'
-class IpFormatter
-    def initialize(bgpInfo)
-        @bgpInfo = bgpInfo
+class IpInfo
+    def initialize()
+        @bgpInfo = BgpInfo.new
     end
 
     def get_addr(dst)
@@ -845,10 +964,18 @@ class IpFormatter
         end
     end
 
+    def getASN(ip)
+        @bgpInfo.getASN(ip)  
+    end
+
     def resolve_dns(dst, dst_ip)
         dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst} (#{dst})" : "#{dst} (#{dst_ip})")
-        dns << " [ASN: #{@bgpInfo.getASN(dst)}]"
-        dns
+    end
+
+    def format(ip, dns=nil, asn=nil)
+        dns = resolve_dns(ip, ip) if dns.nil?
+        asn = @bgpInfo.getASN(ip) if asn.nil?
+        "#{dns} (#{ip}) [ASN: #{asn}]"
     end
 end
 

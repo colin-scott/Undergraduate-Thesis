@@ -3,10 +3,10 @@
 require 'isolation_module'
 dispatcher = FailureDispatcher.new
 if ARGV.empty?
-    srcdst = ["planetlab-node3.it-sudparis.eu", "195.178.99.1"]
+    srcdst = ["planetlab-node3.it-sudparis.eu", "132.252.152.193"]
     dispatcher.isolate_outages({ srcdst =>
                ["pl1.6test.edu.cn", "planetlab2.eecs.umich.edu", "planetlab1.nvlab.org",
-                  "plgmu4.ite.gmu.edu", "75-130-96-12.static.oxfr.ma.charter.com" ]},
+                  "plgmu4.ite.gmu.edu", "deimos.cecalc.ula.ve"]},
                {srcdst => []}, {srcdst => []}, true)
 else
     src = ARGV.shift
