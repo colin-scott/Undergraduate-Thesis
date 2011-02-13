@@ -310,10 +310,11 @@ class FailureMonitor
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-           if observingnode2rounds.size >= @@vp_bound and target2stillconnected[target].size >= @@vp_bound and
+           if target2stillconnected[target].size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and
-                  !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil?
+                  !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and
+                  !observingnode2rounds.empty?
 
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
@@ -363,7 +364,6 @@ end
 
 class Hop
     attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
-
     def initialize
         @ping_responsive = false
         @last_responsive = false
@@ -397,11 +397,12 @@ class HistoricalForwardHop < Hop
 end
 
 class ReverseHop < Hop
+    attr_accessor :valid_ip
     def initialize(formatted, ipInfo)
         $stderr.puts "formatted was nil!" if formatted.nil?
         @formatted = formatted
         # could be a true hop, or could be "No matches in the past 1440 minutes!"
-        match = formatted.scan(/^(\d+) (.*) \((.*)\).*/)
+        match = formatted.scan(/^(\d+)(.*)\((.*)\).*/)
 
         if match.empty?
             @ttl = -1
@@ -536,7 +537,7 @@ class FailureDispatcher
         symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
-        srcdst2spoofed_tr_ttlhopstuples = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
+        srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
         $stderr.puts "srcdst2spoofed_tr_ttlhopstuples: #{srcdst2spoofed_tr_ttlhopstuples.inspect}"
 
         # thread out on each src, dst
@@ -547,12 +548,12 @@ class FailureDispatcher
                     dsthostname, srcip = srcdst2dstsrc[srcdst]
                     analyze_results_with_symmetry(src, dst, dsthostname, srcip, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
-                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst],
-                                    srcdst2spoofed_tr_ttlhopstuples[srcdst2dstsrc[srcdst]], testing)
+                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
+                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], testing)
                 else
                     analyze_results(src, dst, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
-                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr_ttlhopstuples[srcdst],
+                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
                                     testing)
                 end
             end
@@ -585,11 +586,11 @@ class FailureDispatcher
         `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
     end
 
-    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr_ttlhopstuples, testing=false)
+    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
         reverse_problem = pings_towards_src.empty?
-        forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
+        forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
 
         direction = infer_direction(reverse_problem, forward_problem)
 
@@ -626,13 +627,9 @@ class FailureDispatcher
 
         dataset = FailureIsolation::get_dataset(dst)
 
-        # TODO: encapsulate tr_ttlhopstuples in an object so that .to_s does
-        # this automatically
-        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
-
         # it's uninteresting if no measurements worked... probably the
         # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
@@ -641,7 +638,7 @@ class FailureDispatcher
                 !forward_measurements_empty && !tr_reached_dst_AS))
             Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, formatted_spoofed_tr_ttlhops,
+                                          tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
 
@@ -651,7 +648,7 @@ class FailureDispatcher
         if(!testing)
             log_isolation_results(src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, formatted_spoofed_tr_ttlhops,
+                                          tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops)
         end
@@ -660,11 +657,11 @@ class FailureDispatcher
     # XXX TERRIBLY REDUNDANT....
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
-                                      spoofed_tr_ttlhopstuples, dst_spoofed_tr_ttlhopstuples, testing=false)
+                                      spoofed_tr, dst_spoofed_tr, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
         reverse_problem = pings_towards_src.empty?
-        forward_problem = spoofed_tr_ttlhopstuples.find { |ttlhops| ttlhops[1].include? dst }.nil?
+        forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
 
         direction = infer_direction(reverse_problem, forward_problem)
 
@@ -702,12 +699,9 @@ class FailureDispatcher
 
         dataset = FailureIsolation::get_dataset(dst)
 
-        formatted_spoofed_tr_ttlhops = format_ttlhops(spoofed_tr_ttlhopstuples)
-        formatted_dst_spoofed_tr_ttlhops = format_ttlhops(dst_spoofed_tr_ttlhopstuples)
-
         # it's uninteresting if no measurements worked... probably the
         # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr_ttlhopstuples.size <= 1)
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
@@ -716,8 +710,8 @@ class FailureDispatcher
                 !forward_measurements_empty && !tr_reached_dst_AS))
             Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, formatted_spoofed_tr_ttlhops,
-                                          tr_dst, formatted_dst_spoofed_tr_ttlhops,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
 
@@ -727,8 +721,8 @@ class FailureDispatcher
         if(!testing)
             log_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, formatted_spoofed_tr_ttlhops,
-                                          tr_dst, formatted_dst_spoofed_tr_ttlhops,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
         end
@@ -788,15 +782,6 @@ class FailureDispatcher
         normal_tr_reached
     end
 
-    def format_ttlhops(ttlhops)
-        ttlhops.map do |ttlhops| 
-            ttl, hops = ttlhops
-            hops = [hops] unless hops.is_a?(Array) or hops.is_a?(Set)
-            resolved_hops = hops.map { |hop| @ipInfo.format(hop) }.join ', '
-            "#{ttl}.  #{resolved_hops}"
-        end
-    end
-    
     def retrieve_historical_tr(src, dst)
         if @node2target2trace.include? src and @node2target2trace[src].include? dst
             historical_tr_ttlhoptuples = @node2target2trace[src][dst]
@@ -836,20 +821,20 @@ class FailureDispatcher
         $LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
         srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
 
-        srcdst2spoofed_tr_ttlhopstuples = {}
+        srcdst2spoofed_tr = {}
 
         $LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2sortedttlrtrs.inspect}"
 
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
             if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
-                srcdst2spoofed_tr_ttlhopstuples[srcdst] = []
+                srcdst2spoofed_tr[srcdst] = []
             else
-                srcdst2spoofed_tr_ttlhopstuples[srcdst] = srcdst2sortedttlrtrs[srcdst]
+                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map { |ttlrtrs| SpoofedForwardHop.new(ttlrtrs, @ipInfo) }
             end
         end
 
-        srcdst2spoofed_tr_ttlhopstuples
+        srcdst2spoofed_tr
     end
 
     # precondition: targets is a single element array
@@ -969,7 +954,7 @@ class IpInfo
     end
 
     def resolve_dns(dst, dst_ip)
-        dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst} (#{dst})" : "#{dst} (#{dst_ip})")
+        dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst}" : "#{dst}")
     end
 
     def format(ip, dns=nil, asn=nil)

@@ -149,6 +149,12 @@ class Emailer < ActionMailer::Base
                      :problems_at_the_source => problems_at_the_source,
                      :not_sshable => not_sshable
     end
+    def test(jpg_path)
+        subject     "testing"
+        from        "cs@cs.washington.edu"
+        recipients  "cs@cs.washington.edu"
+        attachment  :filename => File.basename(jpg_path), :content_type => "image/jpeg", :body => File.read(jpg_path) 
+    end
 end
 
 def email_and_die
