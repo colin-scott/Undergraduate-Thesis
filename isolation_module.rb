@@ -68,7 +68,8 @@ module FailureIsolation
     FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
     FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
-    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results"
+    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev2"
+    FailureIsolation::DotFiles = "#{$DATADIR}/dots"
     FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
 
     def FailureIsolation::get_dataset(dst)
@@ -84,7 +85,6 @@ module FailureIsolation
             return "Unkown"
         end
     end
-
 end
 
 class FailureMonitor
@@ -538,7 +538,7 @@ class FailureDispatcher
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
-        $stderr.puts "srcdst2spoofed_tr_ttlhopstuples: #{srcdst2spoofed_tr_ttlhopstuples.inspect}"
+        $stderr.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
         # thread out on each src, dst
         srcdst2stillconnected.keys.each do |srcdst|
@@ -645,12 +645,17 @@ class FailureDispatcher
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
+        log_name = get_uniq_filename(src, dst)
+
         if(!testing)
-            log_isolation_results(src, dst, dataset, direction, formatted_connected, 
+            log_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops)
+
+            Dot::create_dot_file(direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops, "#{FailureIsolation::DotFiles}/#{log_name}.dot")
         end
     end
 
@@ -718,13 +723,18 @@ class FailureDispatcher
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
+        log_name = get_uniq_filename(src, dst)
+
         if(!testing)
-            log_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+            log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
+
+            Dot::create_dot_file(direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops, "#{FailureIsolation::DotFiles}/#{log_name}.dot")
         end
     end
 
@@ -924,14 +934,21 @@ class FailureDispatcher
         end
     end
 
-    def log_isolation_results(*args)
+    def get_uniq_filename(src, dst)
         t = Time.new
-        File.open(FailureIsolation::IsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
+        "#{src}#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}"
     end
 
+    # first arg must be the filename
+    def log_isolation_results(*args)
+        filename = args.shift
+        File.open(FailureIsolation::IsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
+    end
+
+    # first arg must be the filename
     def log_symmetric_isolation_results(*args)
-        t = Time.new
-        File.open(FailureIsolation::SymmetricIsolationResults+"/#{args[0]}#{args[1]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
+        filename = args.shift
+        File.open(FailureIsolation::SymmetricIsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
     end
 end
 
