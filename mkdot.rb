@@ -1,7 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 # TODO:
-#    * handle 0.0.0.0's more elegantly. * To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
+#    * handle 0.0.0.0's more elegantly. To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
 #       nodes as the hop before them and the hop after them, and say the number of *s in a row? this
 #       would collapse these cases while keeping distinct ones that should be distinct
 #    * For paths that don't reach, should we connect them to the dst / src, with a special edge indicating 
@@ -207,7 +207,7 @@ module Dot
                 dot.puts edge + "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\"];"
               end
               if edge_seen_in_measurements[[node,neighbor,:historic_revtr]]
-                dot.puts edge + "color=\"green\", arrowhead=\"none\", arrowtail=\"normal\"];"
+                dot.puts edge + "style=\"dotted\", color=\"green\", arrowhead=\"none\", arrowtail=\"normal\"];"
               end
             end
           end
