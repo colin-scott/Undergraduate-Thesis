@@ -1,0 +1,7 @@
+Run controller with:
+
+./controller -t -c ../spooftr_config.rb
+
+Run ping client with:
+
+./spoofed_ping_client.rb -c [registrar URI] -t [proberoute dir] -o [output directory]
