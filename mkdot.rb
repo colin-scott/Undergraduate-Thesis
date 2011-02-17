@@ -9,6 +9,8 @@
 #    * use a different alias dataset
 #    * label the reverse links were symmetry was assumed
 #    * graphs really need a legend -> include a link in the emails 
+#    * fix the bug where there are gaps in the spoofed traceroute ttls ->
+#         false edges
 
 require 'hops'
 require 'ip_info'

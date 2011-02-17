@@ -75,6 +75,8 @@ module FailureIsolation
     FailureIsolation::DotFiles = "#{$DATADIR}/dots"
     FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
 
+    FailureIsolation::WebDirectory = "/homes/network/revtr/www/isolation_graphs"
+
     def FailureIsolation::get_dataset(dst)
         if FailureIsolation::HarshaPoPs.include? dst
             return "Harsha's most well-connected PoPs"
@@ -649,9 +651,13 @@ class FailureDispatcher
     end
 
     def generate_web_symlink(jpg_output)
+        t = Time.new
+        subdir = "#{t.year}.#{t.month}.#{t.day}"
+        abs_path = FailureIsolation::WebDirectory+"/"+subdir
+        FileUtils.mkdir_p(abs_path)
         basename = File.basename(jpg_output)
-        File.symlink(jpg_output, "/homes/network/revtr/www/isolation_graphs/#{basename}")
-        "http://revtr.cs.washington.edu/isolation_graphs/#{basename}"
+        File.symlink(jpg_output, abs_path+"/#{basename}")
+        "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
     def infer_direction(reverse_problem, forward_problem)
@@ -853,7 +859,7 @@ class FailureDispatcher
 
     def get_uniq_filename(src, dst)
         t = Time.new
-        "#{src}#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}"
+        "#{src}_#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}"
     end
 
     # first arg must be the filename
