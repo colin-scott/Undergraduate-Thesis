@@ -207,7 +207,7 @@ module Dot
                 dot.puts edge + "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\"];"
               end
               if edge_seen_in_measurements[[node,neighbor,:historic_revtr]]
-                dot.puts edge + "style=\"dotted\", color=\"green\", arrowhead=\"none\", arrowtail=\"normal\"];"
+                dot.puts edge + "style=\"dotted\", color=\"red\", arrowhead=\"none\", arrowtail=\"normal\"];"
               end
             end
           end
