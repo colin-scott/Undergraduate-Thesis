@@ -1,6 +1,14 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-# TODO: handle 0.0.0.0's
+# TODO:
+#    * handle 0.0.0.0's more elegantly. * To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
+#       nodes as the hop before them and the hop after them, and say the number of *s in a row? this
+#       would collapse these cases while keeping distinct ones that should be distinct
+#    * For paths that don't reach, should we connect them to the dst / src, with a special edge indicating 
+#        that it didn't work? This will tie the images together.
+#    * use a different alias dataset
+#    * label the reverse links were symmetry was assumed
+#    * graphs really need a legend -> include a link in the emails 
 
 require 'hops'
 require 'ip_info'
@@ -19,14 +27,15 @@ module Dot
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
         self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, dot_output)
+        # TODO: once support installs graphviz on slider, I should run dot
+        # locally rather than pushing the bits across the wire
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
-    private
-
     def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, output)
-        # we want to keep all 0.0.0.0's distinct in the final graph
-        oooo_marker = "a" # FUUCKKK. this is ugly. turn Dot into an object?
+        # we want to keep all 0.0.0.0's distinct in the final graph, so
+        # we append this marker to each 0.0.0.0 node to keep them distinct
+        oooo_marker = "a" # FUUCKKK. this is ugly 
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
@@ -71,6 +80,8 @@ module Dot
             add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         end
         add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        # dave returns a symbol if the revtr request failed... TODO: this
+        # filtering should happen at a higher level
         add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
 
         node2names.each_pair do |node,ips|
@@ -87,18 +98,22 @@ module Dot
 
         assign_colors(node2asn, node_attributes)
 
-        $stderr.puts "node2pingable: #{node2pingable.inspect}"
-        $stderr.puts "node2historicallypingable: #{node2historicallypingable.inspect}"
+        if $DEBUG
+            $stderr.puts "node2pingable: #{node2pingable.inspect}"
+            $stderr.puts "node2historicallypingable: #{node2historicallypingable.inspect}"
+        end
 
         output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, node2neighbors, edge_seen_in_measurements, output)
     end
+
+    private
 
     def self.assign_colors(node2asn, node_attributes)
         all_ases = node2asn.values.uniq
         asn2color = {}
         i = 0
         all_ases.each do |asn|
-           next if asn.nil?
+           next if asn.nil?     # nil asn's get assigned to black by default
            asn2color[asn] = Dot::Colors[i] 
            i += 1
            raise "too many asns!" if i >= Dot::Colors.size
@@ -113,15 +128,22 @@ module Dot
         previous = nil
         current = nil
         for hop in path
-          next if (type == :revtr || type == :historic_revtr) && hop.valid_ip == false # could be nil for ForwardHop objects...
+          # we include the preamble of the reverse traceroute output as a "hop" -- make sure to exclude
+          # preamble from the graph. 
+          # we use hop.valid_ip == false rather than !hop.valid_ip because
+          # valid_ip will be nil for ForwardHop objects
+          next if (type == :revtr || type == :historic_revtr) && hop.valid_ip == false 
           previous = current
           ip = hop.ip
-          ip = ip + oooo_marker.next! if ip == "0.0.0.0"
+          ip += oooo_marker.next! if ip == "0.0.0.0"
           current = $ip2cluster[ip]
           name = (hop.dns.empty?) ? hop.ip : hop.dns
           node2names[current] << name
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
+          # TODO: distinguish between a hop being historically unresponsive
+          # (hop.last_responsive.nil?) from a hop not found in the pingability
+          # DB (hop.last_responsive == "N/A")
           last_responsive = (hop.last_responsive == "N/A") ? false : hop.last_responsive
           node2historicallypingable[current] ||= last_responsive
 
