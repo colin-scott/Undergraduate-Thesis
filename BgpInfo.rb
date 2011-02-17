@@ -47,6 +47,7 @@ class BgpInfo
                 unless line =~ /^\d+\.\d+\.\d+\.\d+\/\d+\s+\S+$/
            
             advertisedPrefix, asn = line.chomp.split
+                    # TODO: asn = asn.to_i? what about '*'s though?
             pt.add advertisedPrefix, asn
         end
         pt

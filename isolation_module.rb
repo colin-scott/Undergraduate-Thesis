@@ -10,8 +10,11 @@ require 'time'
 require 'fileutils'
 require 'thread'
 require 'reverse_traceroute_cache'
-require 'BgpInfo'
+require 'ip_info'
+require 'mkdot'
+require 'hops'
 require 'db_interface'
+require 'base64'
 require '../spooftr_config.rb' # XXX don't hardcode...
 
 # XXX Don't hardcode!!!
@@ -119,6 +122,7 @@ class FailureMonitor
         @@never_seen_yml = "./targets_never_seen.yml"
         begin
             @vps_2_targets_never_seen = YAML.load_file(@@never_seen_yml)
+            raise unless @vps_2_targets_never_seen
         rescue
             @vps_2_targets_never_seen = {}
 
@@ -130,6 +134,7 @@ class FailureMonitor
         begin
             # [node, target] -> last time outage was observed
             @nodetarget2lastoutage = (File.readable? @@last_outage_yml) ? YAML.load_file(@@last_outage_yml) : {}
+            raise unless @nodetarget2lastoutage.is_a?(Hash)
         rescue
             @nodetarget2lastoutage = {}
         end
@@ -362,117 +367,6 @@ class FailureMonitor
     end
 end
 
-class Hop
-    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
-    def initialize
-        @ping_responsive = false
-        @last_responsive = false
-    end
-
-    def <=>(other)
-        @ttl <=> other.ttl
-    end
-end
-
-class HistoricalForwardHop < Hop
-    attr_accessor :reverse_path
-    def initialize(ttl, ip, ipInfo)
-        @ttl = ttl
-        @ip = ip
-        @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
-        @formatted = ipInfo.format(@ip, @dns, @asn)
-        @reverse_path = []
-    end
-
-    def to_s()
-       s = "#{@ttl}.  #{@formatted} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive or "false"}]"
-       s << "\n  <ul type=none>\n"
-       reverse_path.each do |hop|
-           s << "    <li> #{hop}</li>\n"
-       end
-       s << "  </ul>\n"
-       s
-    end
-end
-
-class ReverseHop < Hop
-    attr_accessor :valid_ip
-    def initialize(formatted, ipInfo)
-        $stderr.puts "formatted was nil!" if formatted.nil?
-        @formatted = formatted
-        # could be a true hop, or could be "No matches in the past 1440 minutes!"
-        match = formatted.scan(/^(\d+)(.*)\((.*)\).*/)
-
-        if match.empty?
-            @ttl = -1
-            @dns = ""
-            @ip = "0.0.0.0"
-            @valid_ip = false
-        else
-            @ttl = match[0][0]
-            @dns = match[0][1]
-            @ip = match[0][2]
-            @valid_ip = true
-        end
-
-        # deal with the weird case where the IP is not included in the output
-        if @ip !~ /\d+\.\d+\.\d+\.\d+/
-            @dns = @ip
-            @ip = Resolv.getaddress(@ip) 
-        end
-
-        begin
-            @asn = ipInfo.getASN(@ip)
-        rescue Exception => e
-            # XXX for debugging purposes
-            Emailer.deliver_isolation_exception("formatted: #{formatted} \n#{e} \n#{e.backtrace.join("<br />")}") 
-        end
-    end
-
-    def to_s()
-        s = (@formatted.nil?) ? "" : @formatted.clone
-        s << " [ASN: #{@asn}]" if @valid_ip
-        s << " (pingable from S?: #{@ping_responsive})" if @valid_ip and !@ping_responsive.nil?
-        s << " [historically pingable?: #{@last_responsive or "false"}]" if @valid_ip
-        s
-    end
-end
-
-class ForwardHop < Hop
-    attr_accessor :reverse_path
-    def initialize(ttlhop, ipInfo)
-        @ttl = ttlhop[0]
-        @ip = ttlhop[1]
-        @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
-        @formatted = ipInfo.format(@ip, @dns, @asn)
-        @reverse_path = []
-    end
-
-    def to_s()
-        s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
-        s << " (pingable from S?: #{@ping_responsive})" if !@ping_responsive.nil?
-        s
-    end
-end
-
-class SpoofedForwardHop < Hop
-    def initialize(ttlhops, ipInfo)
-        @ttl = ttlhops[0]
-        @ip = ttlhops[1][0]  # XXX for now, just take the first ip...
-        @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
-        @formatted = ipInfo.format(@ip, @dns, @asn)
-    end
-
-    def to_s()
-        s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
-        s << " (pingable from S?: #{@ping_responsive})" if !@ping_responsive.nil?
-        s
-    end
-end
-
 class FailureDispatcher
     def initialize
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
@@ -633,19 +527,30 @@ class FailureDispatcher
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
+        log_name = get_uniq_filename(src, dst)
+
+        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
+
+        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops, jpg_output)
+
+
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
                 !forward_measurements_empty && !tr_reached_dst_AS))
+
+            graph_url = generate_web_symlink(jpg_output)
+
             Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
+
+            # Emailer.deliver_dot_graph(jpg_output)
 
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
-
-        log_name = get_uniq_filename(src, dst)
 
         if(!testing)
             log_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
@@ -653,9 +558,6 @@ class FailureDispatcher
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops)
-
-            Dot::create_dot_file(direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops, "#{FailureIsolation::DotFiles}/#{log_name}.dot")
         end
     end
 
@@ -710,20 +612,31 @@ class FailureDispatcher
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
+        log_name = get_uniq_filename(src, dst)
+
+        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
+
+        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops, jpg_output)
+
+
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
                 !forward_measurements_empty && !tr_reached_dst_AS))
+             
+            graph_url = generate_web_symlink(jpg_output)
+
             Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
+
+            # Emailer.deliver_dot_graph(jpg_output)
 
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
-
-        log_name = get_uniq_filename(src, dst)
 
         if(!testing)
             log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
@@ -732,10 +645,13 @@ class FailureDispatcher
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, testing)
-
-            Dot::create_dot_file(direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops, "#{FailureIsolation::DotFiles}/#{log_name}.dot")
         end
+    end
+
+    def generate_web_symlink(jpg_output)
+        basename = File.basename(jpg_output)
+        File.symlink(jpg_output, "/homes/network/revtr/www/isolation_graphs/#{basename}")
+        "http://revtr.cs.washington.edu/isolation_graphs/#{basename}"
     end
 
     def infer_direction(reverse_problem, forward_problem)
@@ -866,7 +782,8 @@ class FailureDispatcher
     # XXX change me later to deal with revtrs from forward hops
     def issue_spoofed_revtr(src, dst, historical_hops)
         begin
-            srcdst2revtr = @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
+            srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
+                                                      @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return [:drb_connection_refused]
@@ -949,35 +866,6 @@ class FailureDispatcher
     def log_symmetric_isolation_results(*args)
         filename = args.shift
         File.open(FailureIsolation::SymmetricIsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
-    end
-end
-
-require 'resolv'
-class IpInfo
-    def initialize()
-        @bgpInfo = BgpInfo.new
-    end
-
-    def get_addr(dst)
-        begin
-            dst_ip=Resolv.getaddress(dst)
-        rescue
-            $stderr.puts "Unable to resolve #{dst}: #{$!}"
-        end
-    end
-
-    def getASN(ip)
-        @bgpInfo.getASN(ip)  
-    end
-
-    def resolve_dns(dst, dst_ip)
-        dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst}" : "#{dst}")
-    end
-
-    def format(ip, dns=nil, asn=nil)
-        dns = resolve_dns(ip, ip) if dns.nil?
-        asn = @bgpInfo.getASN(ip) if asn.nil?
-        "#{dns} (#{ip}) [ASN: #{asn}]"
     end
 end
 
