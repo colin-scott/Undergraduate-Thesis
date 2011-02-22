@@ -33,23 +33,29 @@ class HistoricalForwardHop < Hop
 end
 
 class ReverseHop < Hop
-    attr_accessor :valid_ip
+    attr_accessor :valid_ip, :type
     def initialize(formatted, ipInfo)
         $stderr.puts "formatted was nil!" if formatted.nil?
         @formatted = formatted
         # could be a true hop, or could be "No matches in the past 1440 minutes!"
-        match = formatted.scan(/^[ ]*(\d+)(.*)\((.*)\).*/)
+        # XXX: I don't like how fragile this regex is.... if Dave changes the
+        # output format...   Use the actual ReverseTraceroute object rather
+        # than parsing the output string
+        match = formatted.scan(/^[ ]*(\d+)(.*)\((.*)\).*(rr|ts|sym|tr2src|dst|tr)/)
 
         if match.empty?
             @ttl = -1
             @dns = ""
             @ip = "0.0.0.0"
             @valid_ip = false
+            @type = nil
         else
             @ttl = match[0][0]
             @dns = match[0][1].strip
             @ip = match[0][2]
             @valid_ip = true
+            @type = match[0][3]
+            @type = @type.to_sym unless @type.nil?
         end
 
         # deal with the weird case where the IP is not included in the output

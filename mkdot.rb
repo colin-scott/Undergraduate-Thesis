@@ -53,9 +53,12 @@ module Dot
         
         # cluster -> ( attribute -> value )
         node_attributes=Hash.new{|hash,key| hash[key]= Hash.new}
-        
+
         # [cluster,cluster] -> (attribute -> value)
         edge_attributes=Hash.new{|hash,key| hash[key]= Hash.new(0)}
+
+        # [cluster,cluster]
+        symmetric_revtr_links = Set.new
         
         # cluster -> (cluster -> bool)
         node2neighbors=Hash.new{|hash,key| hash[key]=Hash.new(false)}
@@ -75,16 +78,16 @@ module Dot
 
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
         # one-time-use object?
-        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         historic_tr.each do |hop|
-            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         end
-        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         # dave returns a symbol if the revtr request failed... TODO: this
         # filtering should happen at a higher level
-        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
+        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
 
         node2names.each_pair do |node,ips|
             node_attributes[node]["label"] = ips.uniq.sort.join(" ").gsub(" ", "\\n")
@@ -105,7 +108,7 @@ module Dot
             $stderr.puts "node2historicallypingable: #{node2historicallypingable.inspect}"
         end
 
-        output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, node2neighbors, edge_seen_in_measurements, output)
+        output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)
     end
 
     private
@@ -126,15 +129,13 @@ module Dot
         end
     end
     
-    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable, edge_attributes, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         previous = nil
         current = nil
         for hop in path
           # we include the preamble of the reverse traceroute output as a "hop" -- make sure to exclude
           # preamble from the graph. 
-          # we use hop.valid_ip == false rather than !hop.valid_ip because
-          # valid_ip will be nil for ForwardHop objects
-          next if (type == :revtr || type == :historic_revtr) && hop.valid_ip == false 
+          next if hop.is_a?(ReverseHop) && !hop.valid_ip
           previous = current
           ip = hop.ip
           ip += oooo_marker.next! if ip == "0.0.0.0"
@@ -150,7 +151,9 @@ module Dot
           node2historicallypingable[current] ||= last_responsive
 
           if previous
-            if type == :revtr || type == :historic_revtr
+            if hop.is_a?(ReverseHop)
+              # we annotate reverse links where symmetry was assumed
+              symmetric_revtr_links.add [current, previous] if hop.type == :sym 
               node2neighbors[current][previous] = true
               edge_seen_in_measurements[[current, previous, type]] = true
             else
@@ -163,7 +166,7 @@ module Dot
     
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
-    def self.output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, node2neighbors, edge_seen_in_measurements, dotfn)
+    def self.output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataSet: #{dataset}\""
@@ -181,7 +184,7 @@ module Dot
               edge= "  \"#{node}\" -> \"#{neighbor}\" ["
               attributes = ""
               edge_attributes[[node,neighbor]].each_pair{|k,v|
-                attributes += "#{k}=\"#{v}\", "
+                attributes += "#{k}=\"#{v}\", " 
               }
               edge = edge + attributes
               if edge_seen_in_measurements[[node,neighbor,:tr]]
@@ -190,26 +193,38 @@ module Dot
         #        if not edge_attributes[[node,neighbor]].has_key?("style")
         #          tre += "style=\"dotted\", "
         #        end
-                tre[-2..-1]="];"
+                tre[-2..-1]="];" 
                 dot.puts tre
               end
               if edge_seen_in_measurements[[node,neighbor,:spoofed_tr]]
                 tre=edge
-                tre += "color=\"blue\",style=\"solid\", "
-                tre[-2..-1]="];"
+                tre += "color=\"blue\",style=\"solid\"];"
                 dot.puts tre
               end
               if edge_seen_in_measurements[[node,neighbor,:historic_tr]]
                 tre=edge
-                tre += "style=\"dotted\", "
-                tre[-2..-1]="];"
+                tre += "style=\"dotted\"];"
                 dot.puts tre
               end
               if edge_seen_in_measurements[[node,neighbor,:revtr]]
-                dot.puts edge + "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\"];"
+                rtre = edge
+                rtre += "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\", "
+                if symmetric_revtr_links.include? [node,neighbor]
+                    rtre += "label=\"sym\", "
+                end
+
+                rtre[-2..-1]="];" 
+                dot.puts rtre
               end
               if edge_seen_in_measurements[[node,neighbor,:historic_revtr]]
-                dot.puts edge + "style=\"dotted\", color=\"red\", arrowhead=\"none\", arrowtail=\"normal\"];"
+                rtre = edge
+                rtre += "style=\"dotted\", color=\"red\", arrowhead=\"none\", arrowtail=\"normal\", "
+                if symmetric_revtr_links.include? [node,neighbor]
+                    rtre += "label=\"sym\", "
+                end
+
+                rtre[-2..-1]="];" 
+                dot.puts rtre
               end
             end
           end

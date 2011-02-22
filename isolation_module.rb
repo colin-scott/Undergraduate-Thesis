@@ -14,7 +14,6 @@ require 'ip_info'
 require 'mkdot'
 require 'hops'
 require 'db_interface'
-require 'base64'
 require '../spooftr_config.rb' # XXX don't hardcode...
 
 # XXX Don't hardcode!!!
@@ -529,6 +528,8 @@ class FailureDispatcher
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
+        no_historical_trace = (historical_tr_hops.empty?)
+
         log_name = get_uniq_filename(src, dst)
 
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
@@ -539,7 +540,7 @@ class FailureDispatcher
 
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS))
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace))
 
             graph_url = generate_web_symlink(jpg_output)
 
@@ -612,6 +613,8 @@ class FailureDispatcher
         # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
 
+        no_historical_trace = (historical_tr_hops.empty?)
+
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
         log_name = get_uniq_filename(src, dst)
@@ -624,7 +627,7 @@ class FailureDispatcher
 
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS))
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace))
              
             graph_url = generate_web_symlink(jpg_output)
 
@@ -859,7 +862,7 @@ class FailureDispatcher
 
     def get_uniq_filename(src, dst)
         t = Time.new
-        "#{src}_#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}"
+        "#{src}_#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}#{t.sec}"
     end
 
     # first arg must be the filename
@@ -876,6 +879,13 @@ class FailureDispatcher
 end
 
 if __FILE__ == $0
+    Signal.trap("USR1") do 
+        $LOG.puts "reloading modules.."
+        load 'ip_info'
+        load 'mkdot'
+        load 'hops'
+        load 'db_interface'
+    end
     begin
        dispatcher = FailureDispatcher.new
        monitor = FailureMonitor.new(dispatcher)
