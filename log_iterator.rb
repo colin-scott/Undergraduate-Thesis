@@ -6,7 +6,10 @@ module LogIterator
     def LogIterator::iterate(&block)
         Dir.chdir FailureIsolation::IsolationResults do
             Dir.glob("*yml").each do |file|
+                begin
                 self.read_log(file, &block)
+                rescue
+                end
             end
         end
     end
@@ -26,18 +29,15 @@ end
 if __FILE__ == $0
     require 'isolation_module'
     require 'mkdot'
+
+    directions = Hash.new(0)
+
     LogIterator::iterate() do |file, src, dst, dataset, direction, formatted_connected, formatted_unconnected,
                      destination_pingable, pings_towards_src, tr,
                      spoofed_tr, historic_tr, historical_trace_timestamp,
                      revtr, historic_revtr, testing|
-
-        dot_output = "#{FailureIsolation::IsolationResults}/#{file.gsub(/yml$/, 'dot')}"
-
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
-        if(!testing && !destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty)
-
-           Dot::create_dot_file(direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, dot_output)
-        end
+        directions[direction] += 1
     end
+
+    puts directions.inspect
 end

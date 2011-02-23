@@ -528,23 +528,27 @@ class FailureDispatcher
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
+        no_pings_at_all = (ping_responsive.empty?)
+
         no_historical_trace = (historical_tr_hops.empty?)
 
         log_name = get_uniq_filename(src, dst)
 
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+        formatted_dst = @ipInfo.format(dst)
+
+        Dot::generate_jpg(src, formatted_dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops, jpg_output)
 
 
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace))
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
 
             graph_url = generate_web_symlink(jpg_output)
 
-            Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+            Emailer.deliver_isolation_results(src, formatted_dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, destination_pingable, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
@@ -613,6 +617,8 @@ class FailureDispatcher
         # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
 
+        no_pings_at_all = (ping_responsive.empty?)
+
         no_historical_trace = (historical_tr_hops.empty?)
 
         tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
@@ -627,7 +633,7 @@ class FailureDispatcher
 
         #                                    TODO: Turn this into a global constant 
         if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace))
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
              
             graph_url = generate_web_symlink(jpg_output)
 
