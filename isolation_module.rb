@@ -494,11 +494,12 @@ class FailureDispatcher
         direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
             ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
 
-                
-        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
-            log_name = get_uniq_filename(src, dst)
+        log_name = get_uniq_filename(src, dst)
 
-            jpg_output = generate_jpg(log_name)
+        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops)
 
             graph_url = generate_web_symlink(jpg_output)
 
@@ -530,10 +531,12 @@ class FailureDispatcher
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
 
+        log_name = get_uniq_filename(src, dst)
+        
         if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
-            log_name = get_uniq_filename(src, dst)
 
-            jpg_output = generate_jpg(log_name)
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops)
  
             graph_url = generate_web_symlink(jpg_output)
 
@@ -617,10 +620,11 @@ class FailureDispatcher
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
     end
 
-    def generate_jpg(log_name)
+    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops)
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
-        Dot::generate_jpg(src, @ipInfo.resolve_dns(dst), direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops, jpg_output)
 
         jpg_output
