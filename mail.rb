@@ -95,7 +95,7 @@ class Emailer < ActionMailer::Base
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
     def isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
-                          formatted_unconnected, destination_pingable, pings_towards_src,
+                          formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
                           spoofed_revtr, cached_revtr, jpg_url, testing=false)
@@ -106,7 +106,6 @@ class Emailer < ActionMailer::Base
         body :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
                     :spoofers_w_connectivity => spoofers_w_connectivity,
                     :formatted_unconnected => formatted_unconnected,
-                    :destination_pingable => destination_pingable,
                     :pings_towards_src => pings_towards_src,
                     :normal_forward_path => normal_forward_path,
                     :spoofed_forward_path => spoofed_forward_path,
@@ -116,7 +115,7 @@ class Emailer < ActionMailer::Base
                     :jpg_url => jpg_url
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
-                          formatted_unconnected, destination_pingable, pings_towards_src,
+                          formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           dst_normal_forward_path, dst_spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
@@ -127,7 +126,6 @@ class Emailer < ActionMailer::Base
         body        :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
                     :spoofers_w_connectivity => spoofers_w_connectivity,
                     :formatted_unconnected => formatted_unconnected,
-                    :destination_pingable => destination_pingable,
                     :pings_towards_src => pings_towards_src,
                     :normal_forward_path => normal_forward_path,
                     :spoofed_forward_path => spoofed_forward_path,

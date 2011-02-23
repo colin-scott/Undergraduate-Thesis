@@ -70,9 +70,16 @@ module FailureIsolation
     FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
     FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
-    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev2"
+
+    # I keep changing the format of the logs....
+    FailureIsolation::OlderIsolationResults = "#{$DATADIR}/isolation_results"
+    FailureIsolation::LastIsolationResults = "#{$DATADIR}/isolation_results_rev2"
+    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev3"
+
+    FailureIsolation::LastSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
+    FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev2"
+
     FailureIsolation::DotFiles = "#{$DATADIR}/dots"
-    FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
 
     FailureIsolation::WebDirectory = "/homes/network/revtr/www/isolation_graphs"
 
@@ -484,96 +491,75 @@ class FailureDispatcher
     def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
-        reverse_problem = pings_towards_src.empty?
-        forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
+        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
 
-        direction = infer_direction(reverse_problem, forward_problem)
+                
+        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+            log_name = get_uniq_filename(src, dst)
 
-        # HistoricalForwardHop objects
-        historical_tr_hops, historical_trace_timestamp = retrieve_historical_tr(src, dst)
-
-        historical_tr_hops.each do |hop|
-            # XXX thread out on this to make it faster? Ask Dave for a faster
-            # way?
-            hop.reverse_path = get_cached_revtr(src, hop.ip)
-        end
-
-        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
-
-        cached_revtr_hops = get_cached_revtr(src, dst)
-
-        # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
-        # are pingeable from the source. Send pings, and append the results to
-        # the strings in the arrays (terrible, terrible, terrible)
-        ping_responsive = issue_pings(src, dst, historical_tr_hops, 
-                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
-                                      cached_revtr_hops)
-
-        fetch_historical_pingability!(historical_tr_hops,
-                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
-                                      cached_revtr_hops)
-
-        # maybe not threadsafe, but fuckit
-        tr = issue_normal_traceroute(src, [dst])
-
-        # sometimes we oddly find that the destination is pingable from the
-        # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
-
-        dataset = FailureIsolation::get_dataset(dst)
-
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
-
-        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
-
-        no_pings_at_all = (ping_responsive.empty?)
-
-        no_historical_trace = (historical_tr_hops.empty?)
-
-        log_name = get_uniq_filename(src, dst)
-
-        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
-
-        formatted_dst = @ipInfo.format(dst)
-
-        Dot::generate_jpg(src, formatted_dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops, jpg_output)
-
-
-        #                                    TODO: Turn this into a global constant 
-        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
+            jpg_output = generate_jpg(log_name)
 
             graph_url = generate_web_symlink(jpg_output)
 
-            Emailer.deliver_isolation_results(src, formatted_dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
+            Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
-
-            # Emailer.deliver_dot_graph(jpg_output)
 
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
         if(!testing)
             log_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
+                                          formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops)
         end
     end
 
-    # XXX TERRIBLY REDUNDANT....
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
                                       spoofed_tr, dst_spoofed_tr, testing=false)
-        $stderr.puts "analyze_results: #{src}, #{dst}"
+        $stderr.puts "analyze_results_with_symmetry: #{src}, #{dst}"
 
+        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
+
+        dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
+
+        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+            log_name = get_uniq_filename(src, dst)
+
+            jpg_output = generate_jpg(log_name)
+ 
+            graph_url = generate_web_symlink(jpg_output)
+
+            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
+
+            $stderr.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
+        end
+
+        if(!testing)
+            log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+        end
+    end
+
+    # this is really ugly -- but it elimanates redundancy between
+    # analyze_results() and analyze_results_with_symmetry()
+    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
         reverse_problem = pings_towards_src.empty?
         forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
 
@@ -595,7 +581,7 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source. Send pings, and append the results to
         # the strings in the arrays (terrible, terrible, terrible)
-        ping_responsive = issue_pings(src, dst, historical_tr_hops, 
+        ping_responsive = issue_pings(src, dst, historical_tr_hops,  spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
 
@@ -605,58 +591,39 @@ class FailureDispatcher
 
         # maybe not threadsafe, but fuckit
         tr = issue_normal_traceroute(src, [dst])
-        dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
+
+        dataset = FailureIsolation::get_dataset(dst)
+        
+        [direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+            ping_responsive, tr, dataset]
+    end
+
+    def passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing)
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
+
+        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
 
         # sometimes we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
 
-        dataset = FailureIsolation::get_dataset(dst)
-
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
+        no_historical_trace = (historical_tr_hops.empty?)
 
         no_pings_at_all = (ping_responsive.empty?)
 
-        no_historical_trace = (historical_tr_hops.empty?)
+        return (testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
+    end
 
-        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
-
-        log_name = get_uniq_filename(src, dst)
-
+    def generate_jpg(log_name)
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+        Dot::generate_jpg(src, @ipInfo.resolve_dns(dst), direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops, jpg_output)
 
-
-        #                                    TODO: Turn this into a global constant 
-        if(testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
-             
-            graph_url = generate_web_symlink(jpg_output)
-
-            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          dst_tr, dst_spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
-
-            # Emailer.deliver_dot_graph(jpg_output)
-
-            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
-        end
-
-        if(!testing)
-            log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
-                                          formatted_unconnected, destination_pingable, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          dst_tr, dst_spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
-        end
+        jpg_output
     end
 
     def generate_web_symlink(jpg_output)
@@ -833,8 +800,8 @@ class FailureDispatcher
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
-    def issue_pings(source, dest, historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
-        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops]
+    def issue_pings(source, dest, historical_tr_hops, spoofed_tr, spoofed_revtr_hops, cached_revtr_hops)
+        all_hop_sets = [historical_tr_hops, spoofed_tr, spoofed_revtr_hops, cached_revtr_hops]
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
         all_targets.add dest
