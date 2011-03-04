@@ -13,6 +13,7 @@
 #         false edges
 
 require 'hops'
+require 'set'
 require 'ip_info'
 require 'resolv'
 
@@ -41,12 +42,10 @@ module Dot
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        # XXX This means that this method has side-effects on the
-        # parameters...
         src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, nil, true, true, [])
-        tr.insert(0, src_hop)
-        spoofed_tr.insert(0, src_hop)
-        historic_tr.insert(0, src_hop)
+        tr = [src_hop] + tr
+        spoofed_tr = [src_hop] + spoofed_tr
+        historic_tr = [src_hop] + historic_tr
 
         # Cluster -> dns names we have seen for the cluster
         node2names = Hash.new{|h,k| h[k] = []}
@@ -153,7 +152,9 @@ module Dot
           if previous
             if hop.is_a?(ReverseHop)
               # we annotate reverse links where symmetry was assumed
-              symmetric_revtr_links.add [current, previous] if hop.type == :sym 
+              if hop.type == :sym 
+                symmetric_revtr_links.add [current, previous] 
+              end
               node2neighbors[current][previous] = true
               edge_seen_in_measurements[[current, previous, type]] = true
             else

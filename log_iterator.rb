@@ -14,7 +14,7 @@ module LogIterator
         end
     end
 
-    def LogIterator::read_log(file)
+    def LogIterator::read_log_rev1(file)
         src, dst, dataset, direction, formatted_connected, formatted_unconnected,
                destination_pingable, pings_towards_src, tr,
                spoofed_tr, historical_tr_hops, historical_trace_timestamp,
@@ -23,6 +23,34 @@ module LogIterator
                destination_pingable, pings_towards_src, tr,
                spoofed_tr, historical_tr_hops, historical_trace_timestamp,
                spoofed_revtr_hops, cached_revtr_hops, testing 
+    end
+    
+    def LogIterator::read_log_rev2(file)
+        src, dst, dataset, direction, formatted_connected, formatted_unconnected,
+               pings_towards_src, tr,
+               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
+               spoofed_revtr_hops, cached_revtr_hops, testing = YAML.load_file(file)
+        yield file, src, dst, dataset, direction, formatted_connected, formatted_unconnected,
+               pings_towards_src, tr,
+               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
+               spoofed_revtr_hops, cached_revtr_hops, testing 
+    end
+
+
+    def LogIterator::read_sym_log(file)
+        src, dst, dataset, direction, formatted_connected,
+           formatted_unconnected, pings_towards_src,
+           tr, spoofed_tr,
+           dst_tr, dst_spoofed_tr,
+           historical_tr_hops, historical_trace_timestamp,
+           spoofed_revtr_hops, cached_revtr_hops, testing = YAML.load_file(file)
+               
+        yield file, src, dst, dataset, direction, formatted_connected,
+           formatted_unconnected, pings_towards_src,
+           tr, spoofed_tr,
+           dst_tr, dst_spoofed_tr,
+           historical_tr_hops, historical_trace_timestamp,
+           spoofed_revtr_hops, cached_revtr_hops, testing
     end
 end
 

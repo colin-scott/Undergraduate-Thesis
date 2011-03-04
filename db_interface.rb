@@ -6,14 +6,15 @@ require 'utilities'
 require '../spooftr_config'
 
 class DatabaseInterface
-    def initialize
-        @@db_host = 'bouncer.cs.washington.edu'
-        @@user = 'revtr'
-        @@password = 'pmep@105&rws'
-        @@db = 'revtr'
-        connect()
+    def initialize(host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
+        begin
+          @connection = Mysql.new(host, usr, pwd, database)
+        rescue Mysql::Error => e
+          $stderr.puts "DB connection error " + host
+          throw e
+        end
     end
-
+    
     # return hash from ip -> last_responsive
     def fetch_pingability(ips)
         $stderr.puts "fetch_pingability(), ips=#{ips.inspect}"
@@ -23,7 +24,7 @@ class DatabaseInterface
 
         sql = "select * from pingability where ip=#{addrs.join " OR ip=" }"
         
-        results = issue_query(sql)
+        results = query(sql)
 
         $stderr.puts "fetch_pingability(), results=#{results.inspect}"
 
@@ -35,19 +36,9 @@ class DatabaseInterface
         responsive
     end
 
-    private
-
-    def issue_query(sql)
+    # wrapper for arbitrary sql queries
+    def query(sql)
         results = @connection.query sql
-    end
-    
-    def connect()
-        begin
-              @connection = Mysql.new(@@db_host, @@user, @@password, @@db)
-        rescue Mysql::Error => e
-              $stderr.puts "DB connection error #{@@db_host} #{e}"
-              throw e
-        end
     end
 end
 

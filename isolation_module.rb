@@ -380,6 +380,7 @@ class FailureDispatcher
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
+
         acl=ACL.new(%w[deny all
 					allow *.cs.washington.edu
 					allow localhost
@@ -395,6 +396,8 @@ class FailureDispatcher
         @db = DatabaseInterface.new
 
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+
+        @revtr_cache = RevtrCache.new(@db, @ipInfo)
 
         Thread.new do
             loop do
@@ -483,11 +486,6 @@ class FailureDispatcher
        [symmetric_srcdst2stillconnected, srcdst2dstsrc]
     end
 
-    def get_cached_revtr(src,dst)
-        $stderr.puts "get_cached_revtr(#{src}, #{dst})"
-        `#{FailureIsolation::CachedRevtrTool} #{src} #{dst}`.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
-    end
-
     def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
@@ -502,6 +500,8 @@ class FailureDispatcher
                              cached_revtr_hops)
 
             graph_url = generate_web_symlink(jpg_output)
+
+            $LOG.puts "before sending email, spoofed_tr: #{spoofed_tr.inspect}"
 
             Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
@@ -539,6 +539,8 @@ class FailureDispatcher
                              cached_revtr_hops)
  
             graph_url = generate_web_symlink(jpg_output)
+
+            $LOG.puts "before sending email, spoofed_tr: #{spoofed_tr.inspect}"
 
             Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
@@ -588,7 +590,7 @@ class FailureDispatcher
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
 
-        fetch_historical_pingability!(historical_tr_hops,
+        fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
 
@@ -614,6 +616,8 @@ class FailureDispatcher
 
         no_historical_trace = (historical_tr_hops.empty?)
 
+        $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+
         no_pings_at_all = (ping_responsive.empty?)
 
         return (testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
@@ -638,6 +642,17 @@ class FailureDispatcher
         basename = File.basename(jpg_output)
         File.symlink(jpg_output, abs_path+"/#{basename}")
         "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
+    end
+
+    def get_cached_revtr(src,dst)
+        $stderr.puts "get_cached_revtr(#{src}, #{dst})"
+        path = @revtr_cache.get_cached_reverse_path(src, dst)
+        
+        # XXX HACKKK. we want to print bad cache results in our email, which takes
+        # on array of hacky non-valid ReverseHop objects...
+        path = path.to_s.join("\n") unless path.valid
+
+        path
     end
 
     def infer_direction(reverse_problem, forward_problem)
@@ -730,12 +745,12 @@ class FailureDispatcher
     end
 
     def issue_spoofed_traceroutes(srcdst2stillconnected)
-        $LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        #$LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
         srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
 
         srcdst2spoofed_tr = {}
 
-        $LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2sortedttlrtrs.inspect}"
+        #$LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2sortedttlrtrs.inspect}"
 
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
@@ -821,9 +836,10 @@ class FailureDispatcher
         responsive
     end
 
-    def fetch_historical_pingability!(historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
+    # XXX Am I giving Ethan all of these hops properly?
+    def fetch_historical_pingability!(historical_tr_hops, spoofed_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
         # TODO: redundannnnttt
-        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops]
+        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, spoofed_tr_hops, cached_revtr_hops]
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
@@ -858,10 +874,10 @@ end
 if __FILE__ == $0
     Signal.trap("USR1") do 
         $LOG.puts "reloading modules.."
-        load 'ip_info'
-        load 'mkdot'
-        load 'hops'
-        load 'db_interface'
+        load 'ip_info.rb'
+        load 'mkdot.rb'
+        load 'hops.rb'
+        load 'db_interface.rb'
     end
     begin
        dispatcher = FailureDispatcher.new
