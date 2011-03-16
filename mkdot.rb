@@ -100,19 +100,20 @@ module Dot
             node_attributes[node]["shape"] = "diamond" if !pingable
         end
 
-        assign_colors(node2asn, node_attributes)
+        assign_colors!(node2asn, node_attributes)
 
         if $DEBUG
             $stderr.puts "node2pingable: #{node2pingable.inspect}"
             $stderr.puts "node2historicallypingable: #{node2historicallypingable.inspect}"
         end
 
-        output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)
+        output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes,
+                        symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)
     end
 
     private
 
-    def self.assign_colors(node2asn, node_attributes)
+    def self.assign_colors!(node2asn, node_attributes)
         all_ases = node2asn.values.uniq
         asn2color = {}
         i = 0
@@ -152,6 +153,7 @@ module Dot
           if previous
             if hop.is_a?(ReverseHop)
               # we annotate reverse links where symmetry was assumed
+              raise unless hop.type.is_a?(Symbol)
               if hop.type == :sym 
                 symmetric_revtr_links.add [current, previous] 
               end
@@ -269,5 +271,6 @@ if $0 == __FILE__
     "8 nox300gw1-peer-nox-wpi-192-5-89-242.nox.org (192.5.89.242) * -tr ",
     "9 PLANETLAB1.RESEARCH.WPI.NET (75.130.96.12) * -tr "].map { |hop| ReverseHop.new(hop, ipInfo) }
 
-    Dot::generate_jpg("PLANETLAB1.RESEARCH.WPI.NET", "planetlab2.cis.UPENN.EDU (158.130.6.253)", "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
+    Dot::generate_jpg("PLANETLAB1.RESEARCH.WPI.NET", "planetlab2.cis.UPENN.EDU (158.130.6.253)",
+        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
 end

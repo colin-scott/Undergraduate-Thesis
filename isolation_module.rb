@@ -14,6 +14,7 @@ require 'ip_info'
 require 'mkdot'
 require 'hops'
 require 'db_interface'
+require 'revtr_cache_interface'
 require '../spooftr_config.rb' # XXX don't hardcode...
 
 # XXX Don't hardcode!!!
@@ -650,7 +651,7 @@ class FailureDispatcher
         
         # XXX HACKKK. we want to print bad cache results in our email, which takes
         # on array of hacky non-valid ReverseHop objects...
-        path = path.to_s.join("\n") unless path.valid
+        path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid
 
         path
     end
@@ -757,7 +758,9 @@ class FailureDispatcher
             if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
                 srcdst2spoofed_tr[srcdst] = []
             else
-                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map { |ttlrtrs| SpoofedForwardHop.new(ttlrtrs, @ipInfo) }
+                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map { |ttlrtrs|
+                    SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
+                }
             end
         end
 
@@ -767,7 +770,7 @@ class FailureDispatcher
     # precondition: targets is a single element array
     def issue_normal_traceroute(src, targets)
         dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
-        dst = targets[0] # ugghh..
+        dst = targets[0] # ugghh...
 
         $LOG.puts "isolate_outage(#{src}, #{dst}), normal_traceroute_results: #{dest2ttlhoptuples.inspect}"
 
@@ -785,6 +788,7 @@ class FailureDispatcher
         begin
             srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
                                                       @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
+
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return [:drb_connection_refused]
@@ -878,6 +882,7 @@ if __FILE__ == $0
         load 'mkdot.rb'
         load 'hops.rb'
         load 'db_interface.rb'
+        load 'revtr_cache_interface.rb'
     end
     begin
        dispatcher = FailureDispatcher.new

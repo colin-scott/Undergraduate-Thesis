@@ -76,7 +76,7 @@ module SpoofedTR
         id2srcdst
     end
 
-    # results is [[probes, reciever], [probes, receiever], ..] 
+    # results is [[probes, reciever], [probes, receiever], ...] 
     def SpoofedTR::parse_path(results, id2dest)
         # DRb can't unmarshall hashes initialized with blocks...
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
@@ -132,11 +132,24 @@ module SpoofedTR
             while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? target and sortedttlrtrs[-2][1].include? target 
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end
+
+            # 0.0.0.0's
+            SpoofedTR::fill_in_zeroes!(sortedttlrtrs)
+            
             dest2sortedttlrtrs[dest] = sortedttlrtrs
         end
 
         $LOG.puts "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
 
         dest2sortedttlrtrs
+   end
+
+   # wow, this is a convoluted piece of code...
+   # fill in gaps with "0.0.0.0"
+   def self.fill_in_zeroes!(sortedttlrtrs)
+     return if sortedttlrtrs.empty?
+     0.upto(sortedttlrtrs[-1][0]-1) do |i|
+         sortedttlrtrs.insert(i, [i+1, ["0.0.0.0"]]) unless sortedttlrtrs[i][0] == i+1
+     end
    end
 end

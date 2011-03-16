@@ -20,8 +20,8 @@ class ReversePathSimple < Array
 
   def to_s
       # print the pretty output
-      result = "From #{$pl_ip2host[Inet::ntoa(@src)]} to #{Inet::ntoa(@dst)} at #{@timestamp}:\n"
-      result << @hops.map { |x| x.to_s }.join("\n") if @valid
+      result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
+      result << self.map { |x| x.to_s }.join("\n") if @valid
       result << "Failed query, reason: #{@invalid_reason}" if !@valid
       result
   end
@@ -67,7 +67,7 @@ class RevtrCache
               old_dst = dst
               dst = row["last_hop"].to_i
             }
-            #$stdout.puts "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}"
+            $LOG.puts "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}"
           end
     
           sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
@@ -83,7 +83,7 @@ class RevtrCache
           if results.num_rows() == 0
             reason = ""
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
-            "#{Inet::aton($pl_host2ip[rtr.src])} and dst=#{Inet::aton(rtr.dst)}"
+            "#{src} and dst=#{dst}"
             #          $LOG.puts sql
             begin
               results = @connection.query sql
@@ -96,7 +96,7 @@ class RevtrCache
             end
             reason = "not yet attempted"
     
-            #$stdout.puts "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
+            $LOG.puts "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
     
             path.valid = false
             path.invalid_reason = reason
@@ -143,7 +143,7 @@ class RevtrCache
       end # begin
     
       path.pop while path[-1].ip=="0.0.0.0"
-    
+    path.valid = true    
       # all data has been generated, add it to the object for eventual return
       path.timestamp = ts
       return path
@@ -232,7 +232,6 @@ end
 if $0 == __FILE__
   connection = DatabaseInterface.new
   cache = RevtrCache.new(connection, IpInfo.new)
-
 
 #  if ARGV.empty?
 #    $stderr.puts "Usage: #{$0} <src ip> <dst ip>"

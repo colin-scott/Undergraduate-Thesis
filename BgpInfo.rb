@@ -27,7 +27,7 @@ class BgpInfo
     private 
 
     def grabResult(dotted)
-        raise ArgumentError.new "Invalid IP Address: #{dotted}" \
+        raise ArgumentError.new "Invalid IP Address: #{dotted.inspect}" \
             unless dotted =~ /^\d+\.\d+\.\d+\.\d+$/
         @trie.search_best(dotted)
     end

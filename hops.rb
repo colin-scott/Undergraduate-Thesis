@@ -32,7 +32,6 @@ class HistoricalForwardHop < Hop
     end
 end
 
-
 class ReverseHop < Hop
     attr_accessor :valid_ip, :type
     def initialize(*args)
@@ -74,6 +73,8 @@ class ReverseHop < Hop
             end
         when 5 # parse from print_cached_reverse_path_reasons.rb
             @ip, @ttl, @type, sym_reasons, ipInfo = args
+            @type = @type.to_sym
+            $stderr.puts "wee: #{@type.inspect}"
             @dns = ipInfo.resolve_dns(@ip, @ip)
             @ttl = @ttl.to_i
             @valid_ip = (@ip != "0.0.0.0")
