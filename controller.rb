@@ -1,5 +1,8 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+require 'file_lock'
+Lock::acquire_lock("controller_lock.txt")
+
 #  Is controller_log used?
 #  it does update controller on all VPs in the main thread, but now that will
 #  happen before all the register threads are done.  have it do it at the end
@@ -100,6 +103,10 @@ class Registrar
         # uri= (vp.is_a?(String) ? vp : vp.uri)
         host=Controller::uri2hostname(uri)
         @controller.unregister_host(host,uri)
+    end
+
+    def garbage_collect()
+        GC.start
     end
 
     # vp can either be a string or a Prober object (via DRb)
@@ -1185,6 +1192,8 @@ class Controller
     end
 end
 
+
+
 # This hash will hold all of the options
 # parsed from the command-line by
 # OptionParser.
@@ -1196,6 +1205,7 @@ optparse = OptionParser.new do |opts|
           options[:config] = f
     end
     opts.on( '-h', '--help', 'Display this screen' ) do
+
         puts opts
         exit
     end
@@ -1249,6 +1259,7 @@ if options[:kill]
     }
 end
 
+
 c=Controller.new(options[:test],options[:config],options[:vp_uri_list])
 # # We need the uri of the service to connect a client
 puts c.uri
@@ -1282,9 +1293,9 @@ Signal.trap("USR1"){
     load "#{$REV_TR_TOOL_DIR}/spoofed_ping.rb"
     load "#{$REV_TR_TOOL_DIR}/ping.rb"
 }
+
 Signal.trap("USR2") {
-    $LOG.puts "reloading mappings.."
-    loadPLHostnames
+  p ObjectSpace.count_objects  
 }
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)

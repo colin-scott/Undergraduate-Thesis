@@ -74,7 +74,6 @@ class ReverseHop < Hop
         when 5 # parse from print_cached_reverse_path_reasons.rb
             @ip, @ttl, @type, sym_reasons, ipInfo = args
             @type = @type.to_sym
-            $stderr.puts "wee: #{@type.inspect}"
             @dns = ipInfo.resolve_dns(@ip, @ip)
             @ttl = @ttl.to_i
             @valid_ip = (@ip != "0.0.0.0")
@@ -130,8 +129,8 @@ class SpoofedForwardHop < Hop
 
     def to_s()
         s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
-        s << " (pingable from S?: #{@ping_responsive})" if @ping_responsive
-        s << " [historically pingable?: #{@last_responsive}]" if @last_responsive
+        s << " (pingable from S?: #{@ping_responsive})" unless @ping_responsive.nil?
+        s << " [historically pingable?: #{@last_responsive}]" unless @last_responsive.nil?
         s
     end
 end

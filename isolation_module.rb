@@ -1,5 +1,8 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+require 'file_lock'
+Lock::acquire_lock("isolation_lock.txt")
+
 require 'drb'
 require 'drb/acl'
 require 'net/http'
@@ -172,6 +175,7 @@ class FailureMonitor
 
         loop do
             @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
+
 
             system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
@@ -381,7 +385,6 @@ class FailureDispatcher
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
-
         acl=ACL.new(%w[deny all
 					allow *.cs.washington.edu
 					allow localhost
@@ -421,6 +424,7 @@ class FailureDispatcher
 
     # precondition: stillconnected are able to reach dst
     def isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
+        @registrar.garbage_collect # XXX HACK. andddd, we still have a memory leak...
         @have_retried_connection = false
 
         # first filter out any outages where no nodes are actually registered
@@ -434,7 +438,11 @@ class FailureDispatcher
 
         return if srcdst2stillconnected.empty? # optimization
 
+        # will become:
+        #   [spoof_ping_time, spooftr_time, revtr_time, ping_time, tr_time]
+        measurement_times = []
         # quickly isolate the directions of the failures
+        measurement_times << ["spoof_ping", Time.new]
         srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
         $stderr.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
 
@@ -443,6 +451,7 @@ class FailureDispatcher
         symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
+        measurement_times << ["spoof_tr", Time.new]
         srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
         $stderr.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
@@ -455,12 +464,12 @@ class FailureDispatcher
                     analyze_results_with_symmetry(src, dst, dsthostname, srcip, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
                                     srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], testing)
+                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], measurement_times.clone, testing)
                 else
                     analyze_results(src, dst, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
                                     srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    testing)
+                                    measurement_times.clone, testing)
                 end
             end
         end
@@ -487,11 +496,14 @@ class FailureDispatcher
        [symmetric_srcdst2stillconnected, srcdst2dstsrc]
     end
 
-    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected, pings_towards_src, spoofed_tr, testing=false)
+    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected,
+                        pings_towards_src, spoofed_tr, measurement_times, testing=false)
         $stderr.puts "analyze_results: #{src}, #{dst}"
 
         direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
-            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
+            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+
+        insert_measurement_durations(measurement_times)
 
         log_name = get_uniq_filename(src, dst)
 
@@ -508,7 +520,7 @@ class FailureDispatcher
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
 
             $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -524,13 +536,15 @@ class FailureDispatcher
 
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
-                                      spoofed_tr, dst_spoofed_tr, testing=false)
+                                      spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
         $stderr.puts "analyze_results_with_symmetry: #{src}, #{dst}"
 
         direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
-            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
+            ping_responsive, tr, dataset, times = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
+
+        insert_measurement_durations(measurement_times)
 
         log_name = get_uniq_filename(src, dst)
         
@@ -548,7 +562,7 @@ class FailureDispatcher
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, testing)
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
 
             $stderr.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -565,7 +579,7 @@ class FailureDispatcher
 
     # this is really ugly -- but it elimanates redundancy between
     # analyze_results() and analyze_results_with_symmetry()
-    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr)
+    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
         reverse_problem = pings_towards_src.empty?
         forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
 
@@ -580,6 +594,7 @@ class FailureDispatcher
             hop.reverse_path = get_cached_revtr(src, hop.ip)
         end
 
+        measurement_times << ["revtr", Time.new]
         spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
 
         cached_revtr_hops = get_cached_revtr(src, dst)
@@ -587,6 +602,8 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source. Send pings, and append the results to
         # the strings in the arrays (terrible, terrible, terrible)
+        measurement_times << ["ping", Time.new]
+
         ping_responsive = issue_pings(src, dst, historical_tr_hops,  spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
@@ -596,6 +613,7 @@ class FailureDispatcher
                                       cached_revtr_hops)
 
         # maybe not threadsafe, but fuckit
+        measurement_times << ["tr_time", Time.new]
         tr = issue_normal_traceroute(src, [dst])
 
         dataset = FailureIsolation::get_dataset(dst)
@@ -633,6 +651,17 @@ class FailureDispatcher
                              cached_revtr_hops, jpg_output)
 
         jpg_output
+    end
+
+    # given an array of the form:
+    #   [[measurement_type, time], ...]
+    # Transform it into:
+    #   [[measurement_type, time, duration], ... ]
+    def insert_measurement_durations(measurement_times)
+        0.upto(measurement_times.size - 2) do |i|
+            duration = measurement_times[i+1][1] - measurement_times[i][1] 
+            measurement_times[i] << "(#{duration} seconds)"
+        end
     end
 
     def generate_web_symlink(jpg_output)
@@ -758,9 +787,9 @@ class FailureDispatcher
             if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
                 srcdst2spoofed_tr[srcdst] = []
             else
-                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map { |ttlrtrs|
+                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
                     SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
-                }
+                end
             end
         end
 
@@ -788,7 +817,6 @@ class FailureDispatcher
         begin
             srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
                                                       @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
-
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return [:drb_connection_refused]
@@ -898,3 +926,4 @@ if __FILE__ == $0
        throw e
     end
 end
+

@@ -98,7 +98,7 @@ class Emailer < ActionMailer::Base
                           formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, testing=false)
+                          spoofed_revtr, cached_revtr, jpg_url, measurement_times, testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -112,14 +112,14 @@ class Emailer < ActionMailer::Base
                     :historical_forward_path => historical_forward_path,
                     :historical_fpath_timestamp => historical_fpath_timestamp,
                     :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
-                    :jpg_url => jpg_url
+                    :jpg_url => jpg_url, :measurement_times => measurement_times
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
                           formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           dst_normal_forward_path, dst_spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, testing=false)
+                          spoofed_revtr, cached_revtr, jpg_url, measurement_times, testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -134,7 +134,7 @@ class Emailer < ActionMailer::Base
                     :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
                     :dst_normal_forward_path => dst_normal_forward_path,
                     :dst_spoofed_forward_path => dst_spoofed_forward_path,
-                    :jpg_url => jpg_url
+                    :jpg_url => jpg_url, :measurement_times => measurement_times
     end
     def isolation_exception(exception)
         subject     "Isolation Module Exception"

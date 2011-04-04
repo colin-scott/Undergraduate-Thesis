@@ -10,7 +10,7 @@ rescue LoadError
 	begin
 		$stderr.puts `date +%Y/%m/%d.%H%M.%S`.chomp("\n") + " " + "Unable to load prober: #{$!.class} #{$!.to_s}"
 		$stderr.puts `date +%Y/%m/%d.%H%M.%S`.chomp("\n") + " " + "Trying to download prober source."
-		source = Net::HTTP.get_response(URI.parse('http://revtr.cs.washington.edu/vps/prober.rb')).body
+		source = Net::HTTP.get_response(URI.parse('http://revtr.cs.washington.edu/vps/failure_isolation/prober.rb')).body
 		$stderr.puts `date +%Y/%m/%d.%H%M.%S`.chomp("\n") + " " +  "Preparing to write prober.rb"
 		File.open("prober.rb", File::CREAT|File::TRUNC|File::WRONLY, 0644){|f|
 			f.puts source
@@ -43,14 +43,14 @@ class VantagePoint < Prober
 	UPDATE_INFO = { 
 		:prober => 	{ 
 					:fn => 'prober.rb',
-					:curr_source => URI.parse('http://revtr.cs.washington.edu/vps/prober.rb'),
-					:curr_version => URI.parse('http://revtr.cs.washington.edu/vps/prober_version.txt'),
+					:curr_source => URI.parse('http://revtr.cs.washington.edu/vps/failure_isolation/prober.rb'),
+					:curr_version => URI.parse('http://revtr.cs.washington.edu/vps/failure_isolation/prober_version.txt'),
 					:version =>  PROBER_VERSION
 		},
 		:vp => 	{ 
 					:fn => 'vantage_point.rb',
-					:curr_source => URI.parse('http://revtr.cs.washington.edu/vps/vantage_point.rb'),
-					:curr_version => URI.parse('http://revtr.cs.washington.edu/vps/vantage_point_version.txt'),
+					:curr_source => URI.parse('http://revtr.cs.washington.edu/vps/failure_isolation/vantage_point.rb'),
+					:curr_version => URI.parse('http://revtr.cs.washington.edu/vps/failure_isolation/vantage_point_version.txt'),
 					:version =>  VP_VERSION
 		}
 	}

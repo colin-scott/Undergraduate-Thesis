@@ -172,7 +172,7 @@ module Dot
     def self.output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
-          dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataSet: #{dataset}\""
+          dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
           dot.puts "  labelloc = \"t\""
                     node_attributes.each_pair do |node,attributes|
             n="  \"#{node}\" ["

@@ -1,6 +1,8 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-#require 'config_website'
+require 'file_lock'
+Lock::acquire_lock("check_up_and_start_lock.txt")
+
 require '../spooftr_config'
 require 'mail'
 
@@ -18,6 +20,7 @@ rescue
 end
 
 begin 
+
    
     # Generate both a Hash pointing VPs to uptime stats, and a file with all
     # of the VPs we want to check
@@ -284,6 +287,8 @@ begin
     file = "/tmp/#{$$}.bs" 
     File.open(file, 'w') { |f| f.write($vps.keys.join("\n")) }
     `#{$REV_TR_TOOL_DIR}/perl/bootstrap_revtr_nodesX_for_sliceY.pl #{file} #{$VP_SLICE} > /dev/null 2>&1; #{$REV_TR_TOOL_DIR}/perl/upgrade_revtr_to_vp_nodesX_for_sliceY.pl #{file} #{$VP_SLICE} > /dev/null 2>&1;`
+    slice.command('sudo ln -s /usr/lib/libpcap.so.0 /usr/lib/libpcap.so.0.9', $vps.keys)
+    slice.command('sudo ln -s /usr/lib/libpcap.so.0.9 /usr/lib/libpcap.so.0.8', $vps.keys)
     sleep(300)
     slice.restart_and_check($vps.keys).each { |vp, up|
         next if !$vps.has_key? vp
