@@ -432,7 +432,6 @@ class Controller
         return true if first_result # uglyyyy
         @vp_lock.synchronize{@hostname2vp.has_key?(@resolver.getaddress(hostname).to_s)}
     end
-
     # raises UnknownVPError if can't find it
     def get_vp(hostname)
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
@@ -1295,8 +1294,9 @@ Signal.trap("USR1"){
 }
 
 Signal.trap("USR2") {
-  p ObjectSpace.count_objects  
-}
+  mem_usage = `ps -o rss= -p #{Process.pid}`.to_i
+  $LOG.puts "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}"
+} 
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_ip="druby://#{my_ip}:#{registrar_uri_port}"

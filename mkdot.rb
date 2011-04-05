@@ -17,7 +17,6 @@ require 'set'
 require 'ip_info'
 require 'resolv'
 
-MockHop = Struct.new(:ip, :dns, :asn, :ping_responsive, :last_responsive, :reverse_path)
 
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
@@ -42,7 +41,7 @@ module Dot
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, nil, true, true, [])
+        src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [])
         tr = [src_hop] + tr
         spoofed_tr = [src_hop] + spoofed_tr
         historic_tr = [src_hop] + historic_tr

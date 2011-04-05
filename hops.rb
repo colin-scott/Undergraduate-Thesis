@@ -16,6 +16,9 @@ class Hop
     end
 end
 
+MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
+                     :reverse_path)
+
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
     def initialize(ttl, ip, ipInfo)

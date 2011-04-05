@@ -8,8 +8,8 @@ module LogIterator
             Dir.glob("*yml").each do |file|
                 begin
                     self.read_log_rev3(file, &block)
-                rescue
-                    $stderr.puts "failed to open #{file}"
+                rescue Errno::ENOENT, ArgumentError
+                    $stderr.puts "failed to open #{file}, #{$!}"
                 end
             end
         end

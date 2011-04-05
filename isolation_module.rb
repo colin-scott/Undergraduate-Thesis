@@ -476,7 +476,7 @@ class FailureDispatcher
 
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
-    def isolate_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
+    def identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         case direction
         when Direction::REVERSE
@@ -502,6 +502,8 @@ class FailureDispatcher
         else 
             raise "unknown direction #{direction}!"
         end
+
+        # TODO: how many sources away from the source/dest is the failure?
     end
 
     def later_hop(tr_suspect, spooftr_suspect)
@@ -510,13 +512,13 @@ class FailureDispatcher
         elsif spooftr_suspect.nil?
             return tr_suspect
         else
-            return (tr_suspect.ttl < spooftr_suspect) ? tr_suspect : spooftr_suspect
+            return (tr_suspect.ttl < spooftr_suspect.ttl) ? tr_suspect : spooftr_suspect
         end
     end
 
     # XXX Should this be find_last_responsive_hop?
     def find_first_nonresponsive_hop(path)
-        path.find { |hop| !hop.ping_responsive && !hop.ip == "0.0.0.0"
+        path.find { |hop| !hop.is_a?(MockHop) && !hop.ping_responsive && !hop.ip == "0.0.0.0" &&
             # if N/A, not in DB, so whatever. If in DB, make sure that this
             # isn't just historically non-responsive
             (hop.last_responsive == "N/A" || hop.last_responsive) }
@@ -662,7 +664,7 @@ class FailureDispatcher
         end
     end
 
-    def forward_path_reached?(path)
+    def forward_path_reached?(path, dst)
         !path.find { |hop| hop.ip == dst }.nil?
     end
 
@@ -670,7 +672,7 @@ class FailureDispatcher
     # analyze_results() and analyze_results_with_symmetry()
     def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
         reverse_problem = pings_towards_src.empty?
-        forward_problem = !forward_path_reached?(spoofed_tr)
+        forward_problem = !forward_path_reached?(spoofed_tr, dst)
 
         direction = infer_direction(reverse_problem, forward_problem)
 
@@ -797,14 +799,19 @@ class FailureDispatcher
 
     def tr_reached_dst_AS?(dst, tr)
         dest_as = @ipInfo.getASN(dst)
-        last_non_zero_hop = find_last_non_zero_hop_of_tr(tr)
+        last_non_zero_hop = find_last_non_zero_ip_of_tr(tr)
         last_hop_as = (last_non_zero_hop.nil?) ? nil : @ipInfo.getASN(last_non_zero_hop)
         return !dest_as.nil? && !last_hop_as.nil? && dest_as == last_hop_as
     end
 
+    def find_last_non_zero_ip_of_tr(tr)
+        hop = find_last_non_zero_hop_of_tr(tr)
+        return (hop.nil?) ? nil : hop.ip
+    end
+
     def find_last_non_zero_hop_of_tr(tr)
         last_hop = tr.reverse.find { |hop| hop.ip != "0.0.0.0" }
-        return (last_hop.nil?) ? nil : last_hop.ip
+        return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
     end
 
     def normal_tr_reached?(dst, tr)
@@ -977,7 +984,6 @@ class FailureDispatcher
     end
 end
 
-
 if __FILE__ == $0
     Signal.trap("USR1") do 
         $LOG.puts "reloading modules.."
@@ -1001,4 +1007,3 @@ if __FILE__ == $0
        throw e
     end
 end
-
