@@ -102,6 +102,14 @@ module FailureIsolation
     end
 end
 
+# TODO: Use symbols?
+class Direction
+    FORWARD = "forward path"
+    REVERSE = "reverse path"
+    BOTH = "bi-directional"
+    FALSE_POSITIVE = "both paths seem to be working...?"
+end
+
 class FailureMonitor
     def initialize(dispatcher, email="failures@cs.washington.edu")
         @dispatcher = dispatcher
@@ -347,19 +355,11 @@ class FailureMonitor
                                               formatted_problems_at_the_source,
                                               formatted_outdated_nodes, formatted_not_sshable)
 
-              #Emailer.deliver_outage_detected(DNS::resolve_dns(target, target), dataset, formatted_unconnected,
-              #                                formatted_connected, formatted_never_seen, 
-              #                                formatted_problems_at_the_source,
-              #                                formatted_outdated_nodes, formatted_not_sshable)
-
-              # $LOG.puts "Tried to send an outage-detected email for #{target}"
-
               # don't issue isolation measurements for nodes which have
               # already issued measuremnt for this target in the last
               # @@isolation_interval rounds
               observingnode2rounds.delete_if { |node, rounds| @nodetarget2lastisolationattempt.include?([node,target]) and 
                   (@current_round - @nodetarget2lastisolationattempt[[node,target]] <= @@isolation_interval) }
-
 
               observingnode2rounds.keys.each do |src|
                  @nodetarget2lastisolationattempt[[src,target]] = @current_round
@@ -464,15 +464,63 @@ class FailureDispatcher
                     analyze_results_with_symmetry(src, dst, dsthostname, srcip, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
                                     srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], measurement_times.clone, testing)
+                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], deep_copy(measurement_times), testing)
                 else
                     analyze_results(src, dst, srcdst2stillconnected[srcdst],
                                     srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
                                     srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    measurement_times.clone, testing)
+                                    deep_copy(measurement_times), testing)
                 end
             end
         end
+    end
+
+    def isolate_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
+                                      spoofed_revtr, historical_revtr)
+        case direction
+        when Direction::BOTH
+            for hop in spoofed_tr
+                if !hop.pingable
+            end
+          #   m = first forward hop that does not yield a revtr to s
+          #   do some comparison of m's historical reverse path to infer the router which is either failed or changed its path
+          #   also ping everything on d's historical reverse path to see if those hops are still reachable
+        when Direction::FORWARD
+          #   spoof_revtr_from_d_to_s() # infer the working reverse path 
+          #   issue_traceroutes_or_pings_to_reverse_hops() # get an idea of whether s can reach the reverse hops
+          #
+          #   spoof_traceroute_as_vps_to_use()
+          #   failure is adjacent to the last responsive forward hop seen by s'
+          #   we might also send pings to historical forward hops to see if the path has changed
+        when Direction::BOTH
+          #   spoof_traceroute_as_vps_to_use()
+          #   failure is adjacent to the last responsive forward hop seen by receivers (assuming only one failure)
+        when Direction::FALSE_POSITIVE
+            return "problem resolved"
+        else 
+            raise "unknown direction #{direction}!"
+        end
+    end
+
+    def find_last_ping_responsive_hop(path)
+        for hop in path
+            
+        end
+    end
+
+    def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
+                                      spoofed_revtr, historical_revtr)
+        
+    end
+
+    def measured_working_direction?(src, dst, direction, tr, spoofed_tr, historical_tr,
+                                      spoofed_revtr, historical_revtr)
+        
+    end
+
+    def compare_ground_truth(src, dst, direction, tr, spoofed_tr, historical_tr,
+                                      spoofed_revtr, historical_revtr)
+        
     end
 
     private
@@ -513,8 +561,6 @@ class FailureDispatcher
                              cached_revtr_hops)
 
             graph_url = generate_web_symlink(jpg_output)
-
-            $LOG.puts "before sending email, spoofed_tr: #{spoofed_tr.inspect}"
 
             Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
@@ -639,7 +685,7 @@ class FailureDispatcher
 
         no_pings_at_all = (ping_responsive.empty?)
 
-        return (testing || (!destination_pingable && direction != "both paths seem to be working...?" &&
+        return (testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
     end
 
@@ -688,34 +734,16 @@ class FailureDispatcher
     def infer_direction(reverse_problem, forward_problem)
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
-            direction = "reverse path"
-            # spoof_traceroute_as_vps_to_use()
-        #   for each (foward_hop n):
-        #      issue_reverse_traceroute_from_n_to_s()
-        # 
-        #   m = first forward hop that does not yield a revtr to s
-        #   do some comparison of m's historical reverse path to infer the router which is either failed or changed its path
-        #   also ping everything on d's historical reverse path to see if those hops are still reachable
-        #
+            direction = Direction::REVERSE
         elsif(reverse_problem and forward_problem)
             # failure is bidirectional
-            direction = "bi-directional"
-        #   spoof_traceroute_as_vps_to_use()
-        #   failure is adjacent to the last responsive forward hop seen by receivers (assuming only one failure)
-        #
+            direction = Direction::BOTH
         elsif(!reverse_problem and forward_problem)
             # failure is only on the forward path
-            direction = "forward path"
-        #   spoof_revtr_from_d_to_s() # infer the working reverse path 
-        #   issue_traceroutes_or_pings_to_reverse_hops() # get an idea of whether s can reach the reverse hops
-        #
-        #   spoof_traceroute_as_vps_to_use()
-        #   failure is adjacent to the last responsive forward hop seen by s'
-        #   we might also send pings to historical forward hops to see if the path has changed
-        #
+            direction = Direction::FORWARD
         else
             # just a lossy link?
-            direction = "both paths seem to be working...?"
+            direction = Direction::FALSE_POSITIVE
         end
 
         direction
@@ -902,6 +930,7 @@ class FailureDispatcher
         File.open(FailureIsolation::SymmetricIsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
     end
 end
+
 
 if __FILE__ == $0
     Signal.trap("USR1") do 
