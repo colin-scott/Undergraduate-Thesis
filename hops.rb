@@ -1,8 +1,14 @@
+# last_responsive will be 
+#    * "N/A" if not in the database
+#    * false if not historically pingable
+#    * A Time object if historically pingable
+#    * nil if not initialized (not grabbed from the
+#       DB yet)
+
 class Hop
     attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
     def initialize
         @ping_responsive = false
-        @last_responsive = false
     end
 
     def <=>(other)

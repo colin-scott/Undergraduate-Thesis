@@ -30,6 +30,8 @@ class DatabaseInterface
 
         results.each_hash do |row|
            $stderr.puts "fetch_pingability(), row=#{row.inspect}"
+           #   see hops.rb for an explanation:
+           row["last_responsive"] = false if row["last_responsive"].nil?
            responsive[Inet::ntoa(row["ip"].to_i)] = row["last_responsive"]
         end
 

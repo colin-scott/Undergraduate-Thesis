@@ -1,7 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 require 'file_lock'
-Lock::acquire_lock("isolation_lock.txt")
+Lock::acquire_lock("isolation_lock.txt") if __FILE__ == $0
 
 require 'drb'
 require 'drb/acl'
@@ -102,7 +102,6 @@ module FailureIsolation
     end
 end
 
-# TODO: Use symbols?
 class Direction
     FORWARD = "forward path"
     REVERSE = "reverse path"
@@ -475,51 +474,91 @@ class FailureDispatcher
         end
     end
 
+    # returns the hop suspected to be close to the failure
+    # Assumes only one failure in the network...
     def isolate_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         case direction
-        when Direction::BOTH
-            for hop in spoofed_tr
-                if !hop.pingable
-            end
-          #   m = first forward hop that does not yield a revtr to s
-          #   do some comparison of m's historical reverse path to infer the router which is either failed or changed its path
-          #   also ping everything on d's historical reverse path to see if those hops are still reachable
-        when Direction::FORWARD
-          #   spoof_revtr_from_d_to_s() # infer the working reverse path 
-          #   issue_traceroutes_or_pings_to_reverse_hops() # get an idea of whether s can reach the reverse hops
-          #
-          #   spoof_traceroute_as_vps_to_use()
-          #   failure is adjacent to the last responsive forward hop seen by s'
-          #   we might also send pings to historical forward hops to see if the path has changed
-        when Direction::BOTH
-          #   spoof_traceroute_as_vps_to_use()
-          #   failure is adjacent to the last responsive forward hop seen by receivers (assuming only one failure)
+        when Direction::REVERSE
+            # let m be the first forward hop that does not yield a revtr to s
+            tr_suspect = find_first_nonresponsive_hop(tr) 
+            spooftr_suspect = find_first_nonresponsive_hop(spoofed_tr)
+            suspected_hop = later_hop(tr_suspect, spooftr_suspect)
+            return nil if suspected_hop.nil?
+
+            # do some comparison of m's historical reverse path to infer the router which is either
+            # failed or changed its path
+            historical_revtr = fetch_cached_revtr(src, suspected_hop) unless suspected_hop.nil?
+            # XXX 
+            return suspected_hop
+        when Direction::FORWARD, Direction::BOTH
+            # the failure is most likely adjacent to the last responsive forward hop
+            last_tr_hop = find_last_non_zero_hop_of_tr(tr)
+            last_spooftr_hop = find_last_non_zero_hop_of_tr(spoofed_tr)
+            suspected_hop = later_hop(last_tr_hop, last_spooftr_hop)
+            return suspected_hop
         when Direction::FALSE_POSITIVE
-            return "problem resolved"
+            return "problem resolved itself"
         else 
             raise "unknown direction #{direction}!"
         end
     end
 
-    def find_last_ping_responsive_hop(path)
-        for hop in path
-            
+    def later_hop(tr_suspect, spooftr_suspect)
+        if tr_suspect.nil?
+            return spooftr_suspect
+        elsif spooftr_suspect.nil?
+            return tr_suspect
+        else
+            return (tr_suspect.ttl < spooftr_suspect) ? tr_suspect : spooftr_suspect
         end
+    end
+
+    # XXX Should this be find_last_responsive_hop?
+    def find_first_nonresponsive_hop(path)
+        path.find { |hop| !hop.ping_responsive && !hop.ip == "0.0.0.0"
+            # if N/A, not in DB, so whatever. If in DB, make sure that this
+            # isn't just historically non-responsive
+            (hop.last_responsive == "N/A" || hop.last_responsive) }
     end
 
     def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
-        
+        case direction
+        when Direction::REVERSE
+        when Direction::FORWARD
+          #   we might also send pings to historical forward hops to see if the path has changed
+        when Direction::FALSE_POSITIVE
+        else 
+        end
     end
 
     def measured_working_direction?(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
-        
+       case direction
+       when Direction::FORWARD
+           # Damn, I hate that hack. .is_a(Symbol)... all because I wanted to
+           # format the html easily
+           return !spoofed_revtr[0].is_a?(Symbol) # Ummm, what about symmetry assumptions...
+       when Direction::REVERSE
+           return forward_path_reached?(spoofed_tr)
+       else
+           return false
+       end
+    end
+
+    def path_changed?()
+       case direction
+       when Direction::REVERSE
+       when Direction::FORWARD
+       when Direction::BOTH
+       when Direction::FALSE_POSITIVE
+       else
+       end
     end
 
     def compare_ground_truth(src, dst, direction, tr, spoofed_tr, historical_tr,
-                                      spoofed_revtr, historical_revtr)
+                                      spoofed_revtr, historical_revtr, dst_tr, dst_spoofed_tr)
         
     end
 
@@ -623,11 +662,15 @@ class FailureDispatcher
         end
     end
 
+    def forward_path_reached?(path)
+        !path.find { |hop| hop.ip == dst }.nil?
+    end
+
     # this is really ugly -- but it elimanates redundancy between
     # analyze_results() and analyze_results_with_symmetry()
     def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
         reverse_problem = pings_towards_src.empty?
-        forward_problem = spoofed_tr.find { |hop| hop.ip == dst }.nil?
+        forward_problem = !forward_path_reached?(spoofed_tr)
 
         direction = infer_direction(reverse_problem, forward_problem)
 
@@ -637,13 +680,13 @@ class FailureDispatcher
         historical_tr_hops.each do |hop|
             # XXX thread out on this to make it faster? Ask Dave for a faster
             # way?
-            hop.reverse_path = get_cached_revtr(src, hop.ip)
+            hop.reverse_path = fetch_cached_revtr(src, hop.ip)
         end
 
         measurement_times << ["revtr", Time.new]
         spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
 
-        cached_revtr_hops = get_cached_revtr(src, dst)
+        cached_revtr_hops = fetch_cached_revtr(src, dst)
 
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source. Send pings, and append the results to
@@ -720,12 +763,15 @@ class FailureDispatcher
         "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
-    def get_cached_revtr(src,dst)
-        $stderr.puts "get_cached_revtr(#{src}, #{dst})"
+    def fetch_cached_revtr(src,dst)
+        $stderr.puts "fetch_cached_revtr(#{src}, #{dst})"
+
+        dst = dst.ip if dst.is_a?(Hop)
+
         path = @revtr_cache.get_cached_reverse_path(src, dst)
         
         # XXX HACKKK. we want to print bad cache results in our email, which takes
-        # on array of hacky non-valid ReverseHop objects...
+        # on an array of hacky non-valid ReverseHop objects...
         path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid
 
         path
