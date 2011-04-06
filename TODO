@@ -1,0 +1,25 @@
+What I want to add to the logs:
+   - a boolean flag for whether the outage passed filtering heuristcs
+   - how many hops from the src/dest the failure was
+
+
+How to tell if the problem was caused by a forward path change:
+ (see: pl1.6test.edu.cn_211.160.161.1_20113301998.jpg)
+'- if hops beyond the suspected problem are still pingable. Especially if
+   there is a AS transition right after the suspected problem
+
+Finding the reverse path failure suspect:
+   - If there is both a tr and a spoofed tr, it's where the two diverge
+   - If only a spoofed tr, it's the last pingable hop
+
+
+There seem to be a fair number of cases where the spoofedtr differs 
+from the normal tr. Path change while measurements were taken?
+Destination-based routing assumption broken?
+see: (planetlab1.nvlab.org_122.203.251.1_2011227191747.jpg)
+Is the suspect then the router where the path diverges?
+
+In general, the reverse path failures seem pretty tough to pin down!
+
+Maybe this process isn't automatable for reverse path failures... 
+implement a system to allow humans to annotate the failures post-hoc?

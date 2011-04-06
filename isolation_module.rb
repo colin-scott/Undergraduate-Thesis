@@ -1,4 +1,3 @@
-
 require 'set'
 require '../spooftr_config.rb' # XXX don't hardcode...
 

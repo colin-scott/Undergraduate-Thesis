@@ -2,6 +2,7 @@
 
 require 'yaml'
 require 'ip_info'
+require 'hops'
 
 module LogIterator
     IPINFO = IpInfo.new # hmmm
@@ -38,7 +39,7 @@ module LogIterator
             yml = LogIterator::jpg2yml(jpg)
             begin 
                 self.read_log_rev3(yml, &block)
-            rescue Errno::ENOENT, ArgumentError
+            rescue Errno::ENOENT, ArgumentError, TypeError
                 $stderr.puts "failed to open #{yml}, #{$!}"
             end
         end
@@ -49,7 +50,7 @@ module LogIterator
             Dir.glob("*yml").each do |file|
                 begin
                     self.read_log_rev3(file, &block)
-                rescue Errno::ENOENT, ArgumentError
+                rescue Errno::ENOENT, ArgumentError, TypeError
                     $stderr.puts "failed to open #{file}, #{$!}"
                 end
             end

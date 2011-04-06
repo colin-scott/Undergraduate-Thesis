@@ -17,11 +17,9 @@ LogIterator::all_filtered_outages do |file, src, dst, dataset, direction, format
         suspect = analyzer.identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
 
-        next if !suspect.nil?
-
         puts "==================="
         puts "jpg: #{File.basename(LogIterator::yml2jpg(file))}"
-        puts "Suspect: #{suspect}"
+        puts "suspect: #{suspect}"
         LogIterator::display_results(src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,

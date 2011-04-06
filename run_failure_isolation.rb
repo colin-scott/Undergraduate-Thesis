@@ -3,7 +3,9 @@
 require 'file_lock'
 Lock::acquire_lock("isolation_lock.txt") if __FILE__ == $0
 
-# TODO: ugggggly
+# TODO: ugggggly. These should be partitioned into the inidividual classes,
+# but I don't have time to deal with it...
+require 'isolation_module'
 require 'drb'
 require 'drb/acl'
 require 'net/http'

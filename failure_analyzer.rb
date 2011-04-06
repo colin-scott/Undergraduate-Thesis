@@ -1,4 +1,4 @@
-require 'isolation_module.rb'
+require 'isolation_module'
 
 class Direction
     FORWARD = "forward path"
@@ -25,10 +25,13 @@ class FailureAnalyzer
             spooftr_suspect = find_last_responsive_hop(spoofed_tr)
             suspected_hop = later_hop(tr_suspect, spooftr_suspect)
             return nil if suspected_hop.nil?
-
+            
             # do some comparison of m's historical reverse path to infer the router which is either
             # failed or changed its path
-            historical_revtr = fetch_cached_revtr(src, suspected_hop) unless suspected_hop.nil?
+            #
+            # doesn't make sense when running over logs... fine when run in
+            # real-time though
+            # historical_revtr = fetch_cached_revtr(src, suspected_hop) unless suspected_hop.nil? 
             # XXX 
             return suspected_hop
         when Direction::FORWARD, Direction::BOTH
@@ -52,12 +55,12 @@ class FailureAnalyzer
         elsif spooftr_suspect.nil?
             return tr_suspect
         else
-            return (tr_suspect.ttl < spooftr_suspect.ttl) ? tr_suspect : spooftr_suspect
+            return (tr_suspect.ttl > spooftr_suspect.ttl) ? tr_suspect : spooftr_suspect
         end
     end
 
     def find_last_responsive_hop(path)
-        path.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && !hop.ip == "0.0.0.0" }
+        path.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
     end
 
     def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
@@ -135,10 +138,8 @@ class FailureAnalyzer
         return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
     end
 
-    def normal_tr_reached?(dst, tr)
-        normal_tr_reached = (!tr.empty? && tr[-1].ip == dst)
-        # $stderr.puts "normal_tr_reached?: #{normal_tr_reached}"
-        normal_tr_reached
+    def forward_path_reached?(path, dst)
+        !path.find { |hop| hop.ip == dst }.nil?
     end
 
     def passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing)
@@ -150,7 +151,7 @@ class FailureAnalyzer
 
         # sometimes we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
+        destination_pingable = ping_responsive.include?(dst) || forward_path_reached?(tr, dst)
 
         no_historical_trace = (historical_tr_hops.empty?)
 
@@ -162,4 +163,3 @@ class FailureAnalyzer
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
     end
 end
-

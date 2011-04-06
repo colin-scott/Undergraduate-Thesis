@@ -198,7 +198,7 @@ class FailureDispatcher
     # analyze_results() and analyze_results_with_symmetry()
     def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
         reverse_problem = pings_towards_src.empty?
-        forward_problem = !forward_path_reached?(spoofed_tr, dst)
+        forward_problem = !@failure_analyzer.forward_path_reached?(spoofed_tr, dst)
 
         direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
 
