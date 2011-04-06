@@ -75,8 +75,9 @@ class FailureMonitor
         FileUtils.mkdir_p(FailureIsolation::PingMonitorRepo) 
 
         loop do
-            @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
+            start = Time.new
 
+            @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
 
             system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
@@ -96,7 +97,9 @@ class FailureMonitor
             
             audit_faulty_nodes if (@current_round % @@node_audit_period) == 0
 
-            sleep period
+            sleep_period =  period - (Time.new - start)
+
+            sleep sleep_period if sleep_period > 0
         end
     end
 

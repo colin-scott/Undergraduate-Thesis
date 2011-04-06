@@ -3,6 +3,9 @@ What I want to add to the logs:
    - how many hops from the src/dest the failure was
 
 
+Not that many outages are passing the filtering heuristics. Could be
+thrashing, could be that the heuristics are too stringent. Look into it?
+
 How to tell if the problem was caused by a forward path change:
  (see: pl1.6test.edu.cn_211.160.161.1_20113301998.jpg)
 '- if hops beyond the suspected problem are still pingable. Especially if
@@ -12,7 +15,6 @@ Finding the reverse path failure suspect:
    - If there is both a tr and a spoofed tr, it's where the two diverge
    - If only a spoofed tr, it's the last pingable hop
 
-
 There seem to be a fair number of cases where the spoofedtr differs 
 from the normal tr. Path change while measurements were taken?
 Destination-based routing assumption broken?
@@ -20,6 +22,18 @@ see: (planetlab1.nvlab.org_122.203.251.1_2011227191747.jpg)
 Is the suspect then the router where the path diverges?
 
 In general, the reverse path failures seem pretty tough to pin down!
+  - Send out an outline of the algorithm for the three pieces of data:
+      * who is adjacent to the failure 
+      * (if possible) whether the failure is on a new or old path
+      * whether the historical forward/reverse paths are working
+  - Find cases where we had complete information, yet couldn't pinpoint the
+    failure
+  - Find cases where we had complete information, and could pinpoint failure,
+    just to demonstrate the algorithm
+  - Find cases where we didn't have complete information, and identify what
+    info would have helped
 
 Maybe this process isn't automatable for reverse path failures... 
 implement a system to allow humans to annotate the failures post-hoc?
+
+Fix Harsha's tool to always go up to ttl 30?

@@ -7,8 +7,12 @@
 
 class Hop
     attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
-    def initialize
+    def initialize(*args)
         @ping_responsive = false
+        case args.size
+        when 1 # just the ip
+            @ip = args.shift
+        end
     end
 
     def <=>(other)
@@ -16,6 +20,7 @@ class Hop
     end
 end
 
+# wait a minute... we could just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
                      :reverse_path)
 
