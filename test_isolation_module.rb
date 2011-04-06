@@ -2,6 +2,7 @@
 
 require 'isolation_module'
 dispatcher = FailureDispatcher.new
+
 if ARGV.empty?
     srcdst = ["planetlab-node3.it-sudparis.eu", "132.252.152.193"]
     dispatcher.isolate_outages({ srcdst =>

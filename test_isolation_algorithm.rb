@@ -14,7 +14,6 @@ LogIterator::all_filtered_outages do |file, src, dst, dataset, direction, format
     if(analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ["not_empty"], # hmmmm...
                                               historical_tr, direction, false))
 
-
         suspect = analyzer.identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
 

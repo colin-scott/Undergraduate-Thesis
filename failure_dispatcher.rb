@@ -16,7 +16,7 @@ class FailureDispatcher
 
         @ipInfo = IpInfo.new
 
-        @failure_analyzer = FailureAnalyzer.new
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo)
         
         @db = DatabaseInterface.new
 

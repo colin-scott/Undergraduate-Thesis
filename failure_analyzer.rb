@@ -7,7 +7,6 @@ class Direction
     FALSE_POSITIVE = "both paths seem to be working...?"
 end
 
-
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 class FailureAnalyzer
@@ -22,8 +21,8 @@ class FailureAnalyzer
         case direction
         when Direction::REVERSE
             # let m be the first forward hop that does not yield a revtr to s
-            tr_suspect = find_first_nonresponsive_hop(tr) 
-            spooftr_suspect = find_first_nonresponsive_hop(spoofed_tr)
+            tr_suspect = find_last_responsive_hop(tr)
+            spooftr_suspect = find_last_responsive_hop(spoofed_tr)
             suspected_hop = later_hop(tr_suspect, spooftr_suspect)
             return nil if suspected_hop.nil?
 
@@ -57,12 +56,8 @@ class FailureAnalyzer
         end
     end
 
-    # XXX Should this be find_last_responsive_hop?
-    def find_first_nonresponsive_hop(path)
-        path.find { |hop| !hop.is_a?(MockHop) && !hop.ping_responsive && !hop.ip == "0.0.0.0" &&
-            # if N/A, not in DB, so whatever. If in DB, make sure that this
-            # isn't just historically non-responsive
-            (hop.last_responsive == "N/A" || hop.last_responsive) }
+    def find_last_responsive_hop(path)
+        path.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && !hop.ip == "0.0.0.0" }
     end
 
     def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
