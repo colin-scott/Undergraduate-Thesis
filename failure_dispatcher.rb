@@ -116,6 +116,85 @@ class FailureDispatcher
        [symmetric_srcdst2stillconnected, srcdst2dstsrc]
     end
 
+    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected,
+                        pings_towards_src, spoofed_tr, measurement_times, testing=false)
+        $stderr.puts "analyze_results: #{src}, #{dst}"
+
+        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+
+        insert_measurement_durations(measurement_times)
+
+        log_name = get_uniq_filename(src, dst)
+
+        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops)
+
+            graph_url = generate_web_symlink(jpg_output)
+
+            Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
+
+            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+        end
+
+        if(!testing)
+            log_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops)
+        end
+    end
+
+    def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
+                                      formatted_connected, formatted_unconnected, pings_towards_src,
+                                      spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
+        $stderr.puts "analyze_results_with_symmetry: #{src}, #{dst}"
+
+        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+            ping_responsive, tr, dataset, times = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+
+        dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
+
+        insert_measurement_durations(measurement_times)
+
+        log_name = get_uniq_filename(src, dst)
+        
+        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
+                             cached_revtr_hops)
+ 
+            graph_url = generate_web_symlink(jpg_output)
+
+            $LOG.puts "before sending email, spoofed_tr: #{spoofed_tr.inspect}"
+
+            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
+
+            $stderr.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
+        end
+
+        if(!testing)
+            log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr_hops, historical_trace_timestamp,
+                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+        end
+    end
+
     # this is really ugly -- but it elimanates redundancy between
     # analyze_results() and analyze_results_with_symmetry()
     def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
