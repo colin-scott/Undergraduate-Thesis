@@ -1,8 +1,49 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 require 'yaml'
+require 'ip_info'
 
 module LogIterator
+    IPINFO = IpInfo.new # hmmm
+
+    def LogIterator::display_results(src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, historical_revtr)
+        puts "Source: #{src}"
+        puts "Destination: #{IPINFO.format(dst)}"
+        puts "Dataset: #{dataset}"
+        puts "Direction: #{direction}"
+       # puts "Nodes with connectivity: #{formatted_connected.join ','}"
+       # puts "Nodes [time since
+       # puts "Succesful spoofers: #{pings_towards_src.join ','}"
+       # puts "Normal tr: #{tr.inspect}"
+       # puts "Spoofed tr: #{spoofed_tr.inspect}"
+       # puts "Historical tr: #{historical_tr.inspect}"
+       # puts "Spoofed revtr: #{spoofed_revtr.inspect}"
+       # puts "Historical revtr: #{historical_revtr.inspect}"
+    end
+
+    def LogIterator::jpg2yml(jpg)
+       FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
+    end
+
+    def LogIterator::yml2jpg(yml)
+        FailureIsolation::DotFiles+"/"+File.basename(yml).gsub(/yml$/, "jpg")
+    end
+
+    def LogIterator::all_filtered_outages(&block)
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
+            yml = LogIterator::jpg2yml(jpg)
+            begin 
+                self.read_log_rev3(yml, &block)
+            rescue Errno::ENOENT, ArgumentError
+                $stderr.puts "failed to open #{yml}, #{$!}"
+            end
+        end
+    end
+
     def LogIterator::iterate(&block)
         Dir.chdir FailureIsolation::IsolationResults do
             Dir.glob("*yml").each do |file|
