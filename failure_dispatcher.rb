@@ -161,27 +161,6 @@ class FailureDispatcher
             ping_responsive, tr, dataset]
     end
 
-    def passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing)
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
-
-        tr_reached_dst_AS = @failure_analyzer.tr_reached_dst_AS?(dst, tr)
-
-        # sometimes we oddly find that the destination is pingable from the
-        # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include?(dst) || @failure_analyzer.normal_tr_reached?(dst, tr)
-
-        no_historical_trace = (historical_tr_hops.empty?)
-
-        # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
-
-        no_pings_at_all = (ping_responsive.empty?)
-
-        return (testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
-    end
-
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops)
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"

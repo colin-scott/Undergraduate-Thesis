@@ -8,6 +8,10 @@ class Direction
 end
 
 class FailureAnalyzer
+    def initialize(ipInfo)
+        @ipInfo = ipInfo
+    end
+
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
     def identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
@@ -138,6 +142,26 @@ class FailureAnalyzer
         # $stderr.puts "normal_tr_reached?: #{normal_tr_reached}"
         normal_tr_reached
     end
-end
 
+    def passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing)
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
+
+        tr_reached_dst_AS = tr_reached_dst_AS?(dst, tr)
+
+        # sometimes we oddly find that the destination is pingable from the
+        # source after isolation measurements have completed
+        destination_pingable = ping_responsive.include?(dst) || normal_tr_reached?(dst, tr)
+
+        no_historical_trace = (historical_tr_hops.empty?)
+
+        # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+
+        no_pings_at_all = (ping_responsive.empty?)
+
+        return (testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
+    end
+end
 
