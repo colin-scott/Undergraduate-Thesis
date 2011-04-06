@@ -59,12 +59,11 @@ class FailureDispatcher
 
         return if srcdst2stillconnected.empty? # optimization
 
-        # will become:
-        #   [spoof_ping_time, spooftr_time, revtr_time, ping_time, tr_time]
         measurement_times = []
+
         # quickly isolate the directions of the failures
-        measurement_times << ["spoof_ping", Time.new]
         srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
+        measurement_times << ["spoof_ping", Time.new]
         $stderr.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
 
         # if we control one of the targets, send out spoofed traceroutes in
@@ -72,8 +71,8 @@ class FailureDispatcher
         symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
-        measurement_times << ["spoof_tr", Time.new]
         srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
+        measurement_times << ["spoof_tr", Time.new]
         $stderr.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
         # thread out on each src, dst
@@ -211,27 +210,25 @@ class FailureDispatcher
             hop.reverse_path = fetch_cached_revtr(src, hop.ip)
         end
 
-        measurement_times << ["revtr", Time.new]
-        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
-
         cached_revtr_hops = fetch_cached_revtr(src, dst)
 
-        # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
-        # are pingeable from the source. Send pings, and append the results to
-        # the strings in the arrays (terrible, terrible, terrible)
-        measurement_times << ["ping", Time.new]
+        # maybe not threadsafe, but fuckit
+        tr = issue_normal_traceroute(src, [dst])
+        measurement_times << ["tr_time", Time.new]
 
+        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
+        measurement_times << ["revtr", Time.new]
+
+        # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
+        # are pingeable from the source.
         ping_responsive = issue_pings(src, dst, historical_tr_hops,  spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
+        measurement_times << ["ping", Time.new]
 
         fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
                                       cached_revtr_hops)
-
-        # maybe not threadsafe, but fuckit
-        measurement_times << ["tr_time", Time.new]
-        tr = issue_normal_traceroute(src, [dst])
 
         dataset = FailureIsolation::get_dataset(dst)
         

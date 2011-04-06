@@ -12,7 +12,7 @@ LogIterator::all_filtered_outages do |file, src, dst, dataset, direction, format
                                           spoofed_revtr, historical_revtr|
 
     if(analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ["not_empty"], # hmmmm...
-                                              historical_tr, direction, false))
+                                              historical_tr, direction, false) && direction == Direction::REVERSE)
 
         suspect = analyzer.identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)

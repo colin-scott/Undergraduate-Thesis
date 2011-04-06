@@ -1,11 +1,6 @@
 require 'set'
 require '../spooftr_config.rb' # XXX don't hardcode...
 
-# XXX Don't hardcode!!!
-$pptasks = "~ethan/scripts/pptasks"
-$default_period_seconds = 620
-Thread.abort_on_exception = true
-
 module FailureIsolation
     # out of place...
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
