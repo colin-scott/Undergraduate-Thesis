@@ -7,6 +7,9 @@ class Direction
     FALSE_POSITIVE = "both paths seem to be working...?"
 end
 
+
+# The "Brains" of the whole business. In charge of heuristcs for filtering,
+# making sense of the measurements, etc.
 class FailureAnalyzer
     def initialize(ipInfo)
         @ipInfo = ipInfo

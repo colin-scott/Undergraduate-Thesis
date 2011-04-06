@@ -1,3 +1,4 @@
+# just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
     def initialize
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
@@ -127,7 +128,7 @@ class FailureDispatcher
 
         log_name = get_uniq_filename(src, dst)
 
-        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+        if(@failure_analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
 
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops)
@@ -166,14 +167,12 @@ class FailureDispatcher
 
         log_name = get_uniq_filename(src, dst)
         
-        if(passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+        if(@failure_analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
 
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops)
  
             graph_url = generate_web_symlink(jpg_output)
-
-            $LOG.puts "before sending email, spoofed_tr: #{spoofed_tr.inspect}"
 
             Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,

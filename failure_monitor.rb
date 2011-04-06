@@ -1,6 +1,8 @@
 require 'failure_dispatcher'
 require 'yaml'
 
+# responsible for pulling state from ping monitors, classifying outages, and
+# dispatching interesting outages to FailureDispatcher
 class FailureMonitor
     def initialize(dispatcher, email="failures@cs.washington.edu")
         @dispatcher = dispatcher
