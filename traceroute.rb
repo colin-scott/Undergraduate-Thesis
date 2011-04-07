@@ -2,7 +2,7 @@ module Traceroute
     # dests is an array of destinations
     # return a set of targets that responded
     def Traceroute::sendProbes(hostname, dests, controller)
-        $LOG.puts "Traceroute::sendProbe(): source #{hostname}, dests #{dests.inspect}"
+        # $LOG.puts "Traceroute::sendProbe(): source #{hostname}, dests #{dests.inspect}"
 
         hostname2targets = { hostname => dests }
          
@@ -17,7 +17,7 @@ module Traceroute
     def Traceroute::parse_results(results)
         # results is of the form:
         # [[binary, "plgmu4.ite.gmu.edu"]]
-        $LOG.puts "Traceroute::parse_results(), raw results: #{results.inspect}"
+        # $LOG.puts "Traceroute::parse_results(), raw results: #{results.inspect}"
 
         dst2ttlhoptuples = {}
 
@@ -30,7 +30,7 @@ module Traceroute
             begin
                 trs = convert_binary_traceroutes(probes)
             rescue TruncatedTraceFileException => e
-                $LOG.puts   
+                $LOG.puts "Truncated trace! #{$!}"
             end
 
             trs.each do |tr|

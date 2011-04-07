@@ -159,7 +159,16 @@ class FailureAnalyzer
 
         no_pings_at_all = (ping_responsive.empty?)
 
-        return (testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all))
+        if(!(testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
+                !forward_measurements_empty && !tr_reached_dst_as && !no_historical_trace && !no_pings_at_all)))
+
+            bool_vector = { :dp => !destination_pingable, :dir => direction != Direction::FALSE_POSITIVE, 
+                :f_empty => !forward_measurements_empty, :tr_reach => !tr_reached_dst_as, :no_hist => !no_historical_trace, :no_ping => !no_pings_at_all}
+
+            $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
+            return false
+        else
+            return true
+        end
     end
 end

@@ -16,18 +16,26 @@ module LogIterator
         puts "Destination: #{IPINFO.format(dst)}"
         puts "Dataset: #{dataset}"
         puts "Direction: #{direction}"
-       # puts "Nodes with connectivity: #{formatted_connected.join ','}"
-       # puts "Nodes [time since
-       # puts "Succesful spoofers: #{pings_towards_src.join ','}"
-       # puts "Normal tr: #{tr.inspect}"
-       # puts "Spoofed tr: #{spoofed_tr.inspect}"
-       # puts "Historical tr: #{historical_tr.inspect}"
-       # puts "Spoofed revtr: #{spoofed_revtr.inspect}"
-       # puts "Historical revtr: #{historical_revtr.inspect}"
+        #puts "Nodes with connectivity: #{formatted_connected.join ','}"
+        #puts "Nodes without connectivity #{formatted_unconnected.join ','}"
+        #puts "Succesful spoofers: #{pings_towards_src.inspect}"
+        #puts "Normal tr: #{tr.inspect}"
+        #puts "Spoofed tr: #{spoofed_tr.inspect}"
+        #puts "Historical tr: #{historical_tr.inspect}"
+        #puts "Spoofed revtr: #{spoofed_revtr.inspect}"
+        #puts "Historical revtr: #{historical_revtr.inspect}"
     end
 
     def LogIterator::jpg2yml(jpg)
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
+    end
+
+    def LogIterator::jpg2yml_rev2(jpg)
+       FailureIsolation::LastIsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
+    end
+
+    def LogIterator::jpg2yml_rev1(jpg)
+       FailureIsolation::OlderIsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
     end
 
     def LogIterator::yml2jpg(yml)
@@ -39,6 +47,28 @@ module LogIterator
             yml = LogIterator::jpg2yml(jpg)
             begin 
                 self.read_log_rev3(yml, &block)
+            rescue Errno::ENOENT, ArgumentError, TypeError
+                $stderr.puts "failed to open #{yml}, #{$!}"
+            end
+        end
+    end
+
+    def LogIterator::all_filtered_outages_rev2(&block)
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
+            yml = LogIterator::jpg2yml_rev2(jpg)
+            begin 
+                self.read_log_rev2(yml, &block)
+            rescue Errno::ENOENT, ArgumentError, TypeError
+                $stderr.puts "failed to open #{yml}, #{$!}"
+            end
+        end
+    end
+
+    def LogIterator::all_filtered_outages_rev1(&block)
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
+            yml = LogIterator::jpg2yml_rev1(jpg)
+            begin 
+                self.read_log_rev1(yml, &block)
             rescue Errno::ENOENT, ArgumentError, TypeError
                 $stderr.puts "failed to open #{yml}, #{$!}"
             end
@@ -70,13 +100,13 @@ module LogIterator
 
     def LogIterator::read_log_rev2(file)
         src, dst, dataset, direction, formatted_connected, formatted_unconnected,
-               pings_towards_src, tr,
-               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
-               spoofed_revtr_hops, cached_revtr_hops, testing = YAML.load_file(file)
+               destination_pingable, pings_towards_src, tr,
+               spoofed_tr, historical_tr, historical_trace_timestamp,
+               spoofed_revtr, historical_revtr = YAML.load_file(file)
         yield file, src, dst, dataset, direction, formatted_connected, formatted_unconnected,
-               pings_towards_src, tr,
-               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
-               spoofed_revtr_hops, cached_revtr_hops, testing 
+               destination_pingable, pings_towards_src, tr,
+               spoofed_tr, historical_tr, historical_trace_timestamp,
+               spoofed_revtr, historical_revtr
     end
  
     def LogIterator::read_log_rev3(file)

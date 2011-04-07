@@ -50,12 +50,12 @@ class FailureDispatcher
 
         # first filter out any outages where no nodes are actually registered
         # with the controller
-        $stderr.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        $LOG.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
         registered_vps = @controller.hosts.clone
         srcdst2stillconnected.delete_if do |srcdst, still_connected|
             !registered_vps.include?(srcdst[0]) || (registered_vps & still_connected).empty?
         end
-        $stderr.puts "after filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        $LOG.puts "after filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
 
         return if srcdst2stillconnected.empty? # optimization
 
@@ -64,7 +64,7 @@ class FailureDispatcher
         # quickly isolate the directions of the failures
         srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
         measurement_times << ["spoof_ping", Time.new]
-        $stderr.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
+        #$LOG.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
 
         # if we control one of the targets, send out spoofed traceroutes in
         # the opposite direction for ground truth information
@@ -73,7 +73,7 @@ class FailureDispatcher
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
         measurement_times << ["spoof_tr", Time.new]
-        $stderr.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
+        $.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
         # thread out on each src, dst
         srcdst2stillconnected.keys.each do |srcdst|
@@ -106,7 +106,7 @@ class FailureDispatcher
                 hostname = FailureIsolation::SpooferIP2Hostname[dst]
                 if registered_hosts.include? hostname
                     swapped = [hostname, $pl_host2ip[src]]
-                    $stderr.puts "check4targetswecontrol(), swapped #{swapped.inspect} srcdst #{srcdst.inspect}"
+                    #$LOG.puts "check4targetswecontrol(), swapped #{swapped.inspect} srcdst #{srcdst.inspect}"
                     srcdst2dstsrc[srcdst] = swapped
                     symmetric_srcdst2stillconnected[swapped] = stillconnected
                 end
@@ -118,7 +118,7 @@ class FailureDispatcher
 
     def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected,
                         pings_towards_src, spoofed_tr, measurement_times, testing=false)
-        $stderr.puts "analyze_results: #{src}, #{dst}"
+        $LOG.puts "analyze_results: #{src}, #{dst}"
 
         direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
             ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
@@ -140,7 +140,7 @@ class FailureDispatcher
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
 
-            $stderr.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+            $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
         if(!testing)
@@ -155,7 +155,7 @@ class FailureDispatcher
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
                                       spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
-        $stderr.puts "analyze_results_with_symmetry: #{src}, #{dst}"
+        $LOG.puts "analyze_results_with_symmetry: #{src}, #{dst}"
 
         direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
             ping_responsive, tr, dataset, times = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
@@ -180,7 +180,7 @@ class FailureDispatcher
                                           historical_tr_hops, historical_trace_timestamp,
                                           spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
 
-            $stderr.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
+            $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
         if(!testing)
@@ -212,10 +212,6 @@ class FailureDispatcher
 
         cached_revtr_hops = fetch_cached_revtr(src, dst)
 
-        fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
-                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
-                                      cached_revtr_hops)
-
         # maybe not threadsafe, but fuckit
         tr = issue_normal_traceroute(src, [dst])
         measurement_times << ["tr_time", Time.new]
@@ -230,6 +226,11 @@ class FailureDispatcher
 
         ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr_hops) unless spoofed_revtr_hops[0].is_a?(Symbol)
         measurement_times << ["revtr pings", Time.new]
+
+        fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
+                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
+                                      cached_revtr_hops)
+
         
         dataset = FailureIsolation::get_dataset(dst)
         
@@ -269,7 +270,7 @@ class FailureDispatcher
     end
 
     def fetch_cached_revtr(src,dst)
-        $stderr.puts "fetch_cached_revtr(#{src}, #{dst})"
+        #$LOG.puts "fetch_cached_revtr(#{src}, #{dst})"
 
         dst = dst.ip if dst.is_a?(Hop)
 
@@ -291,7 +292,7 @@ class FailureDispatcher
             historical_trace_timestamp = nil
         end
 
-        $LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
+        #$LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
         # XXX why is this a nested array?
         [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }, historical_trace_timestamp]
@@ -301,7 +302,7 @@ class FailureDispatcher
         # hash is target2receiver2succesfulvps
         spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2stillconnected)
 
-        $LOG.puts "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
+        #$LOG.puts "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
         srcdst2pings_towards_src = {}
 
@@ -344,7 +345,7 @@ class FailureDispatcher
         dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
         dst = targets[0] # ugghh...
 
-        $LOG.puts "isolate_outage(#{src}, #{dst}), normal_traceroute_results: #{dest2ttlhoptuples.inspect}"
+        #$LOG.puts "isolate_outage(#{src}, #{dst}), normal_traceroute_results: #{dest2ttlhoptuples.inspect}"
 
         if dest2ttlhoptuples.nil? || dest2ttlhoptuples[dst].nil?
             tr_ttlhoptuples = []
@@ -369,7 +370,7 @@ class FailureDispatcher
             return [:drb_exception]
         end
 
-        $LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
+        #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return [:nil_return_value]
@@ -396,22 +397,22 @@ class FailureDispatcher
     # hop.ping_responsive, and return the responsive pings
     def issue_pings(source, dest, historical_tr_hops, spoofed_tr, cached_revtr_hops)
         all_hop_sets = [[Hop.new(dest)], historical_tr_hops, spoofed_tr, cached_revtr_hops]
-        request_pings(all_hop_sets)
+        request_pings(source, all_hop_sets)
     end
 
     # we issue the pings separately for the revtr, since the revtr can take an
     # excrutiatingly long time to execute sometimes
     def issue_pings_for_revtr(source, revtr_hops)
-        request_pings([revtr_hops])
+        request_pings(source, [revtr_hops])
     end
 
     # private
-    def request_pings(all_hop_sets)
+    def request_pings(source, all_hop_sets)
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
-        $stderr.puts "Responsive to ping: #{responsive.inspect}"
+        #$LOG.puts "Responsive to ping: #{responsive.inspect}"
 
         # update reachability
         all_hop_sets.each do |hop_set|
@@ -430,7 +431,7 @@ class FailureDispatcher
 
         ip2lastresponsive = @db.fetch_pingability(all_targets.to_a)
 
-        $stderr.puts "fetch_historical_pingability(), ip2lastresponsive #{ip2lastresponsive.inspect}"
+        #$LOG.puts "fetch_historical_pingability(), ip2lastresponsive #{ip2lastresponsive.inspect}"
 
         # update historical reachability
         all_hop_sets.each do |hop_set|
