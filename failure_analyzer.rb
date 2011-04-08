@@ -10,12 +10,13 @@ end
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 class FailureAnalyzer
-    def initialize(ipInfo)
+    def initialize(ipInfo, dispatcher)
         @ipInfo = ipInfo
     end
 
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
+    # Returns [suspect, # AS-hops from dst, # AS-hops from src]
     def identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         case direction
@@ -24,8 +25,16 @@ class FailureAnalyzer
             tr_suspect = tr.last_responsive_hop
             spooftr_suspect = spoofed_tr.last_responsive_hop
             suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            return nil if suspected_hop.nil?
-            
+            return [nil, -1, -1] if suspected_hop.nil?
+
+            as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
+                count_AS_hops(spoofed_revtr, suspected_hop),
+                spoofed_tr.compressed_as_path.length - as_hops_from_src,
+                tr.compressed_as_path.length - as_hops_from_src].max
+
+            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
+                count_AS_hops(spoofed_tr, suspected_hop)].max
+
             # do some comparison of m's historical reverse path to infer the router which is either
             # failed or changed its path
             #
@@ -33,20 +42,63 @@ class FailureAnalyzer
             # real-time though
             # historical_revtr = fetch_cached_revtr(src, suspected_hop)
             # XXX 
-            return suspected_hop
+            return [suspected_hop, as_hops_from_dst, as_hops_from_src]
         when Direction::FORWARD, Direction::BOTH
             # the failure is most likely adjacent to the last responsive forward hop
             last_tr_hop = tr.last_non_zero_hop
             last_spooftr_hop = spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-            return suspected_hop
+
+            as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
+                count_AS_hops(spoofed_revtr, suspected_hop),
+                spoofed_tr.compressed_as_path.length - as_hops_from_src,
+                tr.compressed_as_path.length - as_hops_from_src].max
+
+            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
+                count_AS_hops(spoofed_tr, suspected_hop),
+                count_AS_hops(historical_tr, suspected_hop)].max
+
+            return [suspected_hop, as_hops_from_dst, as_hops_from_src]
         when Direction::FALSE_POSITIVE
-            return "problem resolved itself"
+            return ["problem resolved itself", -1, -1]
         else 
             raise "unknown direction #{direction}!"
         end
-     
-        # TODO: how many sources away from the source/dest is the failure?
+    end
+
+    def count_AS_hops(path, suspected_hop)
+        return -1 if path.empty? || suspected_hop.nil?
+
+        as_count = 0
+        prev_AS = path[0].asn
+
+        if suspected_hop.asn.nil?
+            for hop in path
+               if hop.asn != prev_AS
+                  prev_AS = hop.asn
+                  as_count += 1
+               end   
+
+               if hop == suspected_hop
+                  return as_count 
+               end
+            end
+
+            return -1
+        else
+            for hop in path
+               if hop.asn != prev_AS
+                  prev_AS = hop.asn
+                  as_count += 1
+               end 
+
+               if hop.asn == suspected_hop.asn
+                   return as_count
+               end
+            end
+
+            return -1
+        end
     end
 
     def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
@@ -54,17 +106,17 @@ class FailureAnalyzer
         alternate_paths = []
      
         if(historical_reverse.ping_responsive_except_dst?(dst) && 
-               historical_reverse.as_path != spoofed_revtr.as_path)
+               historical_reverse.compressed_as_path != spoofed_revtr.compressed_as_path)
             alternate_paths << :"historical reverse path"
         end
     
-        historical_as_path = historical_tr.as_path
-        spoofed_as_path = spoofed_tr.as_path
+        historical_as_path = historical_tr.compressed_as_path
+        spoofed_as_path = spoofed_tr.compressed_as_path
         # if the spoofed_tr reached (reverse path problem), we compare the AS-level paths directly
         # if the spoofed_tr didn't reach, we compare up the interesction of
         # the two path. Both of these are subsumed by ([] & [])
         if(historical_tr.ping_responsive_except_dst?(dst) &&
-               ((spoofed_as_path & historical_as_path) != spoofed_as_path)
+               ((spoofed_as_path & historical_as_path) != spoofed_as_path))
             alternate_paths << :"historical forward path"
         end
     
@@ -90,7 +142,7 @@ class FailureAnalyzer
         end
     end
 
-    def path_changed?()
+    def path_changed?(historical_tr, tr, spoofed_tr, direction)
        case direction
        when Direction::REVERSE
        when Direction::FORWARD

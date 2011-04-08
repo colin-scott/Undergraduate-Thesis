@@ -120,14 +120,18 @@ class FailureDispatcher
                         pings_towards_src, spoofed_tr, measurement_times, testing=false)
         $LOG.puts "analyze_results: #{src}, #{dst}"
 
+        # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
-            ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
+            working_historical_paths, measured_working_direction, path_changed = gather_additional_data(
+                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         insert_measurement_durations(measurement_times)
 
         log_name = get_uniq_filename(src, dst)
 
-        passed_filters =  @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
+        passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr,
+                                                             ping_responsive, historical_tr, direction, testing)
 
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
@@ -139,7 +143,10 @@ class FailureDispatcher
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, cached_revtr, graph_url, measurement_times, testing)
+                                          spoofed_revtr, cached_revtr, graph_url, measurement_times,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -149,7 +156,10 @@ class FailureDispatcher
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, cached_revtr, passed_filters)
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters)
         end
     end
 
@@ -158,8 +168,11 @@ class FailureDispatcher
                                       spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
         $LOG.puts "analyze_results_with_symmetry: #{src}, #{dst}"
 
+        # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
-            ping_responsive, tr, dataset, times = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
+            alternate_paths, measured_working_direction, path_changed = gather_additional_data(
+                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
 
@@ -167,7 +180,8 @@ class FailureDispatcher
 
         log_name = get_uniq_filename(src, dst)
 
-        passed_filters =  @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
+        passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive,
+                                                                        historical_tr, direction, testing)
         
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
@@ -175,23 +189,30 @@ class FailureDispatcher
  
             graph_url = generate_web_symlink(jpg_output)
 
-            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset,
+                                          direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, cached_revtr, graph_url, measurement_times, testing)
+                                          spoofed_revtr, cached_revtr, graph_url, measurement_times,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         end
 
         if(!testing)
-            log_symmetric_isolation_results(log_name, src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
+            log_symmetric_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
                                           historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, cached_revtr, passed_filters)
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters)
         end
     end
 
@@ -230,18 +251,23 @@ class FailureDispatcher
         ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
         measurement_times << ["measurements completed", Time.new]
 
-        fetch_historical_pingability!(historical_tr, spoofed_tr,
-                                      spoofed_revtr, cached_revtr)
+        fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)
 
         dataset = FailureIsolation::get_dataset(dst)
+        
+        suspected_failure, as_hops_from_dst, as_hops_from_src = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr,
+                                                             historical_tr, spoofed_revtr, historical_revtr)
 
-        # XXX
-        suspected_failure = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
-        as_hops_from_dst = 1
-        as_hops_from_src = 1
+        working_historical_paths = @failure_analyzer.find_working_historical_paths(src, dst, direction, tr,
+                                                    spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
+
+        measured_working_direction = @failure_analyzer.measured_working_direction?(direction, spoofed_revtr)
+
+        path_changed = @failure_analyzer.path_changed?(historical_tr, tr, spoofed_tr, direction)
         
         [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
-            ping_responsive, tr, dataset]
+            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
+            working_historical_paths, measured_working_direction, path_changed]
     end
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,

@@ -98,7 +98,10 @@ class Emailer < ActionMailer::Base
                           formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, measurement_times, testing=false)
+                          spoofed_revtr, cached_revtr, jpg_url, measurement_times,
+                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                          alternate_paths, measured_working_direction, path_changed,
+                          testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -112,6 +115,12 @@ class Emailer < ActionMailer::Base
                     :historical_forward_path => historical_forward_path,
                     :historical_fpath_timestamp => historical_fpath_timestamp,
                     :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
+                    :suspected_failure => suspected_failure,
+                    :as_hops_from_dst => as_hops_from_dst,
+                    :as_hops_from_src => as_hops_from_src, 
+                    :alternate_paths => alternate_paths, 
+                    :measured_working_direction => measured_working_direction, 
+                    :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
@@ -119,7 +128,10 @@ class Emailer < ActionMailer::Base
                           normal_forward_path, spoofed_forward_path,
                           dst_normal_forward_path, dst_spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, measurement_times, testing=false)
+                          spoofed_revtr, cached_revtr, jpg_url, measurement_times,
+                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                          alternate_paths, measured_working_direction, path_changed,
+                          testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -134,6 +146,12 @@ class Emailer < ActionMailer::Base
                     :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
                     :dst_normal_forward_path => dst_normal_forward_path,
                     :dst_spoofed_forward_path => dst_spoofed_forward_path,
+                    :suspected_failure => suspected_failure,
+                    :as_hops_from_dst => as_hops_from_dst,
+                    :as_hops_from_src => as_hops_from_src, 
+                    :alternate_paths => alternate_paths, 
+                    :measured_working_direction => measured_working_direction, 
+                    :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times
     end
     def isolation_exception(exception)

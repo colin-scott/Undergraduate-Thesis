@@ -13,10 +13,14 @@
 class Path < Array
    # SpoofedReversePath.valid? kind of throws a wrench into this whole
    # endeavor...  override!
-   def as_path(ipInfo)
+   def compressed_as_path()
        # .uniq assumes no AS loops
        # TODO: do I need the find_all?
-       self.map { |hop| ipInfo.getASN(hop.ip) }.find_all { |asn| !asn.nil? }.uniq 
+       as_path().find_all { |asn| !asn.nil? }.uniq 
+   end
+
+   def as_path()
+       self.map { |hop| hop.asn }
    end
 end
 
@@ -238,6 +242,7 @@ class ReverseHop < Hop
             if @valid_ip and @dns.empty?
                 @dns = @ip
             end
+
         when 5 # parse from print_cached_reverse_path_reasons.rb
             @ip, @ttl, @type, sym_reasons, ipInfo = args
             @type = @type.to_sym

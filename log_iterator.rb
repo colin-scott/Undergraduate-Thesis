@@ -4,6 +4,9 @@ require 'yaml'
 require 'ip_info'
 require 'hops'
 
+# HMMMMMMMM, wouldn't protobufs have been nice :P
+# Gotta love versioning
+
 module LogIterator
     IPINFO = IpInfo.new # hmmm
 
@@ -46,9 +49,20 @@ module LogIterator
         FailureIsolation::DotFiles+"/"+File.basename(yml).gsub(/yml$/, "jpg")
     end
 
-    def LogIterator::all_filtered_outages(&block)
+    def LogIterator::all_filtered_outages_rev4(&block)
         Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
             yml = LogIterator::jpg2yml(jpg)
+            begin 
+                self.read_log_rev4(yml, &block)
+            rescue Errno::ENOENT, ArgumentError, TypeError
+                $stderr.puts "failed to open #{yml}, #{$!}"
+            end
+        end
+    end
+
+    def LogIterator::all_filtered_outages_rev3(&block)
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
+            yml = LogIterator::jpg2yml_rev3(jpg)
             begin 
                 self.read_log_rev3(yml, &block)
             rescue Errno::ENOENT, ArgumentError, TypeError
@@ -83,7 +97,7 @@ module LogIterator
         Dir.chdir FailureIsolation::IsolationResults do
             Dir.glob("*yml").each do |file|
                 begin
-                    self.read_log_rev3(file, &block)
+                    self.read_log_rev4(file, &block)
                 rescue Errno::ENOENT, ArgumentError, TypeError
                     $stderr.puts "failed to open #{file}, #{$!}"
                 end
@@ -126,8 +140,28 @@ module LogIterator
                                           historical_tr, historical_trace_timestamp,
                                           spoofed_revtr, cached_revtr
     end
+ 
+    def LogIterator::read_log_rev4(file)
+        src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters = YAML.load_file(file)
+               
+        yield file, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters
+    end
 
-    def LogIterator::read_sym_log(file)
+    def LogIterator::read_sym_log_rev2(file)
         src, dst, dataset, direction, formatted_connected,
            formatted_unconnected, pings_towards_src,
            tr, spoofed_tr,
@@ -141,6 +175,28 @@ module LogIterator
            dst_tr, dst_spoofed_tr,
            historical_tr, historical_trace_timestamp,
            spoofed_revtr, cached_revtr, testing
+    end
+
+    def LogIterator::read_sym_log_rev3(file)
+        src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters = YAML.load_file(file)
+
+        yield file, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters
     end
 end
 
