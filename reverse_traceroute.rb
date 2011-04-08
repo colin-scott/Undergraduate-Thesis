@@ -1842,11 +1842,11 @@ def reverse_traceroute( pairs, dirname, backoff_endhost=true)
 		$LOG.puts "REACHED"
 		reached_rnd.each{|rtr| 
 			if $dump_logs
-				tr_hops=[]
+				tr=[]
 				if rtr.curr_path.lastSeg.class==TRtoSrcRevSegment
-					tr_hops=[rtr.curr_path.lastSeg.hop] + rtr.curr_path.lastSeg.hops
+					tr=[rtr.curr_path.lastSeg.hop] + rtr.curr_path.lastSeg.hops
 				end
-				$stdout.puts "RTR #{rtr.src} #{rtr.dst} #{rtr.symmetric_assumptions} #{rtr.curr_path.hops.join(" ")} [#{tr_hops.join(" ")}]"
+				$stdout.puts "RTR #{rtr.src} #{rtr.dst} #{rtr.symmetric_assumptions} #{rtr.curr_path.hops.join(" ")} [#{tr.join(" ")}]"
 				begin
 					dumpfile = File.new("#{dirname}/dump.out.#{rtr.src}_#{rtr.dst}",'w')
 					dumpfile.write Marshal.dump(rtr.curr_path)

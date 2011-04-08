@@ -120,25 +120,26 @@ class FailureDispatcher
                         pings_towards_src, spoofed_tr, measurement_times, testing=false)
         $LOG.puts "analyze_results: #{src}, #{dst}"
 
-        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+        direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         insert_measurement_durations(measurement_times)
 
         log_name = get_uniq_filename(src, dst)
 
-        if(@failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+        passed_filters =  @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
 
-            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops)
+        if(passed_filters)
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             cached_revtr)
 
             graph_url = generate_web_symlink(jpg_output)
 
             Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr, graph_url, measurement_times, testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -147,8 +148,8 @@ class FailureDispatcher
             log_isolation_results(log_name, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops)
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr, passed_filters)
         end
     end
 
@@ -157,7 +158,7 @@ class FailureDispatcher
                                       spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
         $LOG.puts "analyze_results_with_symmetry: #{src}, #{dst}"
 
-        direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+        direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, times = gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
@@ -165,11 +166,12 @@ class FailureDispatcher
         insert_measurement_durations(measurement_times)
 
         log_name = get_uniq_filename(src, dst)
-        
-        if(@failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
 
-            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops)
+        passed_filters =  @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
+        
+        if(passed_filters)
+            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             cached_revtr)
  
             graph_url = generate_web_symlink(jpg_output)
 
@@ -177,8 +179,8 @@ class FailureDispatcher
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, graph_url, measurement_times, testing)
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr, graph_url, measurement_times, testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -188,8 +190,8 @@ class FailureDispatcher
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           dst_tr, dst_spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops, testing)
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr, passed_filters)
         end
     end
 
@@ -197,20 +199,20 @@ class FailureDispatcher
     # analyze_results() and analyze_results_with_symmetry()
     def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
         reverse_problem = pings_towards_src.empty?
-        forward_problem = !@failure_analyzer.forward_path_reached?(spoofed_tr, dst)
+        forward_problem = !spoofed_tr.reached?(dst)
 
         direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
 
         # HistoricalForwardHop objects
-        historical_tr_hops, historical_trace_timestamp = retrieve_historical_tr(src, dst)
+        historical_tr, historical_trace_timestamp = retrieve_historical_tr(src, dst)
 
-        historical_tr_hops.each do |hop|
+        historical_tr.each do |hop|
             # XXX thread out on this to make it faster? Ask Dave for a faster
             # way?
             hop.reverse_path = fetch_cached_revtr(src, hop.ip)
         end
 
-        cached_revtr_hops = fetch_cached_revtr(src, dst)
+        cached_revtr = fetch_cached_revtr(src, dst)
 
         # maybe not threadsafe, but fukit
         measurement_times << ["tr_time", Time.new]
@@ -219,32 +221,35 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         measurement_times << ["non-revtr pings", Time.new]
-        ping_responsive = issue_pings(src, dst, historical_tr_hops, spoofed_tr, cached_revtr_hops)
+        ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, cached_revtr)
 
         measurement_times << ["revtr", Time.new]
-        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
+        spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
 
         measurement_times << ["revtr pings", Time.new]
-        ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr_hops) unless spoofed_revtr_hops[0].is_a?(Symbol)
+        ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
         measurement_times << ["measurements completed", Time.new]
 
-        fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
-                                      spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
-                                      cached_revtr_hops)
+        fetch_historical_pingability!(historical_tr, spoofed_tr,
+                                      spoofed_revtr, cached_revtr)
 
-        
         dataset = FailureIsolation::get_dataset(dst)
+
+        # XXX
+        suspected_failure = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
+        as_hops_from_dst = 1
+        as_hops_from_src = 1
         
-        [direction, historical_tr_hops, historical_trace_timestamp, spoofed_revtr_hops, cached_revtr_hops,
+        [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset]
     end
 
-    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops)
+    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             cached_revtr)
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
-                             cached_revtr_hops, jpg_output)
+        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             cached_revtr, jpg_output)
 
         jpg_output
     end
@@ -279,7 +284,7 @@ class FailureDispatcher
         
         # XXX HACKKK. we want to print bad cache results in our email, which takes
         # on an array of hacky non-valid ReverseHop objects...
-        path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid
+        path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid?
 
         HistoricalReversePath.new(path)
     end
@@ -375,7 +380,7 @@ class FailureDispatcher
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
-            return [:nil_return_value] # XXX Encapsulate this into the reverse path object rather than using the hack...
+            return SpoofedReversePath.new([:nil_return_value])
         end
                 
         revtr = srcdst2revtr[[src,dst]]
@@ -386,26 +391,26 @@ class FailureDispatcher
             spoofed_revtr = [revtr]
         else
             # XXX string -> array -> string. meh.
-            spoofed_revtr = ReversePath.new(revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) })
+            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
         
-        spoofed_revtr
+        SpoofedReversePath.new(spoofed_revtr)
     end
 
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
-    def issue_pings(source, dest, historical_tr_hops, spoofed_tr, cached_revtr_hops)
-        all_hop_sets = [[Hop.new(dest)], historical_tr_hops, spoofed_tr, cached_revtr_hops]
+    def issue_pings(source, dest, historical_tr, spoofed_tr, cached_revtr)
+        all_hop_sets = [[Hop.new(dest)], historical_tr, spoofed_tr, cached_revtr]
         request_pings(source, all_hop_sets)
     end
 
     # we issue the pings separately for the revtr, since the revtr can take an
     # excrutiatingly long time to execute sometimes
-    def issue_pings_for_revtr(source, revtr_hops)
-        request_pings(source, [revtr_hops])
+    def issue_pings_for_revtr(source, revtr)
+        request_pings(source, [revtr])
     end
 
     # private
@@ -425,9 +430,10 @@ class FailureDispatcher
     end
 
     # XXX Am I giving Ethan all of these hops properly?
-    def fetch_historical_pingability!(historical_tr_hops, spoofed_tr_hops, spoofed_revtr_hops, cached_revtr_hops)
+    def fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)
         # TODO: redundannnnttt
-        all_hop_sets = [historical_tr_hops, spoofed_revtr_hops, spoofed_tr_hops, cached_revtr_hops]
+        all_hop_sets = [historical_tr, spoofed_tr, cached_revtr]
+        all_hop_sets << spoofed_revtr if spoofed_revtr.valid? # might contain a symbol. hmmm... XXX
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 

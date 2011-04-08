@@ -52,11 +52,14 @@ module FailureIsolation
     FailureIsolation::OutageNotifications = "#{$DATADIR}/outage_notifications"
 
     # I keep changing the format of the logs....
+    # Also, this naming convention is retarted
     FailureIsolation::OlderIsolationResults = "#{$DATADIR}/isolation_results"
     FailureIsolation::LastIsolationResults = "#{$DATADIR}/isolation_results_rev2"
-    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev3"
+    FailureIsolation::PreviousIsolationResults = "#{$DATADIR}/isolation_results_rev3"
+    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev4"
 
     FailureIsolation::LastSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
+    FailureIsolation::OldSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev2"
     FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev2"
 
     FailureIsolation::DotFiles = "#{$DATADIR}/dots"

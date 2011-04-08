@@ -30,6 +30,10 @@ module LogIterator
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
     end
 
+    def LogIterator::jpg2yml_rev3(jpg)
+       FailureIsolation::PreviousIsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
+    end
+
     def LogIterator::jpg2yml_rev2(jpg)
        FailureIsolation::LastIsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
     end
@@ -90,12 +94,12 @@ module LogIterator
     def LogIterator::read_log_rev1(file)
         src, dst, dataset, direction, formatted_connected, formatted_unconnected,
                destination_pingable, pings_towards_src, tr,
-               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
-               spoofed_revtr_hops, cached_revtr_hops, testing = YAML.load_file(file)
+               spoofed_tr, historical_tr, historical_trace_timestamp,
+               spoofed_revtr, cached_revtr, testing = YAML.load_file(file)
         yield file, src, dst, dataset, direction, formatted_connected, formatted_unconnected,
                destination_pingable, pings_towards_src, tr,
-               spoofed_tr, historical_tr_hops, historical_trace_timestamp,
-               spoofed_revtr_hops, cached_revtr_hops, testing 
+               spoofed_tr, historical_tr, historical_trace_timestamp,
+               spoofed_revtr, cached_revtr, testing 
     end
 
     def LogIterator::read_log_rev2(file)
@@ -113,14 +117,14 @@ module LogIterator
         src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops = YAML.load_file(file)
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr = YAML.load_file(file)
                
         yield file, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr
     end
 
     def LogIterator::read_sym_log(file)
@@ -128,15 +132,15 @@ module LogIterator
            formatted_unconnected, pings_towards_src,
            tr, spoofed_tr,
            dst_tr, dst_spoofed_tr,
-           historical_tr_hops, historical_trace_timestamp,
-           spoofed_revtr_hops, cached_revtr_hops, testing = YAML.load_file(file)
+           historical_tr, historical_trace_timestamp,
+           spoofed_revtr, cached_revtr, testing = YAML.load_file(file)
                
         yield file, src, dst, dataset, direction, formatted_connected,
            formatted_unconnected, pings_towards_src,
            tr, spoofed_tr,
            dst_tr, dst_spoofed_tr,
-           historical_tr_hops, historical_trace_timestamp,
-           spoofed_revtr_hops, cached_revtr_hops, testing
+           historical_tr, historical_trace_timestamp,
+           spoofed_revtr, cached_revtr, testing
     end
 end
 
@@ -158,9 +162,9 @@ if __FILE__ == $0
     LogIterator::read_log_rev3(ARGV.shift) do |file, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
-                                          historical_tr_hops, historical_trace_timestamp,
-                                          spoofed_revtr_hops, cached_revtr_hops|
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr|
         Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr,
-             historical_tr_hops, spoofed_revtr_hops, cached_revtr_hops, "testing.jpg")
+             historical_tr, spoofed_revtr, cached_revtr, "testing.jpg")
     end
 end

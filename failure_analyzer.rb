@@ -45,29 +45,38 @@ class FailureAnalyzer
         else 
             raise "unknown direction #{direction}!"
         end
-
+     
         # TODO: how many sources away from the source/dest is the failure?
     end
 
     def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         alternate_paths = []
-
-        if(historical_reverse.ping_responsive_except_dst?(dst))
-            alternate_paths << "historical reverse path"
-        end 
-
-        if(historical_tr.ping_responsive_except_dst?(dst))
-            alternate_paths << "historical forward path"
+     
+        if(historical_reverse.ping_responsive_except_dst?(dst) && 
+               historical_reverse.as_path != spoofed_revtr.as_path)
+            alternate_paths << :"historical reverse path"
         end
-
+    
+        historical_as_path = historical_tr.as_path
+        spoofed_as_path = spoofed_tr.as_path
+        # if the spoofed_tr reached (reverse path problem), we compare the AS-level paths directly
+        # if the spoofed_tr didn't reach, we compare up the interesction of
+        # the two path. Both of these are subsumed by ([] & [])
+        if(historical_tr.ping_responsive_except_dst?(dst) &&
+               ((spoofed_as_path & historical_as_path) != spoofed_as_path)
+            alternate_paths << :"historical forward path"
+        end
+    
         if(direction == Direction::FORWARD && measured_working_direction?(direction, spoofed_revtr))
-            alternate_paths << "reverse path"
+            alternate_paths << :"reverse path"
+        end
+    
+        if(direction == Direction::REVERSE && measured_working_direction?(direction, spoofed_tr))
+            alternate_paths << :"forward path"
         end
 
-        if(direction == Direction::REVERSE)
-            alternate_paths << "forward path"
-        end
+        alternate_paths
     end
 
     def measured_working_direction?(direction, spoofed_revtr)
@@ -89,6 +98,8 @@ class FailureAnalyzer
        when Direction::FALSE_POSITIVE
        else
        end
+
+       return false
     end
 
     def compare_ground_truth(src, dst, direction, tr, spoofed_tr, historical_tr,
@@ -114,7 +125,7 @@ class FailureAnalyzer
         direction
     end
 
-    def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing)
+    def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
         # it's uninteresting if no measurements worked... probably the
         # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
@@ -125,7 +136,7 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        #no_historical_trace = (historical_tr_hops.empty?)
+        #no_historical_trace = (historical_tr.empty?)
         no_historical_trace = false # XXX    just to see if more emails show up...
 
         # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace

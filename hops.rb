@@ -5,61 +5,60 @@
 #    * nil if not initialized (not grabbed from the
 #       DB yet)
 
-class Hop
-    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
-    def initialize(*args)
-        @ping_responsive = false
-        case args.size
-        when 1 # just the ip
-            @ip = args.shift
-        end
-    end
 
-    def <=>(other)
-        @ttl <=> other.ttl
-    end
-
-    def self.later(tr_suspect, spooftr_suspect)
-        if tr_suspect.nil?
-            return spooftr_suspect
-        elsif spooftr_suspect.nil?
-            return tr_suspect
-        else
-            return (tr_suspect > spooftr_suspect) ? tr_suspect : spooftr_suspect
-        end
-    end
-end
-
-# wait a minute... we could just instantiate a Hop object...
-MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
-                     :reverse_path)
+# =============================================================================
+#                            Paths                                            #
+# =============================================================================
 
 class Path < Array
-    def last_responsive_hop()
-        self.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
-    end
+   # SpoofedReversePath.valid? kind of throws a wrench into this whole
+   # endeavor...  override!
+   def as_path(ipInfo)
+       # .uniq assumes no AS loops
+       # TODO: do I need the find_all?
+       self.map { |hop| ipInfo.getASN(hop.ip) }.find_all { |asn| !asn.nil? }.uniq 
+   end
 end
 
-class HistoricalReversePath < Path
-   attr_accessor :timestamp, :valid, :invalid_reason, :src, :dst
+# fuckin' namespace collision with reverse_traceroute.rb
+class RevPath < Path
+   #def last_responsive_hop()
+   #    self.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
+   #end
 
-   def initialize()
-     @timestamp = 0 # measurement timestamp
-     @valid = false # if false, then there was nothing found in the DB
-     @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
-     @src = "" # should be clear
-     @dst = "" # ditto
+   def as_path()
+       return [] unless valid?
+       super
    end
 
    def ping_responsive_except_dst?(dst)
-       return false if path[-1].ip != dst # historical didn't reach
-       # Are reverse traceroutes reversed? Is the dest at the head or the tail?
-       reversed = path.reverse
-       reversed.shift # get rid of dst
+       return false if self.empty?
 
-       return false # XXX
+       # first hop of the reverse traceroute is the destination
+       for hop in self[1..-1]
+          return false if !hop.ping_responsive && hop.historically_pingable?
+       end
+
+       return true
+   end
+end
+
+class HistoricalReversePath < RevPath
+   attr_accessor :timestamp, :invalid_reason, :src, :dst, :valid
+
+   def initialize(*args)
+       super
+       @timestamp = 0 # measurement timestamp
+       @valid = false # if false, then there was nothing found in the DB
+       @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
+       @src = "" # should be clear
+       @dst = "" # ditto
    end
 
+   def valid?
+       return @valid
+   end
+   
    def to_s
        # print the pretty output
        result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
@@ -69,35 +68,11 @@ class HistoricalReversePath < Path
    end
 end
 
-# normal traceroute, spoofed traceroute, historical traceroute
-class ForwardPath < Path
-   def reached_dst_AS?(dst, ipInfo)
-       dst_as = ipInfo.getASN(dst)
-       last_non_zero_hop = last_non_zero_ip
-       last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
-       return !dest_as.nil? && !last_hop_as.nil? && dest_as == last_hop_as
-   end
+class SpoofedReversePath < RevPath
+    def valid?()
+        return !self[0].is_a?(Symbol)
+    end
 
-   def last_non_zero_ip
-        hop = last_non_zero_hop
-        return (hop.nil?) ? nil : hop.ip
-   end
-
-   def last_non_zero_hop()
-        last_hop = self.reverse.find { |hop| hop.ip != "0.0.0.0" }
-        return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
-   end
-
-   def reached?(dst)
-        !self.find { |hop| hop.ip == dst }.nil?
-   end
-
-   def ping_responsive_except_dst?(dst)
-       return false # XXX 
-   end    
-end
-
-class ReversePath < Path
     # not that many sym assumptions?
     def successful?()
         return false if self.size < 2
@@ -125,6 +100,82 @@ class ReversePath < Path
        return false
     end
 end
+
+# normal traceroute, spoofed traceroute, historical traceroute
+class ForwardPath < Path
+   def reached_dst_AS?(dst, ipInfo)
+       dst_as = ipInfo.getASN(dst)
+       last_non_zero_hop = last_non_zero_ip
+       last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
+       return !dst_as.nil? && !last_hop_as.nil? && dst_as == last_hop_as
+   end
+
+   def last_non_zero_ip
+        hop = last_non_zero_hop
+        return (hop.nil?) ? nil : hop.ip
+   end
+
+   def last_non_zero_hop()
+        last_hop = self.reverse.find { |hop| hop.ip != "0.0.0.0" }
+        return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
+   end
+
+   def reached?(dst)
+        !self.find { |hop| hop.ip == dst }.nil?
+   end
+
+   def ping_responsive_except_dst?(dst)
+       return false if self.empty?
+
+       for hop in self[0..-2]
+          return false if !hop.ping_responsive && hop.historically_pingable?
+       end
+
+       return true
+   end
+
+   def last_responsive_hop()
+       self.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
+   end
+end
+
+# =============================================================================
+#                            Hops                                            #
+# =============================================================================
+
+class Hop
+    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
+    def initialize(*args)
+        @ping_responsive = false
+        case args.size
+        when 1 # just the ip
+            @ip = args.shift
+        end
+    end
+
+    def <=>(other)
+        @ttl <=> other.ttl
+    end
+
+    def self.later(tr_suspect, spooftr_suspect)
+        if tr_suspect.nil?
+            return spooftr_suspect
+        elsif spooftr_suspect.nil?
+            return tr_suspect
+        else
+            return (tr_suspect > spooftr_suspect) ? tr_suspect : spooftr_suspect
+        end
+    end
+
+    def historically_pingable?
+        return @last_responsive != "N/A" && @last_responsive
+    end
+end
+
+# wait a minute... we could just instantiate a Hop object...
+MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
+                     :reverse_path)
+
 
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
