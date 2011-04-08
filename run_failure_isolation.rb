@@ -26,7 +26,7 @@ require 'failure_monitor'
 
 # XXX Don't hardcode!!!
 $pptasks = "~ethan/scripts/pptasks"
-$default_period_seconds = 300
+$default_period_seconds = 360
 Thread.abort_on_exception = true
 
 Signal.trap("USR1") do 

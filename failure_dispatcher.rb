@@ -62,8 +62,8 @@ class FailureDispatcher
         measurement_times = []
 
         # quickly isolate the directions of the failures
-        srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
         measurement_times << ["spoof_ping", Time.new]
+        srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
         #$LOG.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
 
         # if we control one of the targets, send out spoofed traceroutes in
@@ -71,9 +71,9 @@ class FailureDispatcher
         symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
-        srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
         measurement_times << ["spoof_tr", Time.new]
-        $.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
+        srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
+        #$LOG.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
         # thread out on each src, dst
         srcdst2stillconnected.keys.each do |srcdst|
@@ -127,7 +127,7 @@ class FailureDispatcher
 
         log_name = get_uniq_filename(src, dst)
 
-        if(@failure_analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+        if(@failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
 
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops)
@@ -166,7 +166,7 @@ class FailureDispatcher
 
         log_name = get_uniq_filename(src, dst)
         
-        if(@failure_analyzer.passes_filtering_heuristics(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
+        if(@failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr_hops, direction, testing))
 
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr_hops, spoofed_revtr_hops,
                              cached_revtr_hops)
@@ -212,20 +212,21 @@ class FailureDispatcher
 
         cached_revtr_hops = fetch_cached_revtr(src, dst)
 
-        # maybe not threadsafe, but fuckit
-        tr = issue_normal_traceroute(src, [dst])
+        # maybe not threadsafe, but fukit
         measurement_times << ["tr_time", Time.new]
+        tr = issue_normal_traceroute(src, [dst])
 
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
-        ping_responsive = issue_pings(src, dst, historical_tr_hops, spoofed_tr, cached_revtr_hops)
         measurement_times << ["non-revtr pings", Time.new]
+        ping_responsive = issue_pings(src, dst, historical_tr_hops, spoofed_tr, cached_revtr_hops)
 
-        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
         measurement_times << ["revtr", Time.new]
+        spoofed_revtr_hops = issue_spoofed_revtr(src, dst, historical_tr_hops.map { |hop| hop.ip })
 
-        ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr_hops) unless spoofed_revtr_hops[0].is_a?(Symbol)
         measurement_times << ["revtr pings", Time.new]
+        ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr_hops) unless spoofed_revtr_hops[0].is_a?(Symbol)
+        measurement_times << ["measurements completed", Time.new]
 
         fetch_historical_pingability!(historical_tr_hops, spoofed_tr,
                                       spoofed_revtr_hops[0].is_a?(Symbol) ? [] : spoofed_revtr_hops,
@@ -280,7 +281,7 @@ class FailureDispatcher
         # on an array of hacky non-valid ReverseHop objects...
         path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid
 
-        path
+        HistoricalReversePath.new(path)
     end
 
     def retrieve_historical_tr(src, dst)
@@ -295,7 +296,8 @@ class FailureDispatcher
         #$LOG.puts "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
         # XXX why is this a nested array?
-        [historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }, historical_trace_timestamp]
+        [ForwardPath.new(historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
+            historical_trace_timestamp]
     end
 
     def issue_pings_towards_srcs(srcdst2stillconnected)
@@ -329,11 +331,11 @@ class FailureDispatcher
         srcdst2stillconnected.keys.each do |srcdst|
             src, dst = srcdst
             if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
-                srcdst2spoofed_tr[srcdst] = []
+                srcdst2spoofed_tr[srcdst] = ForwardPath.new
             else
-                srcdst2spoofed_tr[srcdst] = srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
+                srcdst2spoofed_tr[srcdst] = ForwardPath.new(srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
                     SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
-                end
+                end)
             end
         end
 
@@ -353,7 +355,7 @@ class FailureDispatcher
             tr_ttlhoptuples = dest2ttlhoptuples[dst]
         end
 
-        tr_ttlhoptuples.map { |ttlhop| ForwardHop.new(ttlhop, @ipInfo) }
+        ForwardPath.new(tr_ttlhoptuples.map { |ttlhop| ForwardHop.new(ttlhop, @ipInfo) })
     end
 
     # XXX change me later to deal with revtrs from forward hops
@@ -373,7 +375,7 @@ class FailureDispatcher
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
-            return [:nil_return_value]
+            return [:nil_return_value] # XXX Encapsulate this into the reverse path object rather than using the hack...
         end
                 
         revtr = srcdst2revtr[[src,dst]]
@@ -384,7 +386,7 @@ class FailureDispatcher
             spoofed_revtr = [revtr]
         else
             # XXX string -> array -> string. meh.
-            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
+            spoofed_revtr = ReversePath.new(revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) })
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"

@@ -7,26 +7,6 @@ require 'utilities'
 require 'ip_info'
 require 'hops'
 
-class ReversePathSimple < Array
-  attr_accessor :timestamp, :valid, :invalid_reason, :src, :dst
-
-  def initialize()
-    @timestamp = 0 # measurement timestamp
-    @valid = false # if false, then there was nothing found in the DB
-    @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
-    @src = "" # should be clear
-    @dst = "" # ditto
-  end
-
-  def to_s
-      # print the pretty output
-      result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
-      result << self.map { |x| x.to_s }.join("\n") if @valid
-      result << "Failed query, reason: #{@invalid_reason}" if !@valid
-      result
-  end
-end
-
 class RevtrCache
     @@freshness = 24*60
     @@max_hops = 30
@@ -37,7 +17,7 @@ class RevtrCache
     end
 
     def get_cached_reverse_path(src, dst)
-      path = ReversePathSimple.new
+      path = HistoricalReversePath.new
       path.src = src
       path.dst = dst
     

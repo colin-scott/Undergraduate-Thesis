@@ -18,11 +18,113 @@ class Hop
     def <=>(other)
         @ttl <=> other.ttl
     end
+
+    def self.later(tr_suspect, spooftr_suspect)
+        if tr_suspect.nil?
+            return spooftr_suspect
+        elsif spooftr_suspect.nil?
+            return tr_suspect
+        else
+            return (tr_suspect > spooftr_suspect) ? tr_suspect : spooftr_suspect
+        end
+    end
 end
 
 # wait a minute... we could just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
                      :reverse_path)
+
+class Path < Array
+    def last_responsive_hop()
+        self.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
+    end
+end
+
+class HistoricalReversePath < Path
+   attr_accessor :timestamp, :valid, :invalid_reason, :src, :dst
+
+   def initialize()
+     @timestamp = 0 # measurement timestamp
+     @valid = false # if false, then there was nothing found in the DB
+     @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
+     @src = "" # should be clear
+     @dst = "" # ditto
+   end
+
+   def ping_responsive_except_dst?(dst)
+       return false if path[-1].ip != dst # historical didn't reach
+       # Are reverse traceroutes reversed? Is the dest at the head or the tail?
+       reversed = path.reverse
+       reversed.shift # get rid of dst
+
+       return false # XXX
+   end
+
+   def to_s
+       # print the pretty output
+       result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
+       result << self.map { |x| x.to_s }.join("\n") if @valid
+       result << "Failed query, reason: #{@invalid_reason}" if !@valid
+       result
+   end
+end
+
+# normal traceroute, spoofed traceroute, historical traceroute
+class ForwardPath < Path
+   def reached_dst_AS?(dst, ipInfo)
+       dst_as = ipInfo.getASN(dst)
+       last_non_zero_hop = last_non_zero_ip
+       last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
+       return !dest_as.nil? && !last_hop_as.nil? && dest_as == last_hop_as
+   end
+
+   def last_non_zero_ip
+        hop = last_non_zero_hop
+        return (hop.nil?) ? nil : hop.ip
+   end
+
+   def last_non_zero_hop()
+        last_hop = self.reverse.find { |hop| hop.ip != "0.0.0.0" }
+        return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
+   end
+
+   def reached?(dst)
+        !self.find { |hop| hop.ip == dst }.nil?
+   end
+
+   def ping_responsive_except_dst?(dst)
+       return false # XXX 
+   end    
+end
+
+class ReversePath < Path
+    # not that many sym assumptions?
+    def successful?()
+        return false if self.size < 2
+
+        # :dst_sym is ignored, I think
+
+        # We actually only require that there is no sequence of more than two symmetric assumptions.
+        # Also, symmetry can't be assumed next to the destination
+        return !more_than_n_consecutive_sym_assumptions?(2) &&
+            self[-2].type != :sym
+    end
+
+    def more_than_n_consecutive_sym_assumptions?(n)
+       sym_count = 0
+
+       for hop in self
+          if hop.type == :sym
+              sym_count += 1
+              return true if sym_count > n
+          else
+              sym_count = 0
+          end
+       end
+
+       return false
+    end
+end
 
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path

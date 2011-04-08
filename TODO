@@ -1,5 +1,5 @@
 What I want to add to the logs:
-   - a boolean flag for whether the outage passed filtering heuristcs
+   - a boolean flag for whether the outage passed filtering heuristics
    - how many hops from the src/dest the failure was
 
 Not that many outages are passing the filtering heuristics. Could be

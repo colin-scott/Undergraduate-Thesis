@@ -1295,7 +1295,9 @@ Signal.trap("USR1"){
 
 Signal.trap("USR2") {
   mem_usage = `ps -o rss= -p #{Process.pid}`.to_i
-  $LOG.puts "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}"
+  threads = Thread.list.map { |x| "#{x[:name]}: #{x.inspect}" }.join("; ")
+  $LOG.puts "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}, Threads: #{threads}"
+  $stderr.flush
 } 
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)

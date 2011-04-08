@@ -1,8 +1,16 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+# last_responsive will be 
+#    * "N/A" if not in the database
+#    * false if not historically pingable
+#    * A Time object if historically pingable
+#    * nil if not initialized (not grabbed from the
+#       DB yet)
+
 require 'mysql'
 require 'socket'
 require 'utilities'
+require 'set'
 require '../spooftr_config'
 
 class DatabaseInterface
@@ -31,11 +39,21 @@ class DatabaseInterface
         results.each_hash do |row|
            #$LOG.puts "fetch_pingability(), row=#{row.inspect}"
            #   see hops.rb for an explanation:
-           row["last_responsive"] = false if row["last_responsive"].nil?
+           row["last_responsive"] = false if row.include?("last_responsive") and row["last_responsive"].nil?
            responsive[Inet::ntoa(row["ip"].to_i)] = row["last_responsive"]
         end
 
         responsive
+    end
+
+    # fetch all reverse hops from the cache
+    def fetch_reverse_hops()
+        sql = "select distinct inet_ntoa(hop) from cache_hops where date < (current_timestamp()-24*60*60)"
+        
+        results = Set.new(query(sql))
+
+        # convert (singleton) arrays into the the strings they contain
+        results.map { |hop| hop[0] }
     end
 
     # wrapper for arbitrary sql queries

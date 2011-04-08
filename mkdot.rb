@@ -65,7 +65,7 @@ module Dot
         edge_seen_in_measurements=Hash.new(false)
 
         # cluster -> pingable?
-        node2pingable = Hash.new(false)
+        node2pingable = {}
 
         # cluster -> historically pingable?
         node2historicallypingable = Hash.new(false)
@@ -95,6 +95,7 @@ module Dot
         end
 
         node2historicallypingable.each_pair do |node, pingable|
+            node_attributes[node]["shape"] = "box" if pingable == "N/A"
             node_attributes[node]["shape"] = "diamond" if !pingable
         end
 
@@ -145,8 +146,19 @@ module Dot
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability
           # DB (hop.last_responsive == "N/A")
-          last_responsive = (hop.last_responsive == "N/A") ? false : hop.last_responsive
-          node2historicallypingable[current] ||= last_responsive
+          #
+          #
+          # oh boy, this is messy. Mixing booleans with "N/A" is bad news
+          # bears. We need the boolean ||= b/c multiple IPs may map to the same
+          # cluster
+          in_db = hop.last_responsive != "N/A"
+          if !in_db and !node2historicallypingable.include? current
+              node2historicallypingable[current] = "N/A"
+          elsif in_db and node2historicallypingable[current] != "N/A"
+              node2historicallypingable[current] ||= hop.last_responsive
+          elsif in_db and node2historicallypingable[current] == "N/A"
+              node2historicallypingable[current] = hop.last_responsive
+          end
 
           if previous
             if hop.is_a?(ReverseHop)
@@ -172,7 +184,7 @@ module Dot
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
           dot.puts "  labelloc = \"t\""
-                    node_attributes.each_pair do |node,attributes|
+          node_attributes.each_pair do |node,attributes|
             n="  \"#{node}\" ["
             attributes.each_pair{|k,v|
               n << "#{k}=\"#{v}\", "
