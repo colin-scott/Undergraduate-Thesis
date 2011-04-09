@@ -1,3 +1,17 @@
+require 'isolation_module'
+require 'drb'
+require 'drb/acl'
+require 'thread'
+require 'ip_info'
+require 'db_interface'
+require 'yaml'
+require 'revtr_cache_interface'
+require 'net/http'
+require 'hops'
+require 'mkdot'
+require 'reverse_traceroute_cache'
+require 'failure_analyzer'
+
 # just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
     def initialize
@@ -16,7 +30,7 @@ class FailureDispatcher
 
         @ipInfo = IpInfo.new
 
-        @failure_analyzer = FailureAnalyzer.new(@ipInfo)
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo, self)
         
         @db = DatabaseInterface.new
 
@@ -123,7 +137,7 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            working_historical_paths, measured_working_direction, path_changed = gather_additional_data(
+            alternate_paths, measured_working_direction, path_changed = gather_additional_data(
                                                        src, dst, pings_towards_src, spoofed_tr, measurement_times)
 
         insert_measurement_durations(measurement_times)
@@ -233,7 +247,7 @@ class FailureDispatcher
             hop.reverse_path = fetch_cached_revtr(src, hop.ip)
         end
 
-        cached_revtr = fetch_cached_revtr(src, dst)
+        historical_revtr = fetch_cached_revtr(src, dst)
 
         # maybe not threadsafe, but fukit
         measurement_times << ["tr_time", Time.new]
@@ -242,7 +256,7 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         measurement_times << ["non-revtr pings", Time.new]
-        ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, cached_revtr)
+        ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
 
         measurement_times << ["revtr", Time.new]
         spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
@@ -251,21 +265,21 @@ class FailureDispatcher
         ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
         measurement_times << ["measurements completed", Time.new]
 
-        fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)
+        fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, historical_revtr)
 
         dataset = FailureIsolation::get_dataset(dst)
         
         suspected_failure, as_hops_from_dst, as_hops_from_src = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr,
                                                              historical_tr, spoofed_revtr, historical_revtr)
 
-        working_historical_paths = @failure_analyzer.find_working_historical_paths(src, dst, direction, tr,
+        working_historical_paths = @failure_analyzer.find_alternate_paths(src, dst, direction, tr,
                                                     spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
 
         measured_working_direction = @failure_analyzer.measured_working_direction?(direction, spoofed_revtr)
 
         path_changed = @failure_analyzer.path_changed?(historical_tr, tr, spoofed_tr, direction)
         
-        [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
+        [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
             working_historical_paths, measured_working_direction, path_changed]
     end
@@ -430,13 +444,22 @@ class FailureDispatcher
     # hop.ping_responsive, and return the responsive pings
     def issue_pings(source, dest, historical_tr, spoofed_tr, cached_revtr)
         all_hop_sets = [[Hop.new(dest)], historical_tr, spoofed_tr, cached_revtr]
+
+        for hop in historical_tr
+            all_hops_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
+        end
+
         request_pings(source, all_hop_sets)
     end
 
     # we issue the pings separately for the revtr, since the revtr can take an
     # excrutiatingly long time to execute sometimes
     def issue_pings_for_revtr(source, revtr)
-        request_pings(source, [revtr])
+        if revtr.valid?
+           return request_pings(source, [revtr]) 
+        else
+           return []
+        end
     end
 
     # private
@@ -459,6 +482,11 @@ class FailureDispatcher
     def fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)
         # TODO: redundannnnttt
         all_hop_sets = [historical_tr, spoofed_tr, cached_revtr]
+
+        for hop in historical_tr
+            all_hops_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
+        end
+
         all_hop_sets << spoofed_revtr if spoofed_revtr.valid? # might contain a symbol. hmmm... XXX
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }

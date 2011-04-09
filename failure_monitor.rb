@@ -93,6 +93,7 @@ class FailureMonitor
             @dispatcher.isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected)
 
             $LOG.puts "round #{@current_round} completed"
+            $stderr.flush
             @current_round += 1
             
             audit_faulty_nodes if (@current_round % @@node_audit_period) == 0
@@ -154,6 +155,7 @@ class FailureMonitor
             node2targetstate[node] = hash
         end
 
+        # nodes with problems at the source are excluded from node2targetstate
         node2targetstate
     end
 

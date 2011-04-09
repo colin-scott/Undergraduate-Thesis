@@ -1,9 +1,3 @@
-** I don't believe the 0.0.0.0 squares in the dot graphs...
-
-What I want to add to the logs:
-   - a boolean flag for whether the outage passed filtering heuristics
-   - how many hops from the src/dest the failure was
-
 Not that many outages are passing the filtering heuristics. Could be
 thrashing, could be that the heuristics are too stringent. Look into it?
 
@@ -14,7 +8,8 @@ How to tell if the problem was caused by a forward path change:
 
 Finding the reverse path failure suspect:
    - If there is both a tr and a spoofed tr, it's where the two diverge
-   - If only a spoofed tr, it's the last pingable hop
+   - If only a spoofed tr, it's the last /pingable/ hop
+   - If only a revtr
 
 There seem to be a fair number of cases where the spoofedtr differs 
 from the normal tr. Path change while measurements were taken?
@@ -34,7 +29,6 @@ In general, the reverse path failures seem pretty tough to pin down!
   - Find cases where we didn't have complete information, and identify what
     info would have helped
 
-Maybe this process isn't automatable for reverse path failures... 
-implement a system to allow humans to annotate the failures post-hoc?
-
 Fix Harsha's tool to always go up to ttl 30?
+
+

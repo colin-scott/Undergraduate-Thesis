@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require 'isolation_module'
+require 'failure_dispatcher'
 dispatcher = FailureDispatcher.new
 
 if ARGV.empty?

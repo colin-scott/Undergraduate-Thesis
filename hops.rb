@@ -22,6 +22,10 @@ class Path < Array
    def as_path()
        self.map { |hop| hop.asn }
    end
+
+   def valid?()
+       return true
+   end
 end
 
 # fuckin' namespace collision with reverse_traceroute.rb
@@ -167,7 +171,7 @@ class Hop
         elsif spooftr_suspect.nil?
             return tr_suspect
         else
-            return (tr_suspect > spooftr_suspect) ? tr_suspect : spooftr_suspect
+            return (tr_suspect.ttl > spooftr_suspect.ttl) ? tr_suspect : spooftr_suspect
         end
     end
 
@@ -193,7 +197,7 @@ class HistoricalForwardHop < Hop
     end
 
     def to_s()
-       s = "#{@ttl}.  #{@formatted} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive or "false"}]"
+       s = "#{@ttl}.  #{@formatted} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive.inspect}]"
        s << "\n  <ul type=none>\n"
        reverse_path.each do |hop|
            s << "    <li> #{hop}</li>\n"

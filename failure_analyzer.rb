@@ -12,6 +12,7 @@ end
 class FailureAnalyzer
     def initialize(ipInfo, dispatcher)
         @ipInfo = ipInfo
+        @dispatcher = dispatcher
     end
 
     # returns the hop suspected to be close to the failure
@@ -27,13 +28,13 @@ class FailureAnalyzer
             suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
             return [nil, -1, -1] if suspected_hop.nil?
 
+            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
+                count_AS_hops(spoofed_tr, suspected_hop)].max
+
             as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
                 count_AS_hops(spoofed_revtr, suspected_hop),
                 spoofed_tr.compressed_as_path.length - as_hops_from_src,
                 tr.compressed_as_path.length - as_hops_from_src].max
-
-            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
-                count_AS_hops(spoofed_tr, suspected_hop)].max
 
             # do some comparison of m's historical reverse path to infer the router which is either
             # failed or changed its path
@@ -48,15 +49,16 @@ class FailureAnalyzer
             last_tr_hop = tr.last_non_zero_hop
             last_spooftr_hop = spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
+            return [nil, -1, -1] if suspected_hop.nil?
+
+            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
+                count_AS_hops(spoofed_tr, suspected_hop),
+                count_AS_hops(historical_tr, suspected_hop)].max
 
             as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
                 count_AS_hops(spoofed_revtr, suspected_hop),
                 spoofed_tr.compressed_as_path.length - as_hops_from_src,
                 tr.compressed_as_path.length - as_hops_from_src].max
-
-            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
-                count_AS_hops(spoofed_tr, suspected_hop),
-                count_AS_hops(historical_tr, suspected_hop)].max
 
             return [suspected_hop, as_hops_from_dst, as_hops_from_src]
         when Direction::FALSE_POSITIVE
@@ -67,7 +69,7 @@ class FailureAnalyzer
     end
 
     def count_AS_hops(path, suspected_hop)
-        return -1 if path.empty? || suspected_hop.nil?
+        return -1 if path.empty? || !path.valid? || suspected_hop.nil?
 
         as_count = 0
         prev_AS = path[0].asn
@@ -101,12 +103,12 @@ class FailureAnalyzer
         end
     end
 
-    def find_working_historical_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
+    def find_alternate_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         alternate_paths = []
      
-        if(historical_reverse.ping_responsive_except_dst?(dst) && 
-               historical_reverse.compressed_as_path != spoofed_revtr.compressed_as_path)
+        if(historical_revtr.ping_responsive_except_dst?(dst) && 
+               historical_revtr.compressed_as_path != spoofed_revtr.compressed_as_path)
             alternate_paths << :"historical reverse path"
         end
     
@@ -198,8 +200,8 @@ class FailureAnalyzer
         if(!(testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all)))
 
-            bool_vector = { :dp => !destination_pingable, :dir => direction != Direction::FALSE_POSITIVE, 
-                :f_empty => !forward_measurements_empty, :tr_reach => !tr_reached_dst_AS, :no_hist => !no_historical_trace, :no_ping => !no_pings_at_all}
+            bool_vector = { :dp => destination_pingable, :dir => direction == Direction::FALSE_POSITIVE, 
+                :f_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all}
 
             $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
             return false
