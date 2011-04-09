@@ -253,10 +253,24 @@ class FailureDispatcher
         measurement_times << ["tr_time", Time.new]
         tr = issue_normal_traceroute(src, [dst])
 
+        if tr.empty?
+            $LOG.puts "empty traceroute! (#{src}, #{dst})"
+            sleep 10
+            tr = issue_normal_traceroute(src, [dst])
+            $LOG.puts "still empty! (#{src}, #{dst})" if tr.empty?
+        end
+
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         measurement_times << ["non-revtr pings", Time.new]
         ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+
+        if ping_responsive.empty?
+            $LOG.puts "empty pings! (#{src}, #{dst})"
+            sleep 10
+            ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+            $LOG.puts "still empty! (#{src}, #{dst})" if ping_responsive.empty?
+        end
 
         measurement_times << ["revtr", Time.new]
         spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })

@@ -1,3 +1,5 @@
+Why does the controller sometimes stop writing to the log?
+
 Not that many outages are passing the filtering heuristics. Could be
 thrashing, could be that the heuristics are too stringent. Look into it?
 
