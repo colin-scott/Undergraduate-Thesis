@@ -194,7 +194,7 @@ end
 # =============================================================================
 
 class Hop
-    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted
+    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps
     def initialize(*args)
         @ping_responsive = false
         case args.size
@@ -219,6 +219,11 @@ class Hop
 
     def historically_pingable?
         return @last_responsive != "N/A" && @last_responsive
+    end
+
+    # TODO: better name
+    def pingable_from_other_vps
+        return !@ping_responsive && @reachable_from_other_vps
     end
 end
 

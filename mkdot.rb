@@ -1,6 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 # TODO:
+#    * This code is shite. Refactor just about everything. esp. add_path()
 #    * handle 0.0.0.0's more elegantly. To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
 #       nodes as the hop before them and the hop after them, and say the number of *s in a row? this
 #       would collapse these cases while keeping distinct ones that should be distinct
@@ -79,25 +80,33 @@ module Dot
         # set of all ASes
         node2asn = {}
 
+        # is a node not pingable from S, but pingable from other VPs?
+        node2othervpscanreach = {}
+
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
-        # one-time-use object?
-        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        # one-time-use object? Orrrrrrr... fill in all of the node attributes
+        # separately from add_path()
+        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         historic_tr.each do |hop|
-            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
+            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
         end
-        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         # dave returns a symbol if the revtr request failed... TODO: this
         # filtering should happen at a higher level
-        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
+        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
 
         node2names.each_pair do |node,ips|
             node_attributes[node]["label"] = ips.uniq.sort.join(" ").gsub(" ", "\\n")
         end
 
         node2pingable.each_pair do |node, pingable|
-            node_attributes[node]["style"] = "dotted" if !pingable
+            if !pingable && !node2othervpscanreach[node]
+                node_attributes[node]["style"] = "dotted" 
+            elsif !pingable && node2othervpscanreach[node]
+                node_attributes[node]["style"] = "dashed"
+            end # else, use rounded
         end
 
         node2historicallypingable.each_pair do |node, pingable|
@@ -136,7 +145,9 @@ module Dot
         end
     end
     
-    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable,
+                     node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
+                     node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         return if !path.valid?
         previous = nil
         current = nil
@@ -152,6 +163,7 @@ module Dot
           node2names[current] << name
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
+          node2othervpscanreach[current] ||= hop.reachable_from_other_vps
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability
           # DB (hop.last_responsive == "N/A")

@@ -138,7 +138,7 @@ class FailureDispatcher
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
             alternate_paths, measured_working_direction, path_changed = gather_additional_data(
-                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times)
+                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity)
 
         insert_measurement_durations(measurement_times)
 
@@ -189,7 +189,7 @@ class FailureDispatcher
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
             alternate_paths, measured_working_direction, path_changed = gather_additional_data(
-                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times)
+                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity)
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
 
@@ -235,7 +235,7 @@ class FailureDispatcher
 
     # this is really ugly -- but it elimanates redundancy between
     # analyze_results() and analyze_results_with_symmetry()
-    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times)
+    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity)
         reverse_problem = pings_towards_src.empty?
         forward_problem = !spoofed_tr.reached?(dst)
 
@@ -270,22 +270,26 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         measurement_times << ["non-revtr pings", Time.new]
-        ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+        ping_responsive, non_responsive_hops = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
 
         if ping_responsive.empty?
             $LOG.puts "empty pings! (#{src}, #{dst})"
             sleep 10
-            ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+            ping_responsive, non_responsive_hops = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
             $LOG.puts "still empty! (#{src}, #{dst})" if ping_responsive.empty?
             results = `ssh uw_revtr2@#{src} 'ps aux; ping -c 3 #{FailureIsolation::TestPing}'` 
             Emailer.deliver_isolation_exception("empty pings! (#{src}, #{dst})\n#{results}")
         end
 
+        measurement_times << ["pings_to_nonresponsive_hops", Time.new]
+        check_pingability_from_other_vps!(spoofers_w_connectivity, non_responsive_hops)
+
         measurement_times << ["revtr", Time.new]
         spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
 
         measurement_times << ["revtr pings", Time.new]
-        ping_responsive |= issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
+        revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
+        ping_responsive |= revtr_ping_responsive
         measurement_times << ["measurements completed", Time.new]
 
         fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, historical_revtr)
@@ -488,6 +492,23 @@ class FailureDispatcher
         end
     end
 
+    def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
+        # there might be multiple hops with the same ip, so we can't have a
+        # nice hashmap from ips -> hops
+        targets = non_responsive_hops.map { |hop| hop.ip }
+
+        pingable_ips = Set.new
+
+        # TODO: thread out
+        connected_vps.each do |vp|
+            pingable_ips |= @registrar.ping(source, targets, true)
+        end
+
+        non_responsive_hops.each do |hop|
+            hop.reachable_from_other_vps = pingable_ips.include? hop.ip
+        end
+    end
+
     # private
     def request_pings(source, all_hop_sets)
         all_targets = Set.new
@@ -501,7 +522,13 @@ class FailureDispatcher
             hop_set.each { |hop| hop.ping_responsive = responsive.include? hop.ip }
         end
 
-        responsive
+        unresponsive_ips = all_targets - responsive
+        unresponsive_hops = Set.new
+        all_hop_sets.each do |hop_set|
+            unresponsive_hops |= hop_set.find_all { |hop| unresponsive_ips.include?(hop.ip) }
+        end
+
+        [responsive, unresponsive_hops]
     end
 
     # XXX Am I giving Ethan all of these hops properly?
