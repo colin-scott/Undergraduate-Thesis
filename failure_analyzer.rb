@@ -64,7 +64,7 @@ class FailureAnalyzer
         when Direction::FALSE_POSITIVE
             return ["problem resolved itself", -1, -1]
         else 
-            raise "unknown direction #{direction}!"
+            raise ArgumentError.new("unknown direction #{direction}!")
         end
     end
 
@@ -136,7 +136,7 @@ class FailureAnalyzer
     def measured_working_direction?(direction, spoofed_revtr)
         case direction
         when Direction::FORWARD
-            return spoofed_revtr.successful?
+            return (spoofed_revtr.valid?) ? spoofed_revtr.num_sym_assumptions : false
         when Direction::REVERSE
             return true # spoofed forward tr must have gone through
         else
@@ -190,18 +190,23 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        #no_historical_trace = (historical_tr.empty?)
-        no_historical_trace = false # XXX    just to see if more emails show up...
+        no_historical_trace = (historical_tr.empty?)
+
+        historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
 
         # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
         no_pings_at_all = (ping_responsive.empty?)
 
+        last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
+
         if(!(testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all)))
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
+                !historical_trace_didnt_reach)))
 
             bool_vector = { :dp => destination_pingable, :dir => direction == Direction::FALSE_POSITIVE, 
-                :f_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all}
+                :f_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
+                :last_hop => last_hop, :htr_not_reach => historical_trace_didnt_reach}
 
             $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
             return false

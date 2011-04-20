@@ -1,16 +1,29 @@
+#!/homes/network/revtr/ruby/bin/ruby
+
 # last_responsive will be 
 #    * "N/A" if not in the database
 #    * false if not historically pingable
 #    * A Time object if historically pingable
-#    * nil if not initialized (not grabbed from the
-#       DB yet)
+#    * nil if not initialized (not grabbed from the DB yet)
 
 
 # =============================================================================
 #                            Paths                                            #
 # =============================================================================
 
-class Path < Array
+require 'forwardable'
+
+class Path
+   attr_accessor :hops
+
+   def initialize(init_hops=[])
+      @hops = Array.new(init_hops)
+   end
+
+   # delegate methods to @hops!!!
+   extend Forwardable
+   def_delegators :@hops,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,:collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,:empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,:initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,:reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,:slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,:|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,:enum_slice,:enum_with_index,:find,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,:partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+
    # SpoofedReversePath.valid? kind of throws a wrench into this whole
    # endeavor...  override!
    def compressed_as_path()
@@ -20,9 +33,10 @@ class Path < Array
    end
 
    def as_path()
-       self.map { |hop| hop.asn }
+       @hops.map { |hop| hop.asn }
    end
 
+   # overriden if necessary
    def valid?()
        return true
    end
@@ -40,22 +54,45 @@ class RevPath < Path
    end
 
    def ping_responsive_except_dst?(dst)
-       return false if self.empty?
+       return false if @hops.empty?
 
        # first hop of the reverse traceroute is the destination
-       for hop in self[1..-1]
+       for hop in @hops[1..-1]
           return false if !hop.ping_responsive && hop.historically_pingable?
        end
 
        return true
+   end
+
+   def num_sym_assumptions()
+      count = 0
+      for hop in @hops
+          count += 1 if hop.type == :sym or hop.type == "sym"
+      end
+      count
+   end
+
+   def longest_sym_sequence()
+      count = 0
+      max = 0
+      for hop in @hops
+         if hop.type != :sym and hop.type != "sym"
+           count = 0 
+         else
+           count += 1
+           max = (count > max) ? count : max
+         end
+      end
+
+      max
    end
 end
 
 class HistoricalReversePath < RevPath
    attr_accessor :timestamp, :invalid_reason, :src, :dst, :valid
 
-   def initialize(*args)
-       super
+   def initialize(init_hops=[])
+       super(init_hops)
        @timestamp = 0 # measurement timestamp
        @valid = false # if false, then there was nothing found in the DB
        @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
@@ -64,39 +101,43 @@ class HistoricalReversePath < RevPath
    end
 
    def valid?
-       return @valid
+       return (@valid || !@hops.find { |hop| hop.valid_ip }.nil?) && !@hops.empty?
    end
    
    def to_s
        # print the pretty output
        result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
-       result << self.map { |x| x.to_s }.join("\n") if @valid
+       result << @hops.map { |x| x.to_s }.join("\n") if @valid
        result << "Failed query, reason: #{@invalid_reason}" if !@valid
        result
    end
 end
 
+# some of the classes in the logs are from the old ReversePathSimple
+class ReversePathSimple < Array
+end
+
 class SpoofedReversePath < RevPath
     def valid?()
-        return !self[0].is_a?(Symbol)
+        return @hops.size > 1 && !(@hops[0].is_a?(Symbol) || @hops[0].is_a?(String))
     end
 
     # not that many sym assumptions?
     def successful?()
-        return false if self.size < 2
+        return false if @hops.size < 2
 
         # :dst_sym is ignored, I think
 
         # We actually only require that there is no sequence of more than two symmetric assumptions.
         # Also, symmetry can't be assumed next to the destination
         return !more_than_n_consecutive_sym_assumptions?(2) &&
-            self[-2].type != :sym
+            @hops[-2].type != :sym
     end
 
     def more_than_n_consecutive_sym_assumptions?(n)
        sym_count = 0
 
-       for hop in self
+       for hop in @hops
           if hop.type == :sym
               sym_count += 1
               return true if sym_count > n
@@ -124,18 +165,19 @@ class ForwardPath < Path
    end
 
    def last_non_zero_hop()
-        last_hop = self.reverse.find { |hop| hop.ip != "0.0.0.0" }
+        last_hop = @hops.reverse.find { |hop| hop.ip != "0.0.0.0" }
         return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
    end
 
    def reached?(dst)
-        !self.find { |hop| hop.ip == dst }.nil?
+        #$LOG.puts" reached?: #{@hops.inspect}"
+        !@hops.find { |hop| hop.ip == dst }.nil?
    end
 
    def ping_responsive_except_dst?(dst)
-       return false if self.empty?
+       return false if @hops.empty?
 
-       for hop in self[0..-2]
+       for hop in @hops[0..-2]
           return false if !hop.ping_responsive && hop.historically_pingable?
        end
 
@@ -143,7 +185,7 @@ class ForwardPath < Path
    end
 
    def last_responsive_hop()
-       self.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
+       @hops.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
    end
 end
 
@@ -309,4 +351,18 @@ class SpoofedForwardHop < Hop
         s << " [historically pingable?: #{@last_responsive}]" unless @last_responsive.nil?
         s
     end
+end
+
+if __FILE__ == $0
+    require 'yaml'
+    test = [1,32,4]
+    r = HistoricalReversePath.new(test)
+    t = ForwardPath.new(test)
+    q = SpoofedReversePath.new(test)
+    u = Path.new(test)
+
+    puts r.inspect
+    puts q.inspect
+    puts u.inspect
+    puts t.inspect
 end

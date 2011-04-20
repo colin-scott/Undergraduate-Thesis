@@ -175,8 +175,11 @@ class FailureDispatcher
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters)
         end
+
+        return passed_filters
     end
 
+    # HMMMM, terribly redundant
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
                                       spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
@@ -250,14 +253,18 @@ class FailureDispatcher
         historical_revtr = fetch_cached_revtr(src, dst)
 
         # maybe not threadsafe, but fukit
-        measurement_times << ["tr_time", Time.new]
+        tr_time = Time.new
+        measurement_times << ["tr_time", tr_time]
         tr = issue_normal_traceroute(src, [dst])
 
         if tr.empty?
             $LOG.puts "empty traceroute! (#{src}, #{dst})"
             sleep 10
+            tr_time2 = Time.new
             tr = issue_normal_traceroute(src, [dst])
             $LOG.puts "still empty! (#{src}, #{dst})" if tr.empty?
+            results = `ssh uw_revtr2@#{src} 'date; ps aux; sudo traceroute -I #{dst}'`
+            Emailer.deliver_isolation_exception("empty traceroute! (#{src}, #{dst})\nFirst tr: #{tr_time.getgm}\nSecond tr:#{tr_time2.getgm}\n#{results}")
         end
 
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
@@ -270,6 +277,8 @@ class FailureDispatcher
             sleep 10
             ping_responsive = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
             $LOG.puts "still empty! (#{src}, #{dst})" if ping_responsive.empty?
+            results = `ssh uw_revtr2@#{src} 'ps aux; ping -c 3 #{FailureIsolation::TestPing}'` 
+            Emailer.deliver_isolation_exception("empty pings! (#{src}, #{dst})\n#{results}")
         end
 
         measurement_times << ["revtr", Time.new]
@@ -300,6 +309,7 @@ class FailureDispatcher
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
                              cached_revtr)
+        # TODO: put this into its own function
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
         Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
@@ -424,14 +434,16 @@ class FailureDispatcher
                                                       @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
-            return [:drb_connection_refused]
+            return SpoofedReversePath.new([:drb_connection_refused])
         rescue Exception => e
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             connect_to_drb()
-            return [:drb_exception]
+            return SpoofedReversePath.new([:drb_exception])
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
+
+        raise "issue_spoofed_revtr returned an array!" if srcdst2revtr.is_a?(Array)
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return SpoofedReversePath.new([:nil_return_value])
@@ -457,10 +469,10 @@ class FailureDispatcher
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
     def issue_pings(source, dest, historical_tr, spoofed_tr, cached_revtr)
-        all_hop_sets = [[Hop.new(dest)], historical_tr, spoofed_tr, cached_revtr]
+        all_hop_sets = [[Hop.new(dest), Hop.new(FailureIsolation::TestPing)], historical_tr, spoofed_tr, cached_revtr]
 
         for hop in historical_tr
-            all_hops_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
+            all_hop_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
         end
 
         request_pings(source, all_hop_sets)
@@ -498,7 +510,9 @@ class FailureDispatcher
         all_hop_sets = [historical_tr, spoofed_tr, cached_revtr]
 
         for hop in historical_tr
-            all_hops_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
+            if !(hop.reverse_path.nil?) && hop.reverse_path.valid?
+                all_hop_sets << hop.reverse_path 
+            end
         end
 
         all_hop_sets << spoofed_revtr if spoofed_revtr.valid? # might contain a symbol. hmmm... XXX
@@ -532,4 +546,3 @@ class FailureDispatcher
         File.open(FailureIsolation::SymmetricIsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
     end
 end
-

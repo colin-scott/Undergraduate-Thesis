@@ -41,9 +41,9 @@ module Dot
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
         src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [])
-        tr = [src_hop] + tr
-        spoofed_tr = [src_hop] + spoofed_tr
-        historic_tr = [src_hop] + historic_tr
+        tr = ForwardPath.new([src_hop] + tr)
+        spoofed_tr = ForwardPath.new([src_hop] + spoofed_tr)
+        historic_tr = ForwardPath.new([src_hop] + historic_tr)
 
         # Cluster -> dns names we have seen for the cluster
         node2names = Hash.new{|h,k| h[k] = []}
@@ -56,6 +56,12 @@ module Dot
 
         # [cluster,cluster]
         symmetric_revtr_links = Set.new
+
+        # non-symmetric revtr links... sometimes the same link is seen
+        # symmetric once but measured on some other path...
+        # in that case, we really want to say that the link did not assume
+        # symmetry
+        non_symmetric_revtr_links = Set.new
         
         # cluster -> (cluster -> bool)
         node2neighbors=Hash.new{|hash,key| hash[key]=Hash.new(false)}
@@ -75,16 +81,16 @@ module Dot
 
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
         # one-time-use object?
-        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         historic_tr.each do |hop|
-            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
         end
-        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         # dave returns a symbol if the revtr request failed... TODO: this
         # filtering should happen at a higher level
-        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
+        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
 
         node2names.each_pair do |node,ips|
             node_attributes[node]["label"] = ips.uniq.sort.join(" ").gsub(" ", "\\n")
@@ -98,6 +104,8 @@ module Dot
             node_attributes[node]["shape"] = "box" if pingable == "N/A"
             node_attributes[node]["shape"] = "diamond" if !pingable
         end
+
+        symmetric_revtr_links -= non_symmetric_revtr_links
 
         assign_colors!(node2asn, node_attributes)
 
@@ -128,7 +136,8 @@ module Dot
         end
     end
     
-    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        return if !path.valid?
         previous = nil
         current = nil
         for hop in path
@@ -139,7 +148,7 @@ module Dot
           ip = hop.ip
           ip += oooo_marker.next! if ip == "0.0.0.0"
           current = $ip2cluster[ip]
-          name = (hop.dns.empty?) ? hop.ip : hop.dns
+          name = (hop.dns.nil? or hop.dns.empty?) ? hop.ip : hop.dns
           node2names[current] << name
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
@@ -163,10 +172,15 @@ module Dot
           if previous
             if hop.is_a?(ReverseHop)
               # we annotate reverse links where symmetry was assumed
-              raise unless hop.type.is_a?(Symbol)
+              raise "not a string! hop.type.class=#{hop.type.class}" unless hop.type.is_a?(Symbol) or hop.type.is_a?(String) or hop.type.nil?
+              hop.type = hop.type.to_sym unless hop.type.nil?
+              
               if hop.type == :sym 
                 symmetric_revtr_links.add [current, previous] 
+              else
+                non_symmetric_revtr_links.add [current, previous]
               end
+
               node2neighbors[current][previous] = true
               edge_seen_in_measurements[[current, previous, type]] = true
             else
@@ -247,40 +261,54 @@ module Dot
 end
 
 if $0 == __FILE__
-    ipInfo = IpInfo.new
-    tr = [[1, "0.0.0.0"], [2, "0.0.0.0"], [3, "192.5.89.222"], [4,"216.27.100.53"], [5, "216.27.100.74"],
-          [6, "128.91.10.3"], [7, "158.130.128.1"], [8, "158.130.6.253"]].map { |hop| ForwardHop.new(hop, ipInfo) }
 
-    spoofed_tr = [[1, ["75.130.96.1"]], [2, ["192.5.89.241"]], [3, ["192.5.89.222"]], [4,["216.27.100.53"]], [5, ["216.27.100.74"]],
-          [6, ["128.91.10.3"]], [7, ["158.130.128.1"]], [8,["158.130.6.253"]]].map { |hop| SpoofedForwardHop.new(hop, ipInfo) }
+#    ipInfo = IpInfo.new
+#    tr = [[1, "0.0.0.0"], [2, "0.0.0.0"], [3, "192.5.89.222"], [4,"216.27.100.53"], [5, "216.27.100.74"],
+#          [6, "128.91.10.3"], [7, "158.130.128.1"], [8, "158.130.6.253"]].map { |hop| ForwardHop.new(hop, ipInfo) }
+#
+#    spoofed_tr = [[1, ["75.130.96.1"]], [2, ["192.5.89.241"]], [3, ["192.5.89.222"]], [4,["216.27.100.53"]], [5, ["216.27.100.74"]],
+#          [6, ["128.91.10.3"]], [7, ["158.130.128.1"]], [8,["158.130.6.253"]]].map { |hop| SpoofedForwardHop.new(hop, ipInfo) }
+#
+#    historic_tr = [[1, "0.0.0.0"], [2, "192.5.89.241"], [3, "192.5.89.222"], [4,"216.27.100.53"], [5, "216.27.100.74"],
+#          [6, "128.91.10.3"], [7, "158.130.128.1"], [8, "158.130.6.253"]].map { |hop| HistoricalForwardHop.new(hop[0], hop[1], ipInfo) }
+#
+#    # TODO: historic_tr.each do { |hop| hop.reverse_path = blah blah }
+#
+#    revtr = ["0 planetlab2.cis.UPENN.EDU (158.130.6.253) * dst ",
+#    "1 external2-border-router.seas.upenn.edu (158.130.128.1) * sym ",
+#    "2 vag2-core1.dccs.upenn.edu (128.91.9.3) * rr ",
+#    "3 external3-core1.dccs.UPENN.EDU (128.91.9.2) * tr ",
+#    "4 external-core1.dccs.upenn.edu (128.91.9.1) * -tr ",
+#    "5 local.upenn.magpi.net (216.27.100.73) * -tr ",
+#    "6 remote.internet2.magpi.net (216.27.100.54) * -tr ", 
+#    "7 nox300gw1-vl-110-nox-internet2.nox.org (192.5.89.221) * -tr ", 
+#    "8 nox300gw1-peer-nox-wpi-192-5-89-242.nox.org (192.5.89.242) * -tr ",
+#    "9 PLANETLAB1.RESEARCH.WPI.NET (75.130.96.12) * -tr "].map { |hop| ReverseHop.new(hop, ipInfo) }
+#
+#    historic_revtr = ["0 planetlab2.cis.UPENN.EDU (158.130.6.253) * dst ",
+#    "1 external2-border-router.seas.upenn.edu (158.130.128.1) * sym ",
+#    "2 vag2-core1.dccs.upenn.edu (128.91.9.3) * rr ",
+#    "3 external3-core1.dccs.UPENN.EDU (128.91.9.2) * tr ",
+#    "4 external-core1.dccs.upenn.edu (128.91.9.1) * -tr ",
+#    "5 local.upenn.magpi.net (216.27.100.73) * -tr ",
+#    "6 remote.internet2.magpi.net (216.27.100.54) * -tr ", 
+#    "7 nox300gw1-vl-110-nox-internet2.nox.org (192.5.89.221) * -tr ", 
+#    "8 nox300gw1-peer-nox-wpi-192-5-89-242.nox.org (192.5.89.242) * -tr ",
+#    "9 PLANETLAB1.RESEARCH.WPI.NET (75.130.96.12) * -tr "].map { |hop| ReverseHop.new(hop, ipInfo) }
+#
+#    Dot::generate_jpg("PLANETLAB1.RESEARCH.WPI.NET", "planetlab2.cis.UPENN.EDU (158.130.6.253)",
+#        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
 
-    historic_tr = [[1, "0.0.0.0"], [2, "192.5.89.241"], [3, "192.5.89.222"], [4,"216.27.100.53"], [5, "216.27.100.74"],
-          [6, "128.91.10.3"], [7, "158.130.128.1"], [8, "158.130.6.253"]].map { |hop| HistoricalForwardHop.new(hop[0], hop[1], ipInfo) }
+    require 'log_iterator' 
+    LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/planetlab-node3.it-sudparis.eu_130.195.4.69_2011418114118.yml") do |file, src, dst, dataset, direction, formatted_connected, 
+                                            formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, historical_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters|
 
-    # TODO: historic_tr.each do { |hop| hop.reverse_path = blah blah }
-
-    revtr = ["0 planetlab2.cis.UPENN.EDU (158.130.6.253) * dst ",
-    "1 external2-border-router.seas.upenn.edu (158.130.128.1) * sym ",
-    "2 vag2-core1.dccs.upenn.edu (128.91.9.3) * rr ",
-    "3 external3-core1.dccs.UPENN.EDU (128.91.9.2) * tr ",
-    "4 external-core1.dccs.upenn.edu (128.91.9.1) * -tr ",
-    "5 local.upenn.magpi.net (216.27.100.73) * -tr ",
-    "6 remote.internet2.magpi.net (216.27.100.54) * -tr ", 
-    "7 nox300gw1-vl-110-nox-internet2.nox.org (192.5.89.221) * -tr ", 
-    "8 nox300gw1-peer-nox-wpi-192-5-89-242.nox.org (192.5.89.242) * -tr ",
-    "9 PLANETLAB1.RESEARCH.WPI.NET (75.130.96.12) * -tr "].map { |hop| ReverseHop.new(hop, ipInfo) }
-
-    historic_revtr = ["0 planetlab2.cis.UPENN.EDU (158.130.6.253) * dst ",
-    "1 external2-border-router.seas.upenn.edu (158.130.128.1) * sym ",
-    "2 vag2-core1.dccs.upenn.edu (128.91.9.3) * rr ",
-    "3 external3-core1.dccs.UPENN.EDU (128.91.9.2) * tr ",
-    "4 external-core1.dccs.upenn.edu (128.91.9.1) * -tr ",
-    "5 local.upenn.magpi.net (216.27.100.73) * -tr ",
-    "6 remote.internet2.magpi.net (216.27.100.54) * -tr ", 
-    "7 nox300gw1-vl-110-nox-internet2.nox.org (192.5.89.221) * -tr ", 
-    "8 nox300gw1-peer-nox-wpi-192-5-89-242.nox.org (192.5.89.242) * -tr ",
-    "9 PLANETLAB1.RESEARCH.WPI.NET (75.130.96.12) * -tr "].map { |hop| ReverseHop.new(hop, ipInfo) }
-
-    Dot::generate_jpg("PLANETLAB1.RESEARCH.WPI.NET", "planetlab2.cis.UPENN.EDU (158.130.6.253)",
-        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
+       Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr, historical_revtr, "testing.jpg")
+    end
 end

@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require '../spooftr_config' # XXX don't hardcode
+require 'isolation_module'
 require 'db_interface'
 require 'socket'
 require 'utilities'

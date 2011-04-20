@@ -3,6 +3,11 @@
 require 'yaml'
 require 'ip_info'
 require 'hops'
+require 'isolation_module'
+
+# REV4 is the only one that matters! everything else has been converted!
+
+# Write a conversion script!!!
 
 # HMMMMMMMM, wouldn't protobufs have been nice :P
 # Gotta love versioning
@@ -29,7 +34,7 @@ module LogIterator
         #puts "Historical revtr: #{historical_revtr.inspect}"
     end
 
-    def LogIterator::jpg2yml(jpg)
+    def LogIterator::jpg2yml_rev4(jpg)
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
     end
 
@@ -51,7 +56,7 @@ module LogIterator
 
     def LogIterator::all_filtered_outages_rev4(&block)
         Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
-            yml = LogIterator::jpg2yml(jpg)
+            yml = LogIterator::jpg2yml_rev4(jpg)
             begin 
                 self.read_log_rev4(yml, &block)
             rescue Errno::ENOENT, ArgumentError, TypeError
@@ -95,9 +100,50 @@ module LogIterator
 
     def LogIterator::iterate(&block)
         Dir.chdir FailureIsolation::IsolationResults do
+            files = Dir.glob("*yml")
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    self.read_log_rev4(file, &block)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::iterate_rev1(&block)
+        Dir.chdir FailureIsolation::OlderIsolationResults do
             Dir.glob("*yml").each do |file|
                 begin
-                    self.read_log_rev4(file, &block)
+                    self.read_log_rev1(file, &block)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::iterate_rev2(&block)
+        Dir.chdir FailureIsolation::LastIsolationResults do
+            Dir.glob("*yml").each do |file|
+                begin
+                    self.read_log_rev2(file, &block)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::iterate_rev3(&block)
+        Dir.chdir FailureIsolation::PreviousIsolationResults do
+            Dir.glob("*yml").each do |file|
+                begin
+                    self.read_log_rev3(file, &block)
                 rescue Errno::ENOENT, ArgumentError, TypeError
                     $stderr.puts "failed to open #{file}, #{$!}"
                 end

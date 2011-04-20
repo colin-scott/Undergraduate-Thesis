@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require '../spooftr_config'
+require 'isolation_module'
 require 'action_mailer'
 
 ActionMailer::Base.delivery_method = :sendmail

@@ -1,5 +1,6 @@
+$config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require 'set'
-require '../spooftr_config.rb' # XXX don't hardcode...
+require $config
 
 module FailureIsolation
     # out of place...
@@ -14,6 +15,8 @@ module FailureIsolation
         "216.137.63.221" ])
 
     FailureIsolation::TargetSet = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
+    
+    FailureIsolation::TestPing = "128.208.4.49" # crash.cs.washington.edu
 
     FailureIsolation::PingMonitorState = "~/colin/target_state.yml"
     FailureIsolation::PingMonitorRepo = "#{$DATADIR}/ping_monitoring_state/"
@@ -56,7 +59,8 @@ module FailureIsolation
     FailureIsolation::OlderIsolationResults = "#{$DATADIR}/isolation_results"
     FailureIsolation::LastIsolationResults = "#{$DATADIR}/isolation_results_rev2"
     FailureIsolation::PreviousIsolationResults = "#{$DATADIR}/isolation_results_rev3"
-    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_rev4"
+    FailureIsolation::LAST_EVER = "#{$DATADIR}/isolation_results_rev4"
+    FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_final"
 
     FailureIsolation::LastSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
     FailureIsolation::OldSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev2"

@@ -29,15 +29,6 @@ $pptasks = "~ethan/scripts/pptasks"
 $default_period_seconds = 360
 Thread.abort_on_exception = true
 
-Signal.trap("USR1") do 
-    $LOG.puts "reloading modules.."
-    load 'ip_info.rb'
-    load 'mkdot.rb'
-    load 'hops.rb'
-    load 'db_interface.rb'
-    load 'revtr_cache_interface.rb'
-end
-
 begin
    dispatcher = FailureDispatcher.new
    monitor = FailureMonitor.new(dispatcher)
@@ -45,7 +36,23 @@ begin
    Signal.trap("TERM") { monitor.persist_state; exit }
    Signal.trap("KILL") { monitor.persist_state; exit }
 
-   monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
+   Signal.trap("USR1") do 
+       $LOG.puts "reloading modules.."
+       load 'ip_info.rb'
+       load 'mkdot.rb'
+       load 'hops.rb'
+       load 'db_interface.rb'
+       load 'revtr_cache_interface.rb'
+       load 'failure_analyzer.rb'
+       load 'failure_dispatcher.rb'
+       load 'failure_monitor.rb'
+
+       monitor = FailureMonitor.new(dispatcher)
+       dispatcher = FailureDispatcher.new
+       monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
+   end
+
+    monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
 rescue Exception => e
    Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
    monitor.persist_state

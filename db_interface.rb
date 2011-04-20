@@ -11,7 +11,7 @@ require 'mysql'
 require 'socket'
 require 'utilities'
 require 'set'
-require '../spooftr_config'
+require 'isolation_module'
 
 class DatabaseInterface
     def initialize(host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
@@ -29,6 +29,8 @@ class DatabaseInterface
         addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton($pl_host2ip[ip]) : ip }
         #$LOG.puts "fetch_pingability(), addrs=#{ips.inspect}"
         responsive = Hash.new { |h,k| h[k] = "N/A" }
+
+        return responsive if addrs.empty?
 
         sql = "select * from pingability where ip=#{addrs.join " OR ip=" }"
         

@@ -1,3 +1,9 @@
+There have been some bizzare cases where the source doesn't get any replies
+back from normal tr or non-revtr pings...
+To look into it, run:
+   - tcpdump on a handful of nodes
+   - add a ping to crash.cs.washington.edu
+
 Why does the controller sometimes stop writing to the log?
 
 Not that many outages are passing the filtering heuristics. Could be
