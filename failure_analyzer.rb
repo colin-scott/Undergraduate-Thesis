@@ -22,54 +22,63 @@ class FailureAnalyzer
                                       spoofed_revtr, historical_revtr)
         case direction
         when Direction::REVERSE
-            # let m be the first forward hop that does not yield a revtr to s
-            tr_suspect = tr.last_responsive_hop
-            spooftr_suspect = spoofed_tr.last_responsive_hop
-            suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            return [nil, -1, -1] if suspected_hop.nil?
+            if !historical_revtr.valid?
+                # let m be the first forward hop that does not yield a revtr to s
+                tr_suspect = tr.last_responsive_hop
+                spooftr_suspect = spoofed_tr.last_responsive_hop
+                suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
+                return suspected_hop
 
-            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
-                count_AS_hops(spoofed_tr, suspected_hop)].max
-
-            as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
-                count_AS_hops(spoofed_revtr, suspected_hop),
-                spoofed_tr.compressed_as_path.length - as_hops_from_src,
-                tr.compressed_as_path.length - as_hops_from_src].max
-
-            # do some comparison of m's historical reverse path to infer the router which is either
-            # failed or changed its path
-            #
-            # doesn't make sense when running over logs... fine when run in
-            # real-time though
-            # historical_revtr = fetch_cached_revtr(src, suspected_hop)
-            # XXX 
-            return [suspected_hop, as_hops_from_dst, as_hops_from_src]
+                # baaaaah. This is confusing and not all that helpful.
+                #
+                # do some comparison of m's historical reverse path to infer the router which is either
+                # failed or changed its path
+                #
+                # doesn't make sense when running over logs... fine when run in
+                # real-time though
+                #
+                # Will only have a historical_revtr if the suspected hop is a
+                # historical hop, or the hops of the measured path overlap.
+                # historical_revtr = fetch_cached_revtr(src, suspected_hop)
+                # XXX 
+                # return suspected_hop
+            else
+                # TODO: more stuff with
+                return historical_revtr.unresponsive_hop_closest_to_dst()
+            end
         when Direction::FORWARD, Direction::BOTH
             # the failure is most likely adjacent to the last responsive forward hop
             last_tr_hop = tr.last_non_zero_hop
             last_spooftr_hop = spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-            return [nil, -1, -1] if suspected_hop.nil?
-
-            as_hops_from_src = [count_AS_hops(tr, suspected_hop),
-                count_AS_hops(spoofed_tr, suspected_hop),
-                count_AS_hops(historical_tr, suspected_hop)].max
-
-            as_hops_from_dst = [count_AS_hops(historical_revtr, suspected_hop),
-                count_AS_hops(spoofed_revtr, suspected_hop),
-                spoofed_tr.compressed_as_path.length - as_hops_from_src,
-                tr.compressed_as_path.length - as_hops_from_src].max
-
-            return [suspected_hop, as_hops_from_dst, as_hops_from_src]
+            return suspected_hop
         when Direction::FALSE_POSITIVE
-            return ["problem resolved itself", -1, -1]
+            return "problem resolved itself"
         else 
             raise ArgumentError.new("unknown direction #{direction}!")
         end
     end
 
+    def as_hops_from_src(suspected_hop, tr, spoofed_tr, historical_tr)
+        as_hops_from_src = [count_AS_hops(tr, suspected_hop),
+                count_AS_hops(spoofed_tr, suspected_hop),
+                count_AS_hops(historical_tr, suspected_hop)].max
+    end
+
+    def as_hops_from_dst(suspected_hop, historical_revtr, spoofed_revtr, spoofed_tr, tr, as_hops_from_src)
+        metrics = [count_AS_hops(historical_revtr, suspected_hop),
+                count_AS_hops(spoofed_revtr, suspected_hop)]
+     
+        if as_hops_from_src != -1
+            metrics << spoofed_tr.compressed_as_path.length - as_hops_from_src
+            metrics << tr.compressed_as_path.length - as_hops_from_src
+        end
+     
+        metrics.max
+    end
+
     def count_AS_hops(path, suspected_hop)
-        return -1 if path.empty? || !path.valid? || suspected_hop.nil?
+        return -1 if path.empty? || !path.valid? || !suspected_hop.is_a?(Hop)
 
         as_count = 0
         prev_AS = path[0].asn

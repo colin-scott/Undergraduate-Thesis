@@ -25,6 +25,8 @@ class FailureDispatcher
 					])
 
         @mutex = Mutex.new
+        @spoof_tr_mutex = Mutex.new
+
         connect_to_drb # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
@@ -37,6 +39,7 @@ class FailureDispatcher
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
         @revtr_cache = RevtrCache.new(@db, @ipInfo)
+
 
         Thread.new do
             loop do
@@ -86,7 +89,10 @@ class FailureDispatcher
         
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         measurement_times << ["spoof_tr", Time.new]
-        srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
+        srcdst2spoofed_tr = {}
+        @spoof_tr_mutex.synchronize do
+          srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
+        end
         #$LOG.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
 
         # thread out on each src, dst
@@ -137,7 +143,7 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed = gather_additional_data(
+            alternate_paths, measured_working_direction, path_changed, measurements_reissued = gather_additional_data(
                                                        src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity)
 
         insert_measurement_durations(measurement_times)
@@ -160,7 +166,7 @@ class FailureDispatcher
                                           spoofed_revtr, cached_revtr, graph_url, measurement_times,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          testing)
+                                          measurements_reissued, testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -188,7 +194,7 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, cached_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed = gather_additional_data(
+            alternate_paths, measured_working_direction, path_changed, measurements_reissued = gather_additional_data(
                                                        src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity)
 
         dst_tr = issue_normal_traceroute(dsthostname, [srcip]) 
@@ -215,7 +221,7 @@ class FailureDispatcher
                                           spoofed_revtr, cached_revtr, graph_url, measurement_times,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          testing)
+                                          measurements_reissued, testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         end
@@ -231,6 +237,27 @@ class FailureDispatcher
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters)
         end
+    end
+
+    def paths_diverge?(src, dst, spoofed_tr, tr)
+        spoofed_tr_loop = spoofed_tr.contains_loop?()
+        tr_loop = tr.contains_loop?()
+        divergence = false
+        compressed_spooftr = spoofed_tr.compressed_as_path
+        compressed_tr = tr.compressed_as_path
+
+        [compressed_tr.size, compressed_spooftr.size].min.times do |i|
+           if compressed_tr[i] != compressed_spooftr[i]
+             divergence = true
+             break
+           end
+        end
+
+        $LOG.puts "spooftr_loop!(#{src}, #{dst}) #{spoofed_tr}" if spoofed_tr_loop
+        $LOG.puts "tr_loop!(#{src}, #{dst}) #{tr}" if tr_loop
+        $LOG.puts "divergence!(#{src}, #{dst}) #{compressed_spooftr} --tr-- #{compressed_tr}" if divergence
+
+        return spoofed_tr_loop || tr_loop || divergence
     end
 
     # this is really ugly -- but it elimanates redundancy between
@@ -267,6 +294,26 @@ class FailureDispatcher
             Emailer.deliver_isolation_exception("empty traceroute! (#{src}, #{dst})\nFirst tr: #{tr_time.getgm}\nSecond tr:#{tr_time2.getgm}\n#{results}")
         end
 
+        measurements_reissued = false
+
+        if paths_diverge?(src, dst, spoofed_tr, tr)
+            # path divergence!
+            # reissue traceroute and spoofed traceroute until they don't
+            # diverge
+            measurements_reissued = 1
+
+            3.times do 
+                sleep 30
+                tr = issue_normal_traceroute(src, [dst])
+                @spoof_tr_mutex.synchronize do
+                    spoofed_tr = issue_spoofed_traceroutes({[src,dst] => spoofers_w_connectivity})[[src,dst]]
+                end
+
+                break if !paths_diverge?(src, dst, spoofed_tr, tr)
+                measurements_reissued += 1
+            end
+        end
+
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         measurement_times << ["non-revtr pings", Time.new]
@@ -287,17 +334,24 @@ class FailureDispatcher
         measurement_times << ["revtr", Time.new]
         spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
 
-        measurement_times << ["revtr pings", Time.new]
-        revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(src, spoofed_revtr) if spoofed_revtr.valid?
-        ping_responsive |= revtr_ping_responsive
+        if spoofed_revtr.valid?
+           measurement_times << ["revtr pings", Time.new]
+           revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(src, spoofed_revtr)
+           ping_responsive |= revtr_ping_responsive
+        end
+
         measurement_times << ["measurements completed", Time.new]
 
         fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, historical_revtr)
 
         dataset = FailureIsolation::get_dataset(dst)
         
-        suspected_failure, as_hops_from_dst, as_hops_from_src = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr,
+        suspected_failure = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr,
                                                              historical_tr, spoofed_revtr, historical_revtr)
+
+        as_hops_from_src = @failure_analyzer.as_hops_from_src(suspected_failure, tr, spoofed_tr, historical_tr)
+        as_hops_from_dst = @failure_analyzer.as_hops_from_dst(suspected_failure, historical_revtr, spoofed_revtr,
+                                                spoofed_tr, tr, as_hops_from_src)
 
         working_historical_paths = @failure_analyzer.find_alternate_paths(src, dst, direction, tr,
                                                     spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
@@ -308,7 +362,7 @@ class FailureDispatcher
         
         [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            working_historical_paths, measured_working_direction, path_changed]
+            working_historical_paths, measured_working_direction, path_changed, measurements_reissued]
     end
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
@@ -488,24 +542,7 @@ class FailureDispatcher
         if revtr.valid?
            return request_pings(source, [revtr]) 
         else
-           return []
-        end
-    end
-
-    def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
-        # there might be multiple hops with the same ip, so we can't have a
-        # nice hashmap from ips -> hops
-        targets = non_responsive_hops.map { |hop| hop.ip }
-
-        pingable_ips = Set.new
-
-        # TODO: thread out
-        connected_vps.each do |vp|
-            pingable_ips |= @registrar.ping(source, targets, true)
-        end
-
-        non_responsive_hops.each do |hop|
-            hop.reachable_from_other_vps = pingable_ips.include? hop.ip
+           return [[], []]
         end
     end
 
@@ -515,6 +552,7 @@ class FailureDispatcher
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
+        responsive ||= []
         #$LOG.puts "Responsive to ping: #{responsive.inspect}"
 
         # update reachability
@@ -530,6 +568,25 @@ class FailureDispatcher
 
         [responsive, unresponsive_hops]
     end
+
+    def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
+        # there might be multiple hops with the same ip, so we can't have a
+        # nice hashmap from ips -> hops
+        targets = non_responsive_hops.map { |hop| hop.ip }
+
+        pingable_ips = Set.new
+
+        # TODO: thread out
+        connected_vps.each do |vp|
+            pingable_ips |= @registrar.ping(vp, targets, true)
+        end
+
+        non_responsive_hops.each do |hop|
+            hop.reachable_from_other_vps = pingable_ips.include? hop.ip
+        end
+    end
+
+
 
     # XXX Am I giving Ethan all of these hops properly?
     def fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)

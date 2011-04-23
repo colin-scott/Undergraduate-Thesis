@@ -40,6 +40,15 @@ class Path
    def valid?()
        return true
    end
+
+   def contains_loop?()
+       no_zeros = @hops.map { |hop| hop.ip }.find_all { |ip| ip != "0.0.0.0" }
+       return no_zeros.uniq.size != no_zeros.size
+   end
+
+   def to_s
+     @hops.inspect
+   end
 end
 
 # fuckin' namespace collision with reverse_traceroute.rb
@@ -148,6 +157,10 @@ class SpoofedReversePath < RevPath
 
        return false
     end
+
+    def unresponsive_hop_closest_to_dst()
+        return @hops.find { |hop| !hop.ping_responsive }
+    end
 end
 
 # normal traceroute, spoofed traceroute, historical traceroute
@@ -185,6 +198,9 @@ class ForwardPath < Path
    end
 
    def last_responsive_hop()
+       # for normal tr this is exactly what we want
+       # for historical tr and spoofed tr, we actually want to identify
+       # the first /non-responsive/ hop as the suspected failure
        @hops.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
    end
 end

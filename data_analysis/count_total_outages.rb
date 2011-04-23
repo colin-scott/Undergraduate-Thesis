@@ -16,6 +16,8 @@ passed = 0
 directions = Hash.new(0)
 forward_measured_working = Hash.new(0)
 
+spoof_revtr_syms = File.new("forward_failure_syms.dat", "w")
+
 # TODO: encapsulate all of these data items into a single object!
 LogIterator::iterate do  |file, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
@@ -31,6 +33,7 @@ LogIterator::iterate do  |file, src, dst, dataset, direction, formatted_connecte
         directions[direction] += 1
 
         if direction == Direction::FORWARD and spoofed_revtr.valid?
+            spoof_revtr_syms.puts spoofed_revtr.num_sym_assumptions
             forward_measured_working[spoofed_revtr.num_sym_assumptions] += 1
         elsif direction == Direction::FORWARD
             forward_measured_working["spoofed revtr missing"] += 1  
@@ -41,10 +44,13 @@ end
 puts "total: #{total}"
 puts "passed: #{passed}"
 puts "directions: #{directions.inspect}"
-puts "forward measured working: #{forward_measured_working.inspect}"
+puts "forward measured working: #{forward_measured_working.to_a.sort_by { |x| x[0] }.inspect}"
 
 #hist_out.close
 #spoof_out.close
 #all_out.close
+#
 
-#system "scp historical_sym.out spoof_sym.out all_sym.out cs@toil:~"
+spoof_revtr_syms.close
+
+system "scp spoof_revtr_syms.dat cs@toil:~"

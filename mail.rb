@@ -101,7 +101,7 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, cached_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          testing=false)
+                          measurements_reissued,testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -121,7 +121,8 @@ class Emailer < ActionMailer::Base
                     :alternate_paths => alternate_paths, 
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
-                    :jpg_url => jpg_url, :measurement_times => measurement_times
+                    :jpg_url => jpg_url, :measurement_times => measurement_times,
+                    :measurements_reissued => meausurements_reissued
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
                           formatted_unconnected, pings_towards_src,
@@ -131,7 +132,7 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, cached_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          testing=false)
+                          measurements_reissued, testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -152,7 +153,8 @@ class Emailer < ActionMailer::Base
                     :alternate_paths => alternate_paths, 
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
-                    :jpg_url => jpg_url, :measurement_times => measurement_times
+                    :jpg_url => jpg_url, :measurement_times => measurement_times,
+                    :measurements_reissued => meausurements_reissued
     end
     def isolation_exception(exception)
         subject     "Isolation Module Exception"
