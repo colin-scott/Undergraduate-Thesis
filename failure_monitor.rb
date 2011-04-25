@@ -79,6 +79,7 @@ class FailureMonitor
 
             @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
 
+            # TODO: cat directly from ssh rather than scp'ing
             system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
 
@@ -248,6 +249,7 @@ class FailureMonitor
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
+           # Boy... this is a mess. XXX
            if target2stillconnected[target].size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and

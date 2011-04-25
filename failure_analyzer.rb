@@ -215,7 +215,7 @@ class FailureAnalyzer
 
             bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction::FALSE_POSITIVE, 
                 :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
-                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach}
+                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach }
 
             $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
             return false
