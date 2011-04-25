@@ -246,15 +246,20 @@ class FailureDispatcher
         compressed_spooftr = spoofed_tr.compressed_as_path
         compressed_tr = tr.compressed_as_path
 
+        # trs and spooftrs sometimes differ in length. We look at the common
+        # prefix
         [compressed_tr.size, compressed_spooftr.size].min.times do |i|
-           if compressed_tr[i] != compressed_spooftr[i]
+           # occasionally spooftr will get *'s where tr doesn't, or vice
+           # versa. Look to make sure the next hop isn't the same
+           if compressed_tr[i] != compressed_spooftr[i] and 
+               compressed_tr[i] != compressed_spooftr[i+1] and compressed_tr[i+1] != compressed_spooftr[i]
              divergence = true
              break
            end
         end
 
-        $LOG.puts "spooftr_loop!(#{src}, #{dst}) #{spoofed_tr}" if spoofed_tr_loop
-        $LOG.puts "tr_loop!(#{src}, #{dst}) #{tr}" if tr_loop
+        $LOG.puts "spooftr_loop!(#{src}, #{dst}) #{spoofed_tr.map { |h| h.ip }}" if spoofed_tr_loop
+        $LOG.puts "tr_loop!(#{src}, #{dst}) #{tr.map { |h| h.ip}}" if tr_loop
         $LOG.puts "divergence!(#{src}, #{dst}) #{compressed_spooftr} --tr-- #{compressed_tr}" if divergence
 
         return spoofed_tr_loop || tr_loop || divergence

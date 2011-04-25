@@ -27,7 +27,9 @@ require 'failure_monitor'
 # XXX Don't hardcode!!!
 $pptasks = "~ethan/scripts/pptasks"
 $default_period_seconds = 360
+$node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 Thread.abort_on_exception = true
+
 
 begin
    dispatcher = FailureDispatcher.new
@@ -50,6 +52,10 @@ begin
        monitor = FailureMonitor.new(dispatcher)
        dispatcher = FailureDispatcher.new
        monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
+   end
+
+   Signal.trap("USR2") do
+      monitor.remove_node(IO.read($node_to_remove).chomp)
    end
 
     monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)

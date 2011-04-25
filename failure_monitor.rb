@@ -184,6 +184,15 @@ class FailureMonitor
         end
     end
 
+    def remove_node(node)
+        @nodetarget2lastoutage.delete_if { |n,t| n[0] == node }
+        @vps_2_targets_never_seen.delete node
+        @problems_at_the_source.delete node
+        @outdated_nodes.delete node
+        @all_nodes.delete node
+        @not_sshable.delete node
+    end
+
     def classify_outages(node2targetstate)
         # target -> { node -> # rounds }
         target2observingnode2rounds = Hash.new { |hash,key| hash[key] = {} }
@@ -276,6 +285,7 @@ class FailureMonitor
         end
         [srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected]
     end
+
 
     def log_outage_detected(*args)
         t = Time.new
