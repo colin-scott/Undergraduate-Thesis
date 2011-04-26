@@ -103,9 +103,9 @@ class RevPath < Path
 
       max
    end
-  def unresponsive_hop_closest_to_dst()
+   def unresponsive_hop_closest_to_dst()
         return @hops.find { |hop| !hop.ping_responsive }
-    end
+   end
 end
 
 class HistoricalReversePath < RevPath
@@ -168,8 +168,6 @@ class SpoofedReversePath < RevPath
 
        return false
     end
-
-  
 end
 
 # normal traceroute, spoofed traceroute, historical traceroute
