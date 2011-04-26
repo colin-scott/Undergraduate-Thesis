@@ -21,11 +21,19 @@ class Path
    end
 
    # delegate methods to @hops!!!
+   # This way the Path Objects will serialize properly...
+   # subclassing Array does weird things...
    extend Forwardable
-   def_delegators :@hops,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,:collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,:empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,:initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,:reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,:slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,:|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,:enum_slice,:enum_with_index,:find,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,:partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+   def_delegators :@hops,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
+       :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
+       :empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,
+       :initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,
+       :reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,
+       :slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,
+       :|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,
+       :enum_slice,:enum_with_index,:find,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
+       :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-   # SpoofedReversePath.valid? kind of throws a wrench into this whole
-   # endeavor...  override!
    def compressed_as_path()
        # .uniq assumes no AS loops
        # TODO: do I need the find_all?
