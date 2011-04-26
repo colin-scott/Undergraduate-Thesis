@@ -41,7 +41,7 @@ module Dot
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [])
+        src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [], true)
         tr = ForwardPath.new([src_hop] + tr)
         spoofed_tr = ForwardPath.new([src_hop] + spoofed_tr)
         historic_tr = ForwardPath.new([src_hop] + historic_tr)
@@ -154,7 +154,9 @@ module Dot
         for hop in path
           # we include the preamble of the reverse traceroute output as a "hop" -- make sure to exclude
           # preamble from the graph. 
+          # Actually, this might be covered by !path.valid? above..
           next if hop.is_a?(ReverseHop) && !hop.valid_ip
+
           previous = current
           ip = hop.ip
           ip += oooo_marker.next! if ip == "0.0.0.0"
@@ -163,6 +165,8 @@ module Dot
           node2names[current] << name
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
+
+          $LOG.puts "add_path(), hop doesn't have reachable_from_other_vps: #{hop}, #{path}" unless hop.methods.include? "reachable_from_other_vps"
           node2othervpscanreach[current] ||= hop.reachable_from_other_vps
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability

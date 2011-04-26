@@ -119,6 +119,14 @@ class HistoricalReversePath < RevPath
        @src = "" # should be clear
        @dst = "" # ditto
    end
+   def initialize(init_hops=[])
+       super(init_hops)
+       @timestamp = 0 # measurement timestamp
+       @valid = false # if false, then there was nothing found in the DB
+       @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
+       @src = "" # should be clear
+       @dst = "" # ditto
+   end
 
    def valid?
        return (@valid || !@hops.find { |hop| hop.valid_ip }.nil?) && !@hops.empty?
@@ -251,9 +259,7 @@ class Hop
 end
 
 # wait a minute... we could just instantiate a Hop object...
-MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
-                     :reverse_path)
-
+MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
 
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
@@ -339,14 +345,10 @@ class ReverseHop < Hop
 
     def to_s()
         s = (@formatted.nil?) ? "" : @formatted.clone
-        s << " [ASN: #{@asn}]" if @valid_ip
-        s << " (pingable from S?: #{@ping_responsive})" if @valid_ip and !@ping_responsive.nil?
-        s << " [historically pingable?: #{@last_responsive or "false"}]" if @valid_ip
-        s
     end
 end
 
-class ForwardHop < Hop
+class HistoricalForwardHop
     attr_accessor :reverse_path
     def initialize(ttlhop, ipInfo)
         @ttl = ttlhop[0]

@@ -40,7 +40,6 @@ class FailureDispatcher
 
         @revtr_cache = RevtrCache.new(@db, @ipInfo)
 
-
         Thread.new do
             loop do
                 sleep 60 * 60 * 24
