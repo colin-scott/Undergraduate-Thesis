@@ -261,6 +261,25 @@ end
 # wait a minute... we could just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
 
+class ForwardHop < Hop 
+    attr_accessor :reverse_path
+    def initialize(ttlhop, ipInfo)
+        @ttl = ttlhop[0]
+        @ip = ttlhop[1]
+        @dns = ipInfo.resolve_dns(@ip, @ip) 
+        @asn = ipInfo.getASN(@ip)
+        @formatted = ipInfo.format(@ip, @dns, @asn)
+        @reverse_path = []
+        @ping_responsive = (@ip != "0.0.0.0")
+        @last_responsive = (@ip != "0.0.0.0")
+    end
+
+    def to_s()
+        "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
+    end
+end
+
+
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
     def initialize(ttl, ip, ipInfo)
@@ -345,24 +364,6 @@ class ReverseHop < Hop
 
     def to_s()
         s = (@formatted.nil?) ? "" : @formatted.clone
-    end
-end
-
-class HistoricalForwardHop
-    attr_accessor :reverse_path
-    def initialize(ttlhop, ipInfo)
-        @ttl = ttlhop[0]
-        @ip = ttlhop[1]
-        @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
-        @formatted = ipInfo.format(@ip, @dns, @asn)
-        @reverse_path = []
-        @ping_responsive = (@ip != "0.0.0.0")
-        @last_responsive = (@ip != "0.0.0.0")
-    end
-
-    def to_s()
-        "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
     end
 end
 
