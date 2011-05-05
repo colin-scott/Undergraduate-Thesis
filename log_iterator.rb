@@ -4,8 +4,99 @@ require 'yaml'
 require 'ip_info'
 require 'hops'
 require 'isolation_module'
+require 'set'
+require 'time'
 
-# REV4 is the only one that matters! everything else has been converted!
+# TODO: builder pattern?
+class Outage
+  attr_accessor :file, :src, :dst, :dataset, :direction, :formatted_connected, 
+                                          :formatted_unconnected, :pings_towards_src,
+                                          :tr, :spoofed_tr,
+                                          :dst_tr, :dst_spoofed_tr,
+                                          :historical_tr, :historical_trace_timestamp,
+                                          :spoofed_revtr, :cached_revtr,
+                                          :suspected_failure, :as_hops_from_dst, :as_hops_from_src, 
+                                          :alternate_paths, :measured_working_direction, :path_changed,
+                                          :measurement_times, :passed_filters, :dst_tr, :dst_spoofed_tr
+
+  def initialize(file, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, historical_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters)
+        @file = file
+        @src = src
+        @dataset = dataset
+        @direction = direction
+        @formatted_connected = formatted_connected
+        @formatted_unconnected = formatted_unconnected  
+        @pings_towards_src = pings_towards_src
+        @tr = tr  
+        @spoofed_tr = spoofed_tr
+        @historical_tr = historical_tr 
+        @historical_trace_timestamp = historical_trace_timestamp 
+        @spoofed_revtr = spoofed_revtr 
+        @historical_revtr = historical_revtr
+        @suspected_failure = suspected_failure 
+        @as_hops_from_dst = as_hops_from_dst 
+        @as_hops_from_src = as_hops_from_src 
+        @alternate_paths = alternate_paths 
+        @measured_working_direction = measured_working_direction 
+        @path_changed = path_changed 
+        @measurement_times = measurement_times 
+        @passed_filters = passed_filters 
+
+        link_listify!
+   end
+
+   def cached_revtr
+       @historical_revtr
+   end
+
+   def ping_responsive
+       ping_responsive = Set.new
+
+       @historical_tr.each do |hop|
+           ping_responsive |= hop.reverse_path.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if hop.reverse_path.valid?
+       end
+
+       ping_responsive |= @historical_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive |= @historical_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive |= @spoofed_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if spoofed_revtr.valid?
+
+       ping_responsive
+   end
+
+   # silly YAML doesn't call our constructor directly... so we have to do this
+   # by hand
+   def link_listify!
+       @tr.link_listify!
+       @spoofed_tr.link_listify!
+       @historical_tr.link_listify!
+       @historical_revtr.link_listify!
+       @spoofed_revtr.link_listify!
+   end
+
+   def anyone_on_as_boundary?(suspected_failure)
+        return false if suspected_failure.nil?
+
+        tr_hop = @tr.find { |hop| hop.ip == suspected_failure }
+   end
+
+   def to_s()
+       ""
+   end
+
+   def to_html()
+      ""
+   end
+end
+
+# REV4 is :the only one that matters! everything else has been converted!
 
 # Write a conversion script!!!
 
@@ -109,7 +200,7 @@ module LogIterator
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
                     self.read_log_rev4(file, &block)
                 rescue Errno::ENOENT, ArgumentError, TypeError
-                    $stderr.puts "failed to open #{file}, #{$!}"
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
                 end
             end
         end
@@ -144,6 +235,36 @@ module LogIterator
             Dir.glob("*yml").each do |file|
                 begin
                     self.read_log_rev3(file, &block)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::symmetric_iterate(&block)
+        Dir.chdir FailureIsolation::SymmetricIsolationResultsFinal do
+            files = Dir.glob("*yml")
+            total = files.size
+            curr = 0
+
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    self.read_sym_log_rev3(file, &block)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::symmetric_iterate_rev2(&block)
+        Dir.chdir FailureIsolation::OldSymmetricIsolationResults do
+            Dir.glob("*yml").each do |file|
+                begin
+                    self.read_sym_log_rev2(file, &block)
                 rescue Errno::ENOENT, ArgumentError, TypeError
                     $stderr.puts "failed to open #{file}, #{$!}"
                 end
@@ -187,7 +308,7 @@ module LogIterator
                                           spoofed_revtr, cached_revtr
     end
  
-    def LogIterator::read_log_rev4(file)
+    def LogIterator::read_log_rev4(file, &block)
         src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
@@ -196,8 +317,20 @@ module LogIterator
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters = YAML.load_file(file)
-               
-        yield file, src, dst, dataset, direction, formatted_connected, 
+
+        case block.arity
+        when 1
+           yield Outage.new(file, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, cached_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters)
+
+        else
+           yield file, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
                                           historical_tr, historical_trace_timestamp,
@@ -205,6 +338,7 @@ module LogIterator
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters
+        end
     end
 
     def LogIterator::read_sym_log_rev2(file)
@@ -243,6 +377,101 @@ module LogIterator
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters
+    end
+
+    def LogIterator::parse_time(filename, measurement_times)
+        # heuristic 1: if this was after I started logging measurement times, just 
+        # take the timestamp of the first measurement
+        if !measurement_times.nil? and !measurement_times.empty?
+            return measurement_times[0][1]
+        end
+    
+        # heuristic 2: the file mtimes are correct for isolation_results_rev2
+        #    unfortunately the files in isolation_results_rev3 and
+        #    isolation_results_rev4 were overwritten, so they all have the same
+        #    mtimes
+        rev2 = FailureIsolation::LastIsolationResults+"/"+filename
+        if File.exists?(rev2)
+            f = File.open(rev2, "r")
+            mtime = f.mtime
+            f.close
+            return mtime 
+        end
+    
+        timestamp = filename.split('_')[-1].gsub(/\.yml/, "")
+    
+        ## heuristic 3: I have .jpgs in the ~/www folder with
+        ##      month/day/ subdirectories...
+        #jpg = filename.gsub(/yml$/, "jpg")
+    
+        #if File.exists?(FailureIsolation::WebDirectory+"/"+"1")
+        #    return 
+        #end
+    
+        # heuristic 4: guess based on the timestamp
+        year = timestamp[0..3]
+        # we know that no log is from before Feb. 12th. So it must be a single
+        # digit.
+        month = timestamp[4..4] 
+        days_in_month = (month == "2") ? 28 : 31
+    
+        timestamp = timestamp[5..-1]
+    
+        if timestamp.size == "DDHHMMSS".size
+           day = timestamp[0..1]
+           hour = timestamp[2..3]
+           minute = timestamp[4..5]
+           second = timestamp[6..7]
+        elsif timestamp.size == "DDHHMMSS".size - 1
+           # one of them is compressed   
+           guesses = LogIterator::infer_one_digit_fields(timestamp, days_in_month)
+           #return nil unless guesses.reduce(:|)
+           return nil if !guesses[0] || !(guesses[-1] && !guesses[0..-2].reduce(:|))  # if the first field doesn't make sense, it's unambiguous
+           day, hour, minute, second = LogIterator::parse_given_single_digit(timestamp, guesses, 1)
+        elsif timestamp.size == "DDHHMMSS".size - 2
+           # two of them are compressed
+           #guesses = infer_one_digit_fields(timestamp, days_in_month)
+           return nil # unless guesses.reduce(:|)
+        elsif timestamp.size == "DDHHMMSS".size - 3
+           # three of them are compressed
+           #guesses = infer_one_digit_fields(timestamp, days_in_month)
+           return nil # unless guesses.reduce(:|)
+        elsif timestamp.size == "DDHHMMSS".size - 4
+           # all of them are compressed
+           day = timestamp[0..0]
+           hour = timestamp[1..1]
+           minute = timestamp[2..2]
+           second = timestamp[3..3] 
+        else
+           return nil
+        end
+    
+        #$stderr.puts timestamp
+        #$stderr.puts "day: #{day} hour: #{hour} minute: #{minute} second: #{second}"
+        return Time.local(year, month, day, hour, minute, second)
+    end
+    
+    def LogIterator::infer_one_digit_fields(timestamp, days_in_month)
+        # DDHHMMSS
+        day_one = (timestamp[0..1].to_i > days_in_month) 
+        hour_one = (timestamp[2..3].to_i >= 60) # || timestamp[2..2] == "0"
+        minute_one = (timestamp[4..5].to_i >= 60) # || timestamp[4..4] == "0"
+        second_one = (timestamp[6..7].to_i >= 60) # || timestamp[6..6] == "0"
+        [day_one, hour_one, minute_one, second_one]
+    end
+    
+    def LogIterator::parse_given_single_digit(timestamp, guesses, num_compressed)
+       day_one, hour_one, minute_one, second_one = guesses
+       #$stderr.puts guesses.inspect
+       if day_one
+          return [timestamp[0..0], timestamp[1..2], timestamp[3..4], timestamp[5..6]]
+       elsif hour_one
+          return [timestamp[0..1], timestamp[2..2], timestamp[3..4], timestamp[5..6]]
+       elsif minute_one
+          return [timestamp[0..1], timestamp[2..3], timestamp[4..4], timestamp[5..6]]
+       elsif second_one
+          return [timestamp[0..1], timestamp[2..3], timestamp[4..5], timestamp[6..6]]
+       end
     end
 end
 

@@ -65,6 +65,7 @@ module FailureIsolation
     FailureIsolation::LastSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results"
     FailureIsolation::OldSymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev2"
     FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev3"
+    FailureIsolation::SymmetricIsolationResultsFinal = "#{$DATADIR}/symmetric_isolation_results_final"
 
     FailureIsolation::DotFiles = "#{$DATADIR}/dots"
 

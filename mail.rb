@@ -122,7 +122,7 @@ class Emailer < ActionMailer::Base
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => meausurements_reissued
+                    :measurements_reissued => measurements_reissued
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
                           formatted_unconnected, pings_towards_src,
@@ -154,7 +154,7 @@ class Emailer < ActionMailer::Base
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => meausurements_reissued
+                    :measurements_reissued => measurements_reissued
     end
     def isolation_exception(exception)
         subject     "Isolation Module Exception"

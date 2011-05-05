@@ -11,9 +11,9 @@ class FailureMonitor
         # TODO: handle these with optparse
         @@minutes_per_round = 2
         @@timestamp_bound = 605
-        @@upper_rounds_bound = 120
+        @@upper_rounds_bound = 500
         @@lower_rounds_bound = 4
-        @@vp_bound = 2
+        @@vp_bound = 1
         # if more than 70% of a node's targets are unreachable, we ignore the
         # node
         @@source_specific_problem_threshold = 0.35
@@ -104,8 +104,6 @@ class FailureMonitor
             sleep sleep_period if sleep_period > 0
         end
     end
-
-    private
 
     def read_in_results
         current_time = Time.now

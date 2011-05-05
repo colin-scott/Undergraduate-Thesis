@@ -17,7 +17,6 @@ class FailureAnalyzer
 
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
-    # Returns [suspect, # AS-hops from dst, # AS-hops from src]
     def identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         case direction
@@ -44,8 +43,8 @@ class FailureAnalyzer
                 # return suspected_hop
             else
                 # TODO: more stuff with
-                return historical_revtr.unresponsive_hop_closest_to_dst()
-            end
+                return historical_revtr.unresponsive_hop_farthest_from_dst()
+            end # what if the spoofed revtr went through?
         when Direction::FORWARD, Direction::BOTH
             # the failure is most likely adjacent to the last responsive forward hop
             last_tr_hop = tr.last_non_zero_hop
@@ -199,9 +198,13 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        no_historical_trace = (historical_tr.empty?)
+        #no_historical_trace = (historical_tr.empty?)
+        # XXX
+        no_historical_trace = false
 
-        historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
+        #historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
+        # XXX
+        historical_trace_didnt_reach = false
 
         # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 

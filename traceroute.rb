@@ -4,9 +4,12 @@ module Traceroute
     def Traceroute::sendProbes(hostname, dests, controller)
         $LOG.puts "Traceroute::sendProbe(): source #{hostname}, dests #{dests.inspect}"
 
+        $LOG.puts "Traceroute::sendProbe() Not registered! #{hostname}" unless controller.hosts.include? hostname
         hostname2targets = { hostname => dests }
          
         results,unsuccessful_hosts,privates,blacklisted = controller.traceroute(hostname2targets)
+
+        $LOG.puts "Traceroute::sendProbe() unsuccesful_hosts!: #{unsuccessful_hosts.inspect}" unless unsuccessful_hosts.empty?
 
         Traceroute::parse_results results
     end

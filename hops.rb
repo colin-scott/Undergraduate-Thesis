@@ -18,6 +18,7 @@ class Path
 
    def initialize(init_hops=[])
       @hops = Array.new(init_hops)
+      link_listify!
    end
 
    # delegate methods to @hops!!!
@@ -44,6 +45,10 @@ class Path
        @hops.map { |hop| hop.asn }
    end
 
+   def without_zeros()
+       @hops.find_all { |hop| hop.ip != "0.0.0.0" }
+   end
+
    # overriden if necessary
    def valid?()
        return true
@@ -51,11 +56,25 @@ class Path
 
    def contains_loop?()
        no_zeros = @hops.map { |hop| hop.ip }.find_all { |ip| ip != "0.0.0.0" }
-       return no_zeros.uniq.size != no_zeros.size
+       adjacents_removed = Path.new
+       (0..(no_zeros.size-2)).each do |i|
+          adjacents_removed << no_zeros[i] if no_zeros[i] != no_zeros[i+1]
+       end
+       adjacents_removed << no_zeros[-1] unless no_zeros.empty?
+
+       return adjacents_removed.uniq.size != adjacents_removed.size
    end
 
    def to_s
-     @hops.inspect
+       @hops.inspect
+   end
+
+   def link_listify!
+       return if !valid?
+       (0...@hops.size).each do |i| 
+          @hops[i].previous = (i == 0) ? nil : @hops[i-1]
+          @hops[i].next = @hops[i+1]
+       end
    end
 end
 
@@ -103,22 +122,24 @@ class RevPath < Path
 
       max
    end
-   def unresponsive_hop_closest_to_dst()
-        return @hops.find { |hop| !hop.ping_responsive }
+
+   def unresponsive_hop_farthest_from_dst()
+       last_hop = @hops[0]
+       for hop in @hops
+          if hop.ping_responsive
+            return last_hop
+          end
+
+          last_hop = hop
+       end
+
+       return last_hop
    end
 end
 
 class HistoricalReversePath < RevPath
    attr_accessor :timestamp, :invalid_reason, :src, :dst, :valid
 
-   def initialize(init_hops=[])
-       super(init_hops)
-       @timestamp = 0 # measurement timestamp
-       @valid = false # if false, then there was nothing found in the DB
-       @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
-       @src = "" # should be clear
-       @dst = "" # ditto
-   end
    def initialize(init_hops=[])
        super(init_hops)
        @timestamp = 0 # measurement timestamp
@@ -181,6 +202,7 @@ end
 # normal traceroute, spoofed traceroute, historical traceroute
 class ForwardPath < Path
    def reached_dst_AS?(dst, ipInfo)
+       dst = dst.is_a?(Hop) ? dst.ip : dst
        dst_as = ipInfo.getASN(dst)
        last_non_zero_hop = last_non_zero_ip
        last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
@@ -218,6 +240,10 @@ class ForwardPath < Path
        # the first /non-responsive/ hop as the suspected failure
        @hops.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
    end
+
+   def valid?()
+      return @hops.size > 1 || (@hops.size == 1 && !@hops[0].is_a?(MockHop))
+   end
 end
 
 # =============================================================================
@@ -225,13 +251,20 @@ end
 # =============================================================================
 
 class Hop
-    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps
+    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps, :next, :previous
+
     def initialize(*args)
         @ping_responsive = false
         case args.size
         when 1 # just the ip
             @ip = args.shift
         end
+    end
+
+    # Alias resolution!
+    def cluster()
+        @cluster ||= $ip2cluster[@ip]
+        @cluster
     end
 
     def <=>(other)
@@ -256,10 +289,22 @@ class Hop
     def pingable_from_other_vps
         return !@ping_responsive && @reachable_from_other_vps
     end
+
+    def adjacent?(ip)
+       return true if @ip == ip
+       return true if !@next.nil? and @next.ip == ip
+       return true if !@previous.nil? and @previous.ip == ip
+       return false
+    end
 end
 
 # wait a minute... we could just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
+
+# what a pain
+class MockHop
+    attr_accessor :next, :previous
+end
 
 class ForwardHop < Hop 
     attr_accessor :reverse_path
@@ -364,6 +409,18 @@ class ReverseHop < Hop
 
     def to_s()
         s = (@formatted.nil?) ? "" : @formatted.clone
+    end
+
+    def on_as_boundary?
+        if !@previous.nil? && @previous.asn != @asn
+            return true
+        end
+
+        if !@next.nil? && @next.asn != @asn
+            return true
+        end
+
+        return false
     end
 end
 

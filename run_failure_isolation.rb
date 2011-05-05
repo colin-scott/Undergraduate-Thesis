@@ -30,7 +30,6 @@ $default_period_seconds = 360
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 Thread.abort_on_exception = true
 
-
 begin
    dispatcher = FailureDispatcher.new
    monitor = FailureMonitor.new(dispatcher)

@@ -10,11 +10,14 @@ require 'net/http'
 require 'hops'
 require 'mkdot'
 require 'reverse_traceroute_cache'
+require 'timeout'
 require 'failure_analyzer'
 
 # just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
     def initialize
+        @@revtr_timeout = 200
+        
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
@@ -152,6 +155,8 @@ class FailureDispatcher
         passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr,
                                                              ping_responsive, historical_tr, direction, testing)
 
+        $LOG.puts "analyze_results: #{src}, #{dst}, passed_filters: #{passed_filters}"
+
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
                              cached_revtr)
@@ -168,6 +173,8 @@ class FailureDispatcher
                                           measurements_reissued, testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+        else
+            $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
         end
 
         if(!testing)
@@ -223,6 +230,8 @@ class FailureDispatcher
                                           measurements_reissued, testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
+        else
+            $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
         end
 
         if(!testing)
@@ -491,9 +500,10 @@ class FailureDispatcher
 
     # XXX change me later to deal with revtrs from forward hops
     def issue_spoofed_revtr(src, dst, historical_hops)
+        srcdst2revtr = {}
         begin
-            srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
-                                                      @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
+                srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
+                                                          @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return SpoofedReversePath.new([:drb_connection_refused])
@@ -501,6 +511,8 @@ class FailureDispatcher
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             connect_to_drb()
             return SpoofedReversePath.new([:drb_exception])
+        rescue Timeout::Error
+            return SpoofedReversePath.new([:self_induced_timeout])
         end
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
@@ -590,8 +602,6 @@ class FailureDispatcher
         end
     end
 
-
-
     # XXX Am I giving Ethan all of these hops properly?
     def fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, cached_revtr)
         # TODO: redundannnnttt
@@ -619,7 +629,8 @@ class FailureDispatcher
 
     def get_uniq_filename(src, dst)
         t = Time.new
-        "#{src}_#{dst}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}#{t.sec}"
+        t_str = t.strftime("%Y%m%d%H%M%S")
+        "#{src}_#{dst}_#{t_str}"
     end
 
     # first arg must be the filename
@@ -631,6 +642,6 @@ class FailureDispatcher
     # first arg must be the filename
     def log_symmetric_isolation_results(*args)
         filename = args.shift
-        File.open(FailureIsolation::SymmetricIsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
+        File.open(FailureIsolation::SymmetricIsolationResultsFinal+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
     end
 end
