@@ -12,6 +12,7 @@ require 'mkdot'
 require 'reverse_traceroute_cache'
 require 'timeout'
 require 'failure_analyzer'
+require 'mail'
 
 # just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
@@ -30,7 +31,7 @@ class FailureDispatcher
         @mutex = Mutex.new
         @spoof_tr_mutex = Mutex.new
 
-        connect_to_drb # sets @rtrSvc
+        connect_to_drb() # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
         @ipInfo = IpInfo.new
@@ -54,10 +55,15 @@ class FailureDispatcher
     def connect_to_drb()
         @mutex.synchronize do
             if !@have_retried_connection
-                @have_retried_connection = true
-                uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
-                uri = Net::HTTP.get_response(URI.parse(uri_location)).body
-                @rtrSvc = DRbObject.new nil, uri
+                begin
+                    @have_retried_connection = true
+                    uri_location = "http://revtr.cs.washington.edu/vps/failure_isolation/spoof_only_rtr_module.txt"
+                    uri = Net::HTTP.get_response(URI.parse(uri_location)).body
+                    @rtrSvc = DRbObject.new nil, uri
+                    @rtrSvc.respond_to?(:anything?)
+                rescue DRb::DRbConnError
+                    Emailer.deliver_isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu")
+                end 
             end
         end
     end
@@ -344,8 +350,12 @@ class FailureDispatcher
         measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(spoofers_w_connectivity, non_responsive_hops)
 
-        measurement_times << ["revtr", Time.new]
-        spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
+        if direction != Direction::REVERSE and direction != Direction::BOTH
+            measurement_times << ["revtr", Time.new]
+            spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
+        else
+            spoofed_revtr = SpoofedReversePath.new
+        end
 
         if spoofed_revtr.valid?
            measurement_times << ["revtr pings", Time.new]
@@ -507,7 +517,7 @@ class FailureDispatcher
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return SpoofedReversePath.new([:drb_connection_refused])
-        rescue Exception => e
+        rescue Exception, NoMethodError => e
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             connect_to_drb()
             return SpoofedReversePath.new([:drb_exception])
@@ -517,7 +527,7 @@ class FailureDispatcher
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
-        raise "issue_spoofed_revtr returned an array!" if srcdst2revtr.is_a?(Array)
+        raise "issue_spoofed_revtr returned an #{srcdst2revtr.class}!" unless srcdst2revtr.is_a?(Hash)
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return SpoofedReversePath.new([:nil_return_value])
@@ -636,12 +646,12 @@ class FailureDispatcher
     # first arg must be the filename
     def log_isolation_results(*args)
         filename = args.shift
-        File.open(FailureIsolation::IsolationResults+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
+        File.open(FailureIsolation::IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(args)) }
     end
 
     # first arg must be the filename
     def log_symmetric_isolation_results(*args)
         filename = args.shift
-        File.open(FailureIsolation::SymmetricIsolationResultsFinal+"/"+filename+".yml", "w") { |f| YAML.dump(args, f) }
+        File.open(FailureIsolation::SymmetricIsolationResultsFinal+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(args)) }
     end
 end

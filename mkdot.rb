@@ -89,6 +89,13 @@ module Dot
         add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+
+        #XXX
+        #hop = historic_tr[-4]
+        #puts hop.dns
+        #puts hop.reverse_path
+        #add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
+
         historic_tr.each do |hop|
             add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
         end
@@ -316,15 +323,7 @@ if $0 == __FILE__
 #        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
 
     require 'log_iterator' 
-    LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/planetlab-node3.it-sudparis.eu_130.195.4.69_2011418114118.yml") do |file, src, dst, dataset, direction, formatted_connected, 
-                                            formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters|
-
-       Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr, historical_revtr, "testing.jpg")
+    LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/plgmu4.ite.gmu.edu_77.221.192.1_2011224142939.bin") do |outage|
+       Dot::generate_jpg(outage.src, outage.dst, outage.direction, outage.dataset, outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr, "testing.jpg")
     end
 end

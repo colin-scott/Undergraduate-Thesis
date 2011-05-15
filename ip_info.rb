@@ -18,6 +18,10 @@ class IpInfo
         @bgpInfo.getASN(ip)  
     end
 
+    def getPrefix(ip)
+        @bgpInfo.getPrefix(ip)
+    end
+
     def resolve_dns(dst, dst_ip)
         dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst}" : "#{dst}")
     end
@@ -25,6 +29,7 @@ class IpInfo
     def format(ip, dns=nil, asn=nil)
         dns = resolve_dns(ip, ip) if dns.nil?
         asn = @bgpInfo.getASN(ip) if asn.nil?
-        "#{dns} (#{ip}) [ASN: #{asn}]"
+        prefix = @bgpInfo.getPrefix(ip)
+        "#{dns} (#{ip}) [#{prefix}, ASN: #{asn}]"
     end
 end

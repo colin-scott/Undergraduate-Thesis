@@ -198,15 +198,11 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        #no_historical_trace = (historical_tr.empty?)
-        # XXX
-        no_historical_trace = false
+        no_historical_trace = (historical_tr.empty?)
 
-        #historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
-        # XXX
-        historical_trace_didnt_reach = false
+        historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
 
-        # $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+        $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
         no_pings_at_all = (ping_responsive.empty?)
 

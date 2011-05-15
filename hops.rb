@@ -32,8 +32,13 @@ class Path
        :reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,
        :slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,
        :|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,
-       :enum_slice,:enum_with_index,:find,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
+       :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+
+   def find(&block)
+       return nil unless valid?
+       @hops.find(&block)
+   end
 
    def compressed_as_path()
        # .uniq assumes no AS loops
@@ -45,8 +50,20 @@ class Path
        @hops.map { |hop| hop.asn }
    end
 
+   def prefix_path
+       @hops.map { |hop| hop.prefix }
+   end
+
+   def compressed_prefix_path
+       prefix_path().find_all { |prefix| !prefix.nil? }.uniq
+   end
+
    def without_zeros()
        @hops.find_all { |hop| hop.ip != "0.0.0.0" }
+   end
+
+   def num_not_advertised
+       @hops.find_all { |hop| hop.prefix.nil? }.size
    end
 
    # overriden if necessary
@@ -251,13 +268,26 @@ end
 # =============================================================================
 
 class Hop
-    attr_accessor :ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps, :next, :previous
+    attr_accessor :ip, :prefix, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps, :next, :previous
+
+    include Comparable
 
     def initialize(*args)
         @ping_responsive = false
         case args.size
         when 1 # just the ip
             @ip = args.shift
+        when 2 # ip, ip_info
+            @ip, ipInfo = args
+            @dns = ipInfo.resolve_dns(@ip,@ip)
+            @prefix = ipInfo.getPrefix(@ip)
+            @asn = ipInfo.getASN(@ip)
+            @formatted = ipInfo.format(@ip, @dns, @asn)
+        when 3 # ip, dns, ip_info
+            @ip, @dns, ipInfo = args
+            @prefix = ipInfo.getPrefix(@ip)
+            @asn = ipInfo.getASN(@ip)
+            @formatted = ipInfo.format(@ip, @dns, @asn)
         end
     end
 
@@ -290,11 +320,32 @@ class Hop
         return !@ping_responsive && @reachable_from_other_vps
     end
 
+    def on_as_boundary?
+        if !@previous.nil? && @previous.asn != @asn && @previous.ip != "0.0.0.0"
+            return @previous.asn
+        end
+
+        if !@next.nil? && @next.asn != @asn && @next.ip != "0.0.0.0"
+            return @next.asn
+        end
+
+        return false
+    end
+
+    # TODO: we have clustering now!
     def adjacent?(ip)
        return true if @ip == ip
        return true if !@next.nil? and @next.ip == ip
        return true if !@previous.nil? and @previous.ip == ip
        return false
+    end
+
+    def inspect
+        "#{self.class} asn=#{@asn} dns=#{@dns} formatted=#{@formatted} ip=#{@ip} last_responsive=#{@last_responsive} ping_responsive=#{@ping_responsive} ttl=#{@ttl} previous=#{@previous.nil? ? nil : @previous.asn} next=#{@next.nil? ? nil : @next.asn}"
+    end
+
+    def to_s
+        @formatted or @ip
     end
 end
 
@@ -323,7 +374,6 @@ class ForwardHop < Hop
         "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
     end
 end
-
 
 class HistoricalForwardHop < Hop
     attr_accessor :reverse_path
@@ -409,18 +459,6 @@ class ReverseHop < Hop
 
     def to_s()
         s = (@formatted.nil?) ? "" : @formatted.clone
-    end
-
-    def on_as_boundary?
-        if !@previous.nil? && @previous.asn != @asn
-            return true
-        end
-
-        if !@next.nil? && @next.asn != @asn
-            return true
-        end
-
-        return false
     end
 end
 

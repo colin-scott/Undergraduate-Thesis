@@ -156,10 +156,10 @@ class Emailer < ActionMailer::Base
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
                     :measurements_reissued => measurements_reissued
     end
-    def isolation_exception(exception)
+    def isolation_exception(exception, recipient="cs@cs.washington.edu")
         subject     "Isolation Module Exception"
         from        "failures@cs.washington.edu"
-        recipients  "cs@cs.washington.edu"
+        recipients  recipient
         body        :exception => exception
     end
     def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable)

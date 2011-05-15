@@ -62,8 +62,8 @@ end
 
 puts "Synopsis!"
 puts "total reverse: #{total_reverse}"
-puts "without historical: #{without_historical} #{without_historical * 100.0 / total_reverse}%"
-puts "without spoofed: #{without_spoofed} #{without_spoofed * 100.0 / total_reverse}%"
+puts "without historical revtr: #{without_historical} #{without_historical * 100.0 / total_reverse}%"
+puts "without spoofed revtr: #{without_spoofed} #{without_spoofed * 100.0 / total_reverse}%"
 puts "without historical and spoofed: #{neither} #{neither * 100.0 / total_reverse}%"
 puts "average historical sym assumptions: #{num_historical_sym_assumptions.reduce(:+) * 1.0 / num_historical_sym_assumptions.size}"
 puts "average spoofed sym assumptions: #{num_spoofed_sym_assumptions.reduce(:+) * 1.0 / num_spoofed_sym_assumptions.size}"

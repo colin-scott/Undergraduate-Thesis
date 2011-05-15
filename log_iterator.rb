@@ -6,95 +6,7 @@ require 'hops'
 require 'isolation_module'
 require 'set'
 require 'time'
-
-# TODO: builder pattern?
-class Outage
-  attr_accessor :file, :src, :dst, :dataset, :direction, :formatted_connected, 
-                                          :formatted_unconnected, :pings_towards_src,
-                                          :tr, :spoofed_tr,
-                                          :dst_tr, :dst_spoofed_tr,
-                                          :historical_tr, :historical_trace_timestamp,
-                                          :spoofed_revtr, :cached_revtr,
-                                          :suspected_failure, :as_hops_from_dst, :as_hops_from_src, 
-                                          :alternate_paths, :measured_working_direction, :path_changed,
-                                          :measurement_times, :passed_filters, :dst_tr, :dst_spoofed_tr
-
-  def initialize(file, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters)
-        @file = file
-        @src = src
-        @dataset = dataset
-        @direction = direction
-        @formatted_connected = formatted_connected
-        @formatted_unconnected = formatted_unconnected  
-        @pings_towards_src = pings_towards_src
-        @tr = tr  
-        @spoofed_tr = spoofed_tr
-        @historical_tr = historical_tr 
-        @historical_trace_timestamp = historical_trace_timestamp 
-        @spoofed_revtr = spoofed_revtr 
-        @historical_revtr = historical_revtr
-        @suspected_failure = suspected_failure 
-        @as_hops_from_dst = as_hops_from_dst 
-        @as_hops_from_src = as_hops_from_src 
-        @alternate_paths = alternate_paths 
-        @measured_working_direction = measured_working_direction 
-        @path_changed = path_changed 
-        @measurement_times = measurement_times 
-        @passed_filters = passed_filters 
-
-        link_listify!
-   end
-
-   def cached_revtr
-       @historical_revtr
-   end
-
-   def ping_responsive
-       ping_responsive = Set.new
-
-       @historical_tr.each do |hop|
-           ping_responsive |= hop.reverse_path.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if hop.reverse_path.valid?
-       end
-
-       ping_responsive |= @historical_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @historical_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @spoofed_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if spoofed_revtr.valid?
-
-       ping_responsive
-   end
-
-   # silly YAML doesn't call our constructor directly... so we have to do this
-   # by hand
-   def link_listify!
-       @tr.link_listify!
-       @spoofed_tr.link_listify!
-       @historical_tr.link_listify!
-       @historical_revtr.link_listify!
-       @spoofed_revtr.link_listify!
-   end
-
-   def anyone_on_as_boundary?(suspected_failure)
-        return false if suspected_failure.nil?
-
-        tr_hop = @tr.find { |hop| hop.ip == suspected_failure }
-   end
-
-   def to_s()
-       ""
-   end
-
-   def to_html()
-      ""
-   end
-end
+require 'outage'
 
 # REV4 is :the only one that matters! everything else has been converted!
 
@@ -105,25 +17,6 @@ end
 
 module LogIterator
     IPINFO = IpInfo.new # hmmm
-
-    def LogIterator::display_results(src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr)
-        puts "Source: #{src}"
-        puts "Destination: #{IPINFO.format(dst)}"
-        puts "Dataset: #{dataset}"
-        puts "Direction: #{direction}"
-        #puts "Nodes with connectivity: #{formatted_connected.join ','}"
-        #puts "Nodes without connectivity #{formatted_unconnected.join ','}"
-        #puts "Succesful spoofers: #{pings_towards_src.inspect}"
-        #puts "Normal tr: #{tr.inspect}"
-        #puts "Spoofed tr: #{spoofed_tr.inspect}"
-        #puts "Historical tr: #{historical_tr.inspect}"
-        #puts "Spoofed revtr: #{spoofed_revtr.inspect}"
-        #puts "Historical revtr: #{historical_revtr.inspect}"
-    end
 
     def LogIterator::jpg2yml_rev4(jpg)
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
@@ -189,16 +82,44 @@ module LogIterator
         end
     end
 
-    def LogIterator::iterate(&block)
+    def LogIterator::convert(filename)
+        bin = filename.gsub(/yml$/, "bin")
+        return if File.exists? bin
+        arr = YAML.load_file(filename)
+        return if arr.empty?
+        tmp = File.new(bin, "w")
+        Marshal.dump(arr, tmp)
+        tmp.close
+    end
+
+    def LogIterator::convert_all()
         Dir.chdir FailureIsolation::IsolationResults do
-            files = Dir.glob("*yml")
+            files = Dir.glob("*yml").sort
             total = files.size
             curr = 0
             files.each do |file|
                 begin
                     curr += 1
+                    self.convert(file)
+                rescue Errno::ENOENT, ArgumentError, TypeError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::iterate(debugging=false, &block)
+        Dir.chdir FailureIsolation::IsolationResults do
+            files = Dir.glob("*bin").sort
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts file if debugging
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
                     self.read_log_rev4(file, &block)
+                    $stderr.print ".." if debugging
                 rescue Errno::ENOENT, ArgumentError, TypeError
                     $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
                 end
@@ -309,6 +230,7 @@ module LogIterator
     end
  
     def LogIterator::read_log_rev4(file, &block)
+        input = File.new(file)
         src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
@@ -316,7 +238,7 @@ module LogIterator
                                           spoofed_revtr, cached_revtr,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters = YAML.load_file(file)
+                                          measurement_times, passed_filters = Marshal.load(input)
 
         case block.arity
         when 1
@@ -339,6 +261,7 @@ module LogIterator
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters
         end
+        input.close
     end
 
     def LogIterator::read_sym_log_rev2(file)
@@ -490,12 +413,14 @@ if __FILE__ == $0
 
     #puts directions.inspect
     
-    LogIterator::read_log_rev3(ARGV.shift) do |file, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, cached_revtr|
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr,
-             historical_tr, spoofed_revtr, cached_revtr, "testing.jpg")
-    end
+    #LogIterator::read_log_rev3(ARGV.shift) do |file, src, dst, dataset, direction, formatted_connected, 
+    #                                      formatted_unconnected, pings_towards_src,
+    #                                      tr, spoofed_tr,
+    #                                      historical_tr, historical_trace_timestamp,
+    #                                      spoofed_revtr, cached_revtr|
+    #    Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr,
+    #         historical_tr, spoofed_revtr, cached_revtr, "testing.jpg")
+    #end
+    
+    LogIterator::convert_all()
 end

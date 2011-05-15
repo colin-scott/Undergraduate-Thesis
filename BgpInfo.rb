@@ -1,5 +1,6 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homesr/network/revtr/ruby/bin/ruby
 
+require '~/dave/revtr-test/reverse_traceroute/utilities.rb'
 require 'rubygems'
 require 'rpatricia'
 
@@ -47,6 +48,10 @@ class BgpInfo
                 unless line =~ /^\d+\.\d+\.\d+\.\d+\/\d+\s+\S+$/
            
             advertisedPrefix, asn = line.chomp.split
+            mockIp, mask = advertisedPrefix.split('/')
+            next if Inet::in_private_prefix? mockIp
+            next if mask.to_i > 24 or mask.to_i < 4
+
                     # TODO: asn = asn.to_i? what about '*'s though?
             pt.add advertisedPrefix, asn
         end
@@ -56,7 +61,7 @@ end
 
 if $0 == __FILE__
     bgpInfo =  BgpInfo.new 
-    ip = ARGV.shift
+    ip = (ARGV.shift or "128.6.45.1")
     puts "#{ip} is part of #{bgpInfo.getPrefix(ip)}"
     puts "ASN is #{bgpInfo.getASN(ip)}"
     puts bgpInfo.getPrefix("0.0.0.0")
