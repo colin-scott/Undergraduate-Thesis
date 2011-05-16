@@ -40,6 +40,10 @@ class Path
        @hops.find(&block)
    end
 
+   def passes_through_as?(asn)
+      !@hops.find { |hop| hop.asn == asn }.nil?
+   end
+
    def compressed_as_path()
        # .uniq assumes no AS loops
        # TODO: do I need the find_all?

@@ -122,8 +122,8 @@ class RevtrCache
         $LOG.puts $!
       end # begin
     
-      path.pop while path[-1].ip=="0.0.0.0"
-    path.valid = true    
+      path.pop while !path.empty? and path[-1].ip=="0.0.0.0"
+      path.valid = true if !path.empty?
       # all data has been generated, add it to the object for eventual return
       path.timestamp = ts
       return path

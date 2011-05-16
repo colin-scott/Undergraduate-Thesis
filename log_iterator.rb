@@ -86,7 +86,7 @@ module LogIterator
         bin = filename.gsub(/yml$/, "bin")
         return if File.exists? bin
         arr = YAML.load_file(filename)
-        return if arr.empty?
+        return if !arr || arr.empty?
         tmp = File.new(bin, "w")
         Marshal.dump(arr, tmp)
         tmp.close

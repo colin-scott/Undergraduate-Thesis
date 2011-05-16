@@ -7,6 +7,13 @@ class Direction
     FALSE_POSITIVE = "both paths seem to be working...?"
 end
 
+class AlternatePath
+    FORWARD = :"forward path"
+    REVERSE = :"reverse path"
+    HISTORICAL_REVERSE = :"historical reverse path"
+    HISTORICAL_FORWARD = :"historical forward path"
+end
+
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 class FailureAnalyzer

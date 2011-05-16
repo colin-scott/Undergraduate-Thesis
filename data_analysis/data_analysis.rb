@@ -1,3 +1,13 @@
+
+class Array
+    def categorize()
+        categories = Hash.new { |h,k| h[k] = [] }
+        self.each { |elt| categories[yield elt] << elt }
+        categories
+    end
+end
+
+
 class Tier
     attr_accessor :name, :rank
 
