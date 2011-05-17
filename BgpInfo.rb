@@ -14,6 +14,9 @@ class BgpInfo
         (result) ? prefixString(result) : nil
     end
 
+    # returns a string representation of the ASN advertising the given IP address
+    # returns nil if no ASN advertised
+    # returns underscore delimited string if multiple ASes advertised the IP
     def getASN(dotted)
         result = grabResult(dotted)
         (result) ? result.data : nil
@@ -51,8 +54,10 @@ class BgpInfo
             mockIp, mask = advertisedPrefix.split('/')
             next if Inet::in_private_prefix? mockIp
             next if mask.to_i > 24 or mask.to_i < 4
-
-                    # TODO: asn = asn.to_i? what about '*'s though?
+            next if asn == "*"
+            
+            # TODO: asn = asn.to_i? what about '*'s though?
+            # hmmm, the trie doesn't accept ints
             pt.add advertisedPrefix, asn
         end
         pt

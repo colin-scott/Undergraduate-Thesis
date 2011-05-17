@@ -159,7 +159,7 @@ class FailureDispatcher
         log_name = get_uniq_filename(src, dst)
 
         passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr,
-                                                             ping_responsive, historical_tr, direction, testing)
+                                                             ping_responsive, historical_tr, historical_revtr, direction, testing)
 
         $LOG.puts "analyze_results: #{src}, #{dst}, passed_filters: #{passed_filters}"
 
@@ -216,7 +216,7 @@ class FailureDispatcher
         log_name = get_uniq_filename(src, dst)
 
         passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive,
-                                                                        historical_tr, direction, testing)
+                                                                        historical_tr, historical_revtr, direction, testing)
         
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,

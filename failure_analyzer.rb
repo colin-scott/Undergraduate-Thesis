@@ -194,7 +194,7 @@ class FailureAnalyzer
         direction
     end
 
-    def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, direction, testing)
+    def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, historical_revtr, direction, testing)
         # it's uninteresting if no measurements worked... probably the
         # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
@@ -215,13 +215,15 @@ class FailureAnalyzer
 
         last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
 
+        reverse_path_helpless = (direction == Direction::REVERSE && !historical_revtr.valid?)
+
         if(!(testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
-                !historical_trace_didnt_reach)))
+                !historical_trace_didnt_reach && !reverse_path_helpless)))
 
             bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction::FALSE_POSITIVE, 
                 :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
-                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach }
+                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpess }
 
             $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
             return false
