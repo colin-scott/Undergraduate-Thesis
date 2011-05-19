@@ -1,14 +1,17 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+require 'isolation_module'
+require 'drb'
 require 'failure_dispatcher'
 dispatcher = FailureDispatcher.new
 
+hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.clone
+src = hosts.shift
+receivers = hosts[0..5]
+
 if ARGV.empty?
-    srcdst = ["planetlab-node3.it-sudparis.eu", "132.252.152.193"]
-    dispatcher.isolate_outages({ srcdst =>
-               ["pl1.6test.edu.cn", "planetlab2.eecs.umich.edu", "planetlab1.nvlab.org",
-                  "plgmu4.ite.gmu.edu", "deimos.cecalc.ula.ve"]},
-               {srcdst => []}, {srcdst => []}, true)
+    srcdst = [src, "132.252.152.193"]
+    dispatcher.gather_additional_data(src, "132.252.152.193", [], ForwardPath.new, [], [], true)
 else
     src = ARGV.shift
     dst = ARGV.shift

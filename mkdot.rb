@@ -25,16 +25,16 @@ module Dot
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
-    def self.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, output)
+    def self.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, output)
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
-        self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, dot_output)
+        self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
         # locally rather than pushing the bits across the wire
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
-    def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, output)
+    def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, output)
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
         oooo_marker = "a" # FUUCKKK. this is ugly 
@@ -85,8 +85,11 @@ module Dot
 
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
         # one-time-use object? Orrrrrrr... fill in all of the node attributes
-        # separately from add_path()
+        # separately from add_path(). Satan
         add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        additional_traces.each do |trace|
+            add_path(trace, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        end
         add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
 

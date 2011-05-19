@@ -98,9 +98,10 @@ class Emailer < ActionMailer::Base
                           formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, measurement_times,
+                          spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
+                          additional_traces,
                           measurements_reissued,testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
@@ -114,7 +115,7 @@ class Emailer < ActionMailer::Base
                     :spoofed_forward_path => spoofed_forward_path,
                     :historical_forward_path => historical_forward_path,
                     :historical_fpath_timestamp => historical_fpath_timestamp,
-                    :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
+                    :spoofed_revtr => spoofed_revtr, :historical_revtr => historical_revtr,
                     :suspected_failure => suspected_failure,
                     :as_hops_from_dst => as_hops_from_dst,
                     :as_hops_from_src => as_hops_from_src, 
@@ -122,16 +123,18 @@ class Emailer < ActionMailer::Base
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => measurements_reissued
+                    :measurements_reissued => measurements_reissued,
+                    :additional_traces => additional_traces
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
                           formatted_unconnected, pings_towards_src,
                           normal_forward_path, spoofed_forward_path,
                           dst_normal_forward_path, dst_spoofed_forward_path,
                           historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, cached_revtr, jpg_url, measurement_times,
+                          spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
+                          additional_traces,
                           measurements_reissued, testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
@@ -144,7 +147,7 @@ class Emailer < ActionMailer::Base
                     :spoofed_forward_path => spoofed_forward_path,
                     :historical_forward_path => historical_forward_path,
                     :historical_fpath_timestamp => historical_fpath_timestamp,
-                    :spoofed_revtr => spoofed_revtr, :cached_revtr => cached_revtr,
+                    :spoofed_revtr => spoofed_revtr, :historical_revtr => historical_revtr,
                     :dst_normal_forward_path => dst_normal_forward_path,
                     :dst_spoofed_forward_path => dst_spoofed_forward_path,
                     :suspected_failure => suspected_failure,
@@ -154,7 +157,8 @@ class Emailer < ActionMailer::Base
                     :measured_working_direction => measured_working_direction, 
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => measurements_reissued
+                    :measurements_reissued => measurements_reissued,
+                    :additional_traces => additional_traces
     end
     def isolation_exception(exception, recipient="cs@cs.washington.edu")
         subject     "Isolation Module Exception"

@@ -156,6 +156,24 @@ class RevPath < Path
 
        return last_hop
    end
+
+   # return all hops within the dst as, or the first egress router outside of
+   # the dst as
+   def all_hops_adjacent_to_dst_as
+        adjacent_hops = []
+        return adjacent_hops unless valid?
+
+        dst_as = @hops[0].asn
+
+        return adjacent_hops if dst_as.nil?
+
+        @hops.each do |hop| 
+            adjacent_hops << hop
+            break if hop.asn != dst_as         
+        end
+
+        adjacent_hops
+   end
 end
 
 class HistoricalReversePath < RevPath

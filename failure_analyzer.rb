@@ -45,7 +45,7 @@ class FailureAnalyzer
                 #
                 # Will only have a historical_revtr if the suspected hop is a
                 # historical hop, or the hops of the measured path overlap.
-                # historical_revtr = fetch_cached_revtr(src, suspected_hop)
+                # historical_revtr = fetch_historical_revtr(src, suspected_hop)
                 # XXX 
                 # return suspected_hop
             else

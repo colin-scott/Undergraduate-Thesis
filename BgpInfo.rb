@@ -1,4 +1,4 @@
-#!/homesr/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby/bin/ruby
 
 require '~/dave/revtr-test/reverse_traceroute/utilities.rb'
 require 'rubygems'
