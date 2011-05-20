@@ -13,6 +13,7 @@ require 'reverse_traceroute_cache'
 require 'timeout'
 require 'failure_analyzer'
 require 'mail'
+require 'outage'
 
 # TODO: log additional traceroutes
 #       convert logs to OBJECT dumps to allow for forward /and/ backward
@@ -212,9 +213,9 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
-            measurements_reissued = gather_additional_data(
-                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
+            working_historical_paths, measured_working_direction, path_changed, additional_traceroutes,
+            measurements_reissued = gather_additional_data(src, dst, pings_towards_src,
+                                                    spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
 
         dst_tr = issue_normal_traceroutes(dsthostname, [srcip])[srcip]
 
@@ -240,8 +241,7 @@ class FailureDispatcher
                                           spoofed_revtr, historical_revtr, graph_url, measurement_times,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          additional_traceroutes,
-                                          measurements_reissued, testing)
+                                          measurements_reissued, additional_traceroutes,testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         else
@@ -404,13 +404,21 @@ class FailureDispatcher
     def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
                                         historical_tr, spoofed_revtr, historical_revtr)
         pingable_targets = []
+        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
 
         if direction == Direction::FORWARD or direction == Direction::BOTH
-            pingable_targets += historical_tr.find_all { |hop| hop.ttl > suspected_failure.ttl && hop.ping_responsive }
+            if historical_tr.include? nil
+                Emailer.deliver_isolation_exception("nil hop in historical trace: #{historical_tr.inspect}")
+            end
+
+            pingable_targets += historical_tr.find_all { |hop| !hop.nil? && hop.ttl > suspected_failure.ttl && hop.ping_responsive }
+            raise "No longer an Array!" if !pingable_targets.is_a?(Array)
         end
 
         pingable_targets += historical_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
+        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
         pingable_targets += spoofed_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
+        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
 
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 

@@ -101,8 +101,7 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          additional_traces,
-                          measurements_reissued,testing=false)
+                          measurements_reissued,additional_traces,testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -134,8 +133,7 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          additional_traces,
-                          measurements_reissued, testing=false)
+                          measurements_reissued, additional_traces,testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
