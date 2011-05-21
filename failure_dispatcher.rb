@@ -213,7 +213,7 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            working_historical_paths, measured_working_direction, path_changed, additional_traceroutes,
+            alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
             measurements_reissued = gather_additional_data(src, dst, pings_towards_src,
                                                     spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
 
@@ -420,6 +420,7 @@ class FailureDispatcher
         pingable_targets += spoofed_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
         raise "No longer an Array!" if !pingable_targets.is_a?(Array)
 
+        $LOG.puts "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
         targ2trace

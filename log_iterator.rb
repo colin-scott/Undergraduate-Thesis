@@ -240,8 +240,9 @@ module LogIterator
                                           alternate_paths, measured_working_direction, path_changed,
                                           measurement_times, passed_filters = Marshal.load(input)
 
-        case block.arity
-        when 1
+        if src.is_a?(Outage) # we changed over to only logging outage objects at some point. BLLARRRGGGHHH
+           yield src
+        else
            yield Outage.new(file, src, dst, dataset, direction, formatted_connected, 
                                           formatted_unconnected, pings_towards_src,
                                           tr, spoofed_tr,
@@ -249,17 +250,7 @@ module LogIterator
                                           spoofed_revtr, historical_revtr,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters)
-
-        else
-           yield file, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters
+                                          measurement_times, passed_filters, [])
         end
         input.close
     end
