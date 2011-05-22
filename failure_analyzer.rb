@@ -17,9 +17,8 @@ end
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 class FailureAnalyzer
-    def initialize(ipInfo, dispatcher)
+    def initialize(ipInfo)
         @ipInfo = ipInfo
-        @dispatcher = dispatcher
     end
 
     # returns the hop suspected to be close to the failure
@@ -83,6 +82,7 @@ class FailureAnalyzer
         metrics.max
     end
 
+    # # AS hops from the first hop in the path until the suspected hop
     def count_AS_hops(path, suspected_hop)
         return -1 if path.empty? || !path.valid? || !suspected_hop.is_a?(Hop)
 
@@ -229,6 +229,53 @@ class FailureAnalyzer
             return false
         else
             return true
+        end
+    end
+
+    def categorize_failure(outage)
+        if outage.direction == Direction::BOTH or outage.direction == Direction::FORWARD
+            # Do the measured forward paths stop at the same hop? They should...
+            last_tr_hop = outage.tr.last_responsive_hop
+            last_spoofed_tr_hop = outage.spoofed_tr.last_responsive_hop
+
+            if last_tr_hop.cluster != last_spoofed_tr_hop.cluster
+               return :measured_forward_paths_differ
+            end
+
+            cluster = last_tr_hop.cluster
+
+            # Does the historical forward path also path through that last hop?
+            same_last_hop = outage.historical_tr.find { |hop| hop.cluster == cluster }
+            return :forward_path_change unless same_last_hop
+
+            if !same_last_hop.next.ping_responsive?
+                return :crytal_clear_forward_path
+            else
+                # TODO: consider wether next is in the same AS. Better if so
+                return :unclear_forward_path
+            end
+        else # Direction::REVERSE
+            # is there a crystal clear "reachability horizon"?
+            # This is easy to do visually. Several historical reverse paths,
+            # all converging to one point, which is then pingable afterwards
+            # TODO: factor in other nearby historical reverse paths
+            
+            # but how to do this in code?
+            # I guess, is there a single point where hops before are pinable
+            # and hops after aren't? Could be h
+            last_unresponsive = outage.historical_revtr.unresponsive_hop_farthest_from_dst()
+            if last_responsive.previous.asn == outage.dst.asn
+                return :multi_homed_provider_link
+            elsif last_unresponsive.find_subsequent { |hop| !hop.ping_responsive }
+                return :no_clear_reachability_horizon
+            else # clear reachability horizon
+                # confined to one AS?
+                if last_unresponsive.on_as_boundary?
+                    return :horizon_on_as_boundary
+                else
+                    return :clear_reachability_horizon
+                end
+            end
         end
     end
 end

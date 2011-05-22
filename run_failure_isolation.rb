@@ -48,8 +48,8 @@ begin
        load 'failure_dispatcher.rb'
        load 'failure_monitor.rb'
 
-       monitor = FailureMonitor.new(dispatcher)
        dispatcher = FailureDispatcher.new
+       monitor = FailureMonitor.new(dispatcher)
        monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
    end
 

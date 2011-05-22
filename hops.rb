@@ -97,6 +97,20 @@ class Path
           @hops[i].next = @hops[i+1]
        end
    end
+
+   def self.share_common_path_prefix?(path1, path2)
+        # trs and spooftrs sometimes differ in length. We look at the common
+        [path1.size, path2.size].min.times do |i|
+           # occasionally spooftr will get *'s where tr doesn't, or vice
+           # versa. Look to make sure the next hop isn't the same
+           if path1[i] != path2[i] and 
+               path1[i] != path2[i+1] and path1[i+1] != path2[i]
+               return false
+           end
+        end
+
+        return true
+   end
 end
 
 # fuckin' namespace collision with reverse_traceroute.rb
@@ -302,13 +316,11 @@ class Hop
         when 2 # ip, ip_info
             @ip, ipInfo = args
             @dns = ipInfo.resolve_dns(@ip,@ip)
-            @prefix = ipInfo.getPrefix(@ip)
-            @asn = ipInfo.getASN(@ip)
+            @prefix, @asn = ipInfo.getInfo(@ip)
             @formatted = ipInfo.format(@ip, @dns, @asn)
         when 3 # ip, dns, ip_info
             @ip, @dns, ipInfo = args
-            @prefix = ipInfo.getPrefix(@ip)
-            @asn = ipInfo.getASN(@ip)
+            @prefix, @asn = ipInfo.getInfo(@ip)
             @formatted = ipInfo.format(@ip, @dns, @asn)
         end
     end
@@ -369,6 +381,18 @@ class Hop
     def to_s
         @formatted or @ip
     end
+
+    # takes a block, and returns any subsequent hop for which the block
+    # evaluates to true
+    def find_subsequent()
+        curr = self
+        while !curr.next.nil?
+            return curr if yield curr
+            curr = curr.next 
+        end
+
+        return nil
+    end
 end
 
 # wait a minute... we could just instantiate a Hop object...
@@ -385,7 +409,7 @@ class ForwardHop < Hop
         @ttl = ttlhop[0]
         @ip = ttlhop[1]
         @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
+        @prefix, @asn = ipInfo.getInfo(@ip)
         @formatted = ipInfo.format(@ip, @dns, @asn)
         @reverse_path = []
         @ping_responsive = (@ip != "0.0.0.0")
@@ -403,7 +427,7 @@ class HistoricalForwardHop < Hop
         @ttl = ttl
         @ip = ip
         @dns = ipInfo.resolve_dns(@ip, @ip) 
-        @asn = ipInfo.getASN(@ip)
+        @prefix, @asn = ipInfo.getInfo(@ip)
         @formatted = ipInfo.format(@ip, @dns, @asn)
         @reverse_path = []
     end
@@ -472,7 +496,7 @@ class ReverseHop < Hop
         end
 
         begin
-            @asn = ipInfo.getASN(@ip)
+            @prefix, @asn = ipInfo.getInfo(@ip)
         rescue Exception => e
             # XXX for debugging purposes
             Emailer.deliver_isolation_exception("formatted: #{formatted} \n#{e} \n#{e.backtrace.join("<br />")}") 
@@ -489,7 +513,7 @@ class SpoofedForwardHop < Hop
         @ttl = ttlhops[0]
         @ip = ttlhops[1][0]  # XXX for now, just take the first ip...
         @dns = ipInfo.resolve_dns(@ip, @ip)
-        @asn = ipInfo.getASN(@ip)
+        @prefix, @asn = ipInfo.getInfo(@ip)
         @formatted = ipInfo.format(@ip, @dns, @asn)
     end
 

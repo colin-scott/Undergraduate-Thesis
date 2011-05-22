@@ -41,7 +41,7 @@ class FailureDispatcher
 
         @ipInfo = IpInfo.new
 
-        @failure_analyzer = FailureAnalyzer.new(@ipInfo, self)
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo)
         
         @db = DatabaseInterface.new
 
@@ -264,21 +264,13 @@ class FailureDispatcher
     def paths_diverge?(src, dst, spoofed_tr, tr)
         spoofed_tr_loop = spoofed_tr.contains_loop?()
         tr_loop = tr.contains_loop?()
-        divergence = false
-        compressed_spooftr = spoofed_tr.compressed_as_path
-        compressed_tr = tr.compressed_as_path
 
-        # trs and spooftrs sometimes differ in length. We look at the common
-        # prefix
-        [compressed_tr.size, compressed_spooftr.size].min.times do |i|
-           # occasionally spooftr will get *'s where tr doesn't, or vice
-           # versa. Look to make sure the next hop isn't the same
-           if compressed_tr[i] != compressed_spooftr[i] and 
-               compressed_tr[i] != compressed_spooftr[i+1] and compressed_tr[i+1] != compressed_spooftr[i]
-             divergence = true
-             break
-           end
-        end
+                                                   
+
+        compressed_spooftr = spoofed_tr.compressed_prefix_path
+        compressed_tr = tr.compressed_prefix_path
+        
+        divergence = !Path.share_common_path_prefix?(compressed_spooftr, compressed_tr)
 
         $LOG.puts "spooftr_loop!(#{src}, #{dst}) #{spoofed_tr.map { |h| h.ip }}" if spoofed_tr_loop
         $LOG.puts "tr_loop!(#{src}, #{dst}) #{tr.map { |h| h.ip}}" if tr_loop
@@ -404,7 +396,6 @@ class FailureDispatcher
     def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
                                         historical_tr, spoofed_revtr, historical_revtr)
         pingable_targets = []
-        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
 
         if direction == Direction::FORWARD or direction == Direction::BOTH
             if historical_tr.include? nil
@@ -412,15 +403,15 @@ class FailureDispatcher
             end
 
             pingable_targets += historical_tr.find_all { |hop| !hop.nil? && hop.ttl > suspected_failure.ttl && hop.ping_responsive }
-            raise "No longer an Array!" if !pingable_targets.is_a?(Array)
         end
 
         pingable_targets += historical_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
-        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
         pingable_targets += spoofed_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
-        raise "No longer an Array!" if !pingable_targets.is_a?(Array)
+
+        pingable_targets.map! { |hop| hop.ip }
 
         $LOG.puts "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
+
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
         targ2trace

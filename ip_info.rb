@@ -22,6 +22,11 @@ class IpInfo
         @bgpInfo.getPrefix(ip)
     end
 
+    #returns [prefix, asn]
+    def getInfo(ip)
+        @bgpInfo.getInfo(ip)
+    end
+
     def resolve_dns(dst, dst_ip)
         dns = ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue dst}" : "#{dst}")
     end

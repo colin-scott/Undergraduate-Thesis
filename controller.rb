@@ -86,7 +86,7 @@ end
 
 class Registrar
     def initialize(controller)
-Thread.current[:name]=__method__
+        Thread.current[:name]=__method__
         @controller=controller
     end
 
@@ -126,7 +126,7 @@ Thread.current[:name]=__method__
 Thread.current[:name]=__method__
         $LOG.puts("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
         pings=[]
-         uri= (vp.is_a?(String) ? vp : vp.uri)
+        uri= (vp.is_a?(String) ? vp : vp.uri)
         #         begin
         #             Timeout::timeout(30, SockTimeout.new("#{uri} timed out after 30 seconds on a test ping to #{$ZOOTER_IP}.  Aborting reverse traceroute.")){
         #                 pings=vp.ping([$ZOOTER_IP]).split("\n")
