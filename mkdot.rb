@@ -25,16 +25,17 @@ module Dot
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
-    def self.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, output)
+    def self.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces,
+                         upstream_reverse_paths, output)
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
-        self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, dot_output)
+        self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
         # locally rather than pushing the bits across the wire
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
-    def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, output)
+    def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, output)
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
         oooo_marker = "a" # FUUCKKK. this is ugly 
@@ -87,9 +88,11 @@ module Dot
         # one-time-use object? Orrrrrrr... fill in all of the node attributes
         # separately from add_path(). Satan
         add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        additional_traces.each do |trace|
-            add_path(trace, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        additional_traces.each do |target, trace|
+            add_path(trace, :aux_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         end
+
+        
         add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
 
@@ -106,6 +109,10 @@ module Dot
         # dave returns a symbol if the revtr request failed... TODO: this
         # filtering should happen at a higher level
         add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
+
+        upstream_reverse_paths.each do |target, revtr|
+            add_path(revtr, :aux_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        end
 
         node2names.each_pair do |node,ips|
             node_attributes[node]["label"] = ips.uniq.sort.join(" ").gsub(" ", "\\n")
@@ -254,6 +261,11 @@ module Dot
                 tre += "color=\"blue\",style=\"solid\"];"
                 dot.puts tre
               end
+              if edge_seen_in_measurements[[node,neighbor,:aux_tr]]
+                tre=edge
+                tre += "color=\"darkolivegreen\",style=\"solid\"];"
+                dot.puts tre
+              end
               if edge_seen_in_measurements[[node,neighbor,:historic_tr]]
                 tre=edge
                 tre += "style=\"dotted\"];"
@@ -262,6 +274,16 @@ module Dot
               if edge_seen_in_measurements[[node,neighbor,:revtr]]
                 rtre = edge
                 rtre += "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\", "
+                if symmetric_revtr_links.include? [node,neighbor]
+                    rtre += "label=\"sym\", "
+                end
+
+                rtre[-2..-1]="];" 
+                dot.puts rtre
+              end
+              if edge_seen_in_measurements[[node,neighbor,:aux_revtr]]
+                rtre = edge
+                rtre += "color=\"pink\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
                     rtre += "label=\"sym\", "
                 end

@@ -101,7 +101,8 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          measurements_reissued,additional_traces,testing=false)
+                          measurements_reissued,additional_traces,
+                          upstream_reverse_paths,testing=false)
         subject     "Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -123,7 +124,8 @@ class Emailer < ActionMailer::Base
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
                     :measurements_reissued => measurements_reissued,
-                    :additional_traces => additional_traces
+                    :additional_traces => additional_traces,
+                    :upstream_reverse_paths => upstream_reverse_paths
     end
     def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
                           formatted_unconnected, pings_towards_src,
@@ -133,7 +135,8 @@ class Emailer < ActionMailer::Base
                           spoofed_revtr, historical_revtr, jpg_url, measurement_times,
                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                           alternate_paths, measured_working_direction, path_changed,
-                          measurements_reissued, additional_traces,testing=false)
+                          measurements_reissued, additional_traces,
+                          upstream_reverse_paths,testing=false)
         subject     "Ground Truth Isolation Results #{src} #{dst}"
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
@@ -156,7 +159,8 @@ class Emailer < ActionMailer::Base
                     :path_changed => path_changed,
                     :jpg_url => jpg_url, :measurement_times => measurement_times,
                     :measurements_reissued => measurements_reissued,
-                    :additional_traces => additional_traces
+                    :additional_traces => additional_traces,
+                    :upstream_reverse_paths => upstream_reverse_paths
     end
     def isolation_exception(exception, recipient="cs@cs.washington.edu")
         subject     "Isolation Module Exception"

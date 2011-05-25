@@ -7,9 +7,16 @@ require 'utilities'
 require 'ip_info'
 require 'hops'
 
+$DATADIR = "/homes/network/ethan/timestamp/reverse_traceroute/data";
+$PL_HOSTNAMES_W_IPS="#{$DATADIR}/pl_hostnames_w_ips.txt"
+$PL_HOSTNAMES_W_SITES="#{$DATADIR}/pl_hosts_w_sites.txt"
+loadPLSites
+loadPLHostnames
+
 class RevtrCache
     @@freshness = 24*60
     @@max_hops = 30
+    @@do_remapping = false
 
     def initialize(connection, ipInfo)
         @connection = connection
@@ -40,6 +47,7 @@ class RevtrCache
         # no match, try remapping to next hop
         results = @connection.query sql
         if results.num_rows() == 0
+        if @@do_remapping
           sql = "select inet_ntoa(endpoint) as e, last_hop from endpoint_mappings where src=#{src} and endpoint=#{dst} limit 1"
           results = @connection.query sql
           if results.num_rows() > 0
@@ -60,8 +68,9 @@ class RevtrCache
     
           # still no match, so output the status for probing this node
           results = @connection.query sql
+        end
           if results.num_rows() == 0
-            reason = ""
+            reason = "not yet attempted"
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
             "#{src} and dst=#{dst}"
             #          $LOG.puts sql
@@ -74,7 +83,6 @@ class RevtrCache
               $LOG.puts "Error with query: #{sql}"
               $LOG.puts $!
             end
-            reason = "not yet attempted"
     
             $LOG.puts "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
     
@@ -226,6 +234,14 @@ if $0 == __FILE__
 done = false
 while not done
 
+#    puts $pl_host2ip
+#    ["159.148.236.1","129.250.3.197"].each{|dst|
+#    puts $pl_host2ip["planetlab-01.kusa.ac.jp"]
+#        path = cache.get_cached_reverse_path("planetlab-01.kusa.ac.jp", dst);
+#  $stderr.puts path.inspect
+#  puts path
+#    }
+#exit
   begin
 
     sql = "select * from cache_rtrs where date > "+

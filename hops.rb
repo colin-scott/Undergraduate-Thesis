@@ -70,6 +70,10 @@ class Path
        @hops.find_all { |hop| hop.prefix.nil? }.size
    end
 
+   def num_non_responsive
+       @hops.find_all { |hop| !hop.ping_responsive }.size
+   end
+
    # overriden if necessary
    def valid?()
        return true
@@ -159,7 +163,7 @@ class RevPath < Path
    end
 
    def unresponsive_hop_farthest_from_dst()
-       last_hop = @hops[0]
+       last_hop = @hops[1]
        for hop in @hops
           if hop.ping_responsive
             return last_hop
@@ -168,7 +172,7 @@ class RevPath < Path
           last_hop = hop
        end
 
-       return last_hop
+       return (last_hop.no_longer_pingable?) ? last_hop : nil
    end
 
    # return all hops within the dst as, or the first egress router outside of
@@ -187,6 +191,15 @@ class RevPath < Path
         end
 
         adjacent_hops
+   end
+
+   def first_hop()
+        @hops.find { |hop| !hop.ip.nil? && hop.ip != "0.0.0.0" }
+   end
+
+   # did we back off?
+   def measured_from_destination?(dst)
+        first_hop().ip == dst
    end
 end
 
@@ -387,11 +400,15 @@ class Hop
     def find_subsequent()
         curr = self
         while !curr.next.nil?
-            return curr if yield curr
             curr = curr.next 
+            return curr if yield curr
         end
 
         return nil
+    end
+
+    def no_longer_pingable?
+        return !@ping_responsive && @last_responsive
     end
 end
 

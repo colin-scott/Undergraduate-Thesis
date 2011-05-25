@@ -158,7 +158,8 @@ class FailureDispatcher
         # wow, this is a mouthful
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed, additional_traceroutes, measurements_reissued = gather_additional_data(
+            alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
+            upstream_reverse_paths, measurements_reissued = gather_additional_data(
                                                        src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
 
         insert_measurement_durations(measurement_times)
@@ -170,9 +171,21 @@ class FailureDispatcher
 
         $LOG.puts "analyze_results: #{src}, #{dst}, passed_filters: #{passed_filters}"
 
+        if(!testing)
+            log_isolation_results(Outage.new(log_name, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, historical_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters, additional_traceroutes,
+                                          upstream_reverse_paths))
+        end
+
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes)
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
 
             graph_url = generate_web_symlink(jpg_output)
 
@@ -183,28 +196,17 @@ class FailureDispatcher
                                           spoofed_revtr, historical_revtr, graph_url, measurement_times,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          measurements_reissued, additional_traceroutes, testing)
+                                          measurements_reissued, additional_traceroutes, upstream_reverse_paths, testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
         else
             $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
         end
 
-        if(!testing)
-            log_isolation_results(Outage.new(log_name, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters, additional_traceroutes))
-        end
-
         return passed_filters
     end
 
-    # HMMMM, terribly redundant
+    # HMMMM, terribly redundant. How can I factor this out?
     def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
                                       formatted_connected, formatted_unconnected, pings_towards_src,
                                       spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
@@ -214,7 +216,7 @@ class FailureDispatcher
         direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
             alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
-            measurements_reissued = gather_additional_data(src, dst, pings_towards_src,
+            upstream_reverse_paths, measurements_reissued = gather_additional_data(src, dst, pings_towards_src,
                                                     spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
 
         dst_tr = issue_normal_traceroutes(dsthostname, [srcip])[srcip]
@@ -226,9 +228,21 @@ class FailureDispatcher
         passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive,
                                                                         historical_tr, historical_revtr, direction, testing)
         
+        if(!testing)
+            log_isolation_results(SymmetricOutage.new(log_name, src, dst, dataset, direction, formatted_connected, 
+                                          formatted_unconnected, pings_towards_src,
+                                          tr, spoofed_tr,
+                                          dst_tr, dst_spoofed_tr,
+                                          historical_tr, historical_trace_timestamp,
+                                          spoofed_revtr, historical_revtr,
+                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                          alternate_paths, measured_working_direction, path_changed,
+                                          measurement_times, passed_filters, additional_traceroutes, upstream_reverse_paths))
+        end
+
         if(passed_filters)
             jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes)
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
  
             graph_url = generate_web_symlink(jpg_output)
 
@@ -241,23 +255,12 @@ class FailureDispatcher
                                           spoofed_revtr, historical_revtr, graph_url, measurement_times,
                                           suspected_failure, as_hops_from_dst, as_hops_from_src, 
                                           alternate_paths, measured_working_direction, path_changed,
-                                          measurements_reissued, additional_traceroutes,testing)
+                                          measurements_reissued, additional_traceroutes, upstream_reverse_paths,
+                                          testing)
 
             $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
         else
             $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
-        end
-
-        if(!testing)
-            log_isolation_results(SymmetricOutage.new(log_name, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          dst_tr, dst_spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters, additional_traceroutes))
         end
     end
 
@@ -387,14 +390,26 @@ class FailureDispatcher
         # traceroutes to them... their paths must differ somehow
         additional_traceroutes = measure_traces_to_pingable_hops(src, suspected_failure, direction, historical_tr, spoofed_revtr,
                                                                  historical_revtr)
+
+        # TODO: an upstream router in a reverse traceroute at the reachability
+        # horizon: was there a path change? Issue spoofed reverse traceroute,
+        # and compare to historical reverse traceroute.
+        upstream_reverse_paths = {}
+        if(direction == Direction::REVERSE && historical_revtr.valid? && !suspected_failure.nil? &&
+               !suspected_failure.next.nil? && suspected_failure.next.ping_responsive)
+            # TODO: should the key be the ip, or the Hop object?
+           upstream_reverse_paths = {suspected_failure.ip => issue_spoofed_revtr(src, suspected_failure.next.ip)} # historical traceroute?
+        end
         
         [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
             ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            working_historical_paths, measured_working_direction, path_changed, additional_traceroutes, measurements_reissued]
+            working_historical_paths, measured_working_direction, path_changed, additional_traceroutes,
+            upstream_reverse_paths, measurements_reissued]
     end
 
     def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
                                         historical_tr, spoofed_revtr, historical_revtr)
+        return {} if suspected_failure.nil?
         pingable_targets = []
 
         if direction == Direction::FORWARD or direction == Direction::BOTH
@@ -418,12 +433,12 @@ class FailureDispatcher
     end
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes)
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
         # TODO: put this into its own function
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
         Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, jpg_output)
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
 
         jpg_output
     end
@@ -540,6 +555,7 @@ class FailureDispatcher
     end
 
     # XXX change me later to deal with revtrs from forward hops
+    # issue_spoofed_revtrs()
     def issue_spoofed_revtr(src, dst, historical_hops)
         srcdst2revtr = {}
         begin

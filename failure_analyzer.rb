@@ -232,25 +232,39 @@ class FailureAnalyzer
         end
     end
 
+    # TODO: get rid of Mock Hops!!!
     def categorize_failure(outage)
         if outage.direction == Direction::BOTH or outage.direction == Direction::FORWARD
             # Do the measured forward paths stop at the same hop? They should...
             last_tr_hop = outage.tr.last_responsive_hop
             last_spoofed_tr_hop = outage.spoofed_tr.last_responsive_hop
 
-            if last_tr_hop.cluster != last_spoofed_tr_hop.cluster
-               return :measured_forward_paths_differ
+            # XXX what if they differ only by one hop? Who cares? It's still a
+            # crystal clear forward path isolation
+            #if !last_tr_hop.nil? && !last_spoofed_tr_hop.nil? && last_tr_hop.cluster != last_spoofed_tr_hop.cluster && (last_tr_hop.ttl - last_spoofed_tr_hop.ttl).abs > 1
+            #   return :measured_forward_paths_differ
+            #end
+            
+            if (last_tr_hop.nil? || last_tr_hop.is_a?(MockHop)) && (last_spoofed_tr_hop.nil? || last_spoofed_tr_hop.is_a?(MockHop))
+                return :no_forward_path_at_all? # wtf??
+            elsif (last_tr_hop.nil? || last_tr_hop.is_a?(MockHop))
+                cluster = last_spoofed_tr_hop.cluster
+            elsif (last_spoofed_tr_hop.nil? || last_spoofed_tr_hop.is_a?(MockHop))
+                cluster = last_tr_hop.cluster
+            else
+                cluster = (last_spoofed_tr_hop.ttl > last_tr_hop.ttl) ? last_spoofed_tr_hop.cluster : last_tr_hop.cluster
             end
 
-            cluster = last_tr_hop.cluster
-
-            # Does the historical forward path also path through that last hop?
-            same_last_hop = outage.historical_tr.find { |hop| hop.cluster == cluster }
+            # Does the historical forward path also pass through that last hop?
+            same_last_hop = outage.historical_tr.find { |hop| !hop.is_a?(MockHop) && hop.cluster == cluster }
             return :forward_path_change unless same_last_hop
 
-            if !same_last_hop.next.ping_responsive?
+            if !same_last_hop.next.nil? && same_last_hop.next.no_longer_pingable?
                 return :crytal_clear_forward_path
             else
+                if !same_last_hop.next.ping_responsive
+                    $stderr.puts "not historcally pingable: #{outage.file}"
+                end
                 # TODO: consider wether next is in the same AS. Better if so
                 return :unclear_forward_path
             end
@@ -263,11 +277,30 @@ class FailureAnalyzer
             # but how to do this in code?
             # I guess, is there a single point where hops before are pinable
             # and hops after aren't? Could be h
-            last_unresponsive = outage.historical_revtr.unresponsive_hop_farthest_from_dst()
-            if last_responsive.previous.asn == outage.dst.asn
+            if !outage.historical_revtr.valid?
+                return :no_historical_revtr? # shouldn't have passed filtering heuristics...
+            end
+
+            # we didn't measure back from the destination, and the second hop
+            # was ping responsive
+            if !outage.historical_revtr.first_hop.no_longer_pingable?
                 return :multi_homed_provider_link
-            elsif last_unresponsive.find_subsequent { |hop| !hop.ping_responsive }
-                return :no_clear_reachability_horizon
+            end
+
+            last_unresponsive = outage.historical_revtr.unresponsive_hop_farthest_from_dst()
+            if last_unresponsive.nil? && outage.historical_revtr.measured_from_destination?(outage.dst)
+                return :all_but_dst_reachable_on_historical_revtr
+            elsif last_unresponsive.nil?
+                # we backed off the destination, and everyone was pingable, so
+                # must be the access link
+                return :multi_homed_provider_link
+            end
+
+            dst_as = @ipInfo.getASN(outage.dst)
+
+            # TODO: how to get destination's ASN?
+            if !dst_as.nil? && !last_unresponsive.previous.nil? && (last_unresponsive.asn == dst_as || last_unresponsive.previous.asn == dst_as)
+                return :multi_homed_provider_link
             else # clear reachability horizon
                 # confined to one AS?
                 if last_unresponsive.on_as_boundary?
@@ -276,6 +309,10 @@ class FailureAnalyzer
                     return :clear_reachability_horizon
                 end
             end
+
+            #elsif last_unresponsive.find_subsequent { |hop| hop.no_longer_pingable? }
+            #    return :no_clear_reachability_horizon
+            
         end
     end
 end
