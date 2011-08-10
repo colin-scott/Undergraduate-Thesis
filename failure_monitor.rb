@@ -176,10 +176,6 @@ class FailureMonitor
 
         to_swap_out = []
 
-        # XXX clear node_2_failed_measurements state
-        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
-        to_swap_out += failed_measurements.keys
-        
         outdated = @outdated_nodes.find_all { |node,time| time > @@outdated_threshold }
         @outdated_nodes -= outdated
         to_swap_out += outdated.keys
@@ -191,6 +187,11 @@ class FailureMonitor
         not_sshable = @not_sshable
         @not_sshable = []
         to_swap_out += not_sshable
+
+        # XXX clear node_2_failed_measurements state
+        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
+        to_swap_out += failed_measurements.keys
+
 
         to_swap_out -= already_blacklisted
 
