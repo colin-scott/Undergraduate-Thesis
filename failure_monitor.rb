@@ -177,8 +177,10 @@ class FailureMonitor
         to_swap_out = []
 
         outdated = @outdated_nodes.find_all { |node,time| time > @@outdated_threshold }
-        @outdated_nodes -= outdated
-        to_swap_out += outdated.keys
+        # wish there was a Hash.partition -> returns hash of selected, and
+        # hash of not selected
+        outdated.each { |k,v| @outdated_nodes.delete k }
+        to_swap_out += outdated.map { |k,v| k }
         
         source_problems = @problems_at_the_source
         @problems_at_the_source = {}
@@ -190,8 +192,7 @@ class FailureMonitor
 
         # XXX clear node_2_failed_measurements state
         failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
-        to_swap_out += failed_measurements.keys
-
+        to_swap_out += failed_measurements.map { |k,v| k }
 
         to_swap_out -= already_blacklisted
 
