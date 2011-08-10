@@ -17,10 +17,12 @@ require 'outage'
 
 # TODO: log additional traceroutes
 #       convert logs to OBJECT dumps to allow for forward /and/ backward
-#       compatiability muthafucka
+#       compatability yo
 
 # just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
+    attr_accessor :node_2_failed_measurements  # assume that the size of this field is constant
+
     def initialize
         @@revtr_timeout = 200
         
@@ -48,6 +50,9 @@ class FailureDispatcher
         @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
 
         @revtr_cache = RevtrCache.new(@db, @ipInfo)
+
+        # track when nodes fail to return tr or ping results
+        @node_2_failed_measurements = Hash.new(0)
 
         Thread.new do
             loop do
@@ -268,8 +273,6 @@ class FailureDispatcher
         spoofed_tr_loop = spoofed_tr.contains_loop?()
         tr_loop = tr.contains_loop?()
 
-                                                   
-
         compressed_spooftr = spoofed_tr.compressed_prefix_path
         compressed_tr = tr.compressed_prefix_path
         
@@ -311,9 +314,10 @@ class FailureDispatcher
             sleep 10
             tr_time2 = Time.new
             tr = issue_normal_traceroutes(src, [dst])[dst]
-            $LOG.puts "still empty! (#{src}, #{dst})" if tr.empty?
-            results = `ssh uw_revtr2@#{src} 'date; ps aux; sudo traceroute -I #{dst}'`
-            Emailer.deliver_isolation_exception("empty traceroute! (#{src}, #{dst})\nFirst tr: #{tr_time.getgm}\nSecond tr:#{tr_time2.getgm}\n#{results}")
+            if tr.empty?
+                $LOG.puts "still empty! (#{src}, #{dst})" 
+                @node_2_failed_measurements[src] += 1
+            end
         end
 
         measurements_reissued = false
@@ -345,9 +349,10 @@ class FailureDispatcher
             $LOG.puts "empty pings! (#{src}, #{dst})"
             sleep 10
             ping_responsive, non_responsive_hops = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
-            $LOG.puts "still empty! (#{src}, #{dst})" if ping_responsive.empty?
-            results = `ssh uw_revtr2@#{src} 'ps aux; ping -c 3 #{FailureIsolation::TestPing}'` 
-            Emailer.deliver_isolation_exception("empty pings! (#{src}, #{dst})\n#{results}")
+            if ping_responsive.empty?
+                $LOG.puts "still empty! (#{src}, #{dst})" 
+                @node_2_failed_measurements[src] += 1
+            end
         end
 
         measurement_times << ["pings_to_nonresponsive_hops", Time.new]
@@ -398,7 +403,8 @@ class FailureDispatcher
         if(direction == Direction::REVERSE && historical_revtr.valid? && !suspected_failure.nil? &&
                !suspected_failure.next.nil? && suspected_failure.next.ping_responsive)
             # TODO: should the key be the ip, or the Hop object?
-           upstream_reverse_paths = {suspected_failure.ip => issue_spoofed_revtr(src, suspected_failure.next.ip)} # historical traceroute?
+           upstream_revtr = issue_spoofed_revtr(src, suspected_failure.next.ip) # historical traceroute?
+           upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
         end
         
         [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
@@ -410,22 +416,13 @@ class FailureDispatcher
     def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
                                         historical_tr, spoofed_revtr, historical_revtr)
         return {} if suspected_failure.nil?
-        pingable_targets = []
 
-        if direction == Direction::FORWARD or direction == Direction::BOTH
-            if historical_tr.include? nil
-                Emailer.deliver_isolation_exception("nil hop in historical trace: #{historical_tr.inspect}")
-            end
-
-            pingable_targets += historical_tr.find_all { |hop| !hop.nil? && hop.ttl > suspected_failure.ttl && hop.ping_responsive }
-        end
-
-        pingable_targets += historical_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
-        pingable_targets += spoofed_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
+        pingable_targets = @failure_analyzer.pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
+        pingable_targets |= @failure_analyzer.pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
 
         pingable_targets.map! { |hop| hop.ip }
 
-        $LOG.puts "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
+        #$LOG.puts "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
 
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
@@ -556,7 +553,8 @@ class FailureDispatcher
 
     # XXX change me later to deal with revtrs from forward hops
     # issue_spoofed_revtrs()
-    def issue_spoofed_revtr(src, dst, historical_hops)
+    #
+    def issue_spoofed_revtr(src, dst, historical_hops=[])
         srcdst2revtr = {}
         begin
                 srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
@@ -574,7 +572,7 @@ class FailureDispatcher
 
         #$LOG.puts "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
-        raise "issue_spoofed_revtr returned an #{srcdst2revtr.class}!" unless srcdst2revtr.is_a?(Hash)
+        raise "issue_spoofed_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" unless srcdst2revtr.is_a?(Hash) or srcdst2revtr.is_a?(DRb::DRbObject)
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return SpoofedReversePath.new([:nil_return_value])

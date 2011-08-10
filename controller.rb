@@ -23,6 +23,17 @@ require 'resolv'
 
 # we use this for test pings
 $ZOOTER_IP="128.208.2.159"
+#$ZOOTER_IP="128.208.2.159".to_sym
+
+#$split_hash = Hash.new(0)
+#
+#class String
+#    alias :old_split :split
+#    def split(pattern=$;,limit=0)
+#        $split_hash[caller[0]] += 1
+#        old_split(pattern,limit)
+#    end
+#end
 
 class SockTimeout < Timeout::Error
     def initialize(extended_msg="timed out")
@@ -606,6 +617,8 @@ Thread.current[:name]=__method__
                 if (pings.length==1 and pings[0].split(" ")[0]==$ZOOTER_IP)
                     return nil
                 else
+                    pings << "length: #{pings.length}"
+                    pings << "#{ZOOTER_IP}!=#{pings[0].split(" ")[0]}"
                     raise BadPingError.new(vp.uri,pings)
                 end
             }
@@ -1358,6 +1371,8 @@ Signal.trap("KILL"){
     registrar_drb.stop_service
     c.shutdown(9) 
 }
+
+# reload modules
 Signal.trap("USR1"){
     $LOG.puts "reloading modules.."
     load "#{$REV_TR_TOOL_DIR}/spoofed_traceroute.rb"
@@ -1367,12 +1382,28 @@ Signal.trap("USR1"){
     $stderr.flush
 }
 
+# mem usage
 Signal.trap("USR2") {
   mem_usage = `ps -o rss= -p #{Process.pid}`.to_i
   threads = Thread.list.map { |x| "#{x[:name]}: #{x.inspect}" }
   $LOG.puts "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}, Threads (#{threads.size}): #{threads.inspect}"
+  if mem_usage.to_i > 170000
+    ObjectSpace.each_object(String) do |s|
+       $stderr.puts s
+    end
+  end
   $stderr.flush
 }
+
+# stack dump
+Signal.trap("ALRM") do
+  fork do
+    ObjectSpace.each_object(Thread) do |th|
+      th.raise Exception, "Stack Dump" unless Thread.current == th
+    end
+    raise Exception, "Stack Dump"
+  end
+end
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_ip="druby://#{my_ip}:#{registrar_uri_port}"

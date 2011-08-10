@@ -168,13 +168,14 @@ class Emailer < ActionMailer::Base
         recipients  recipient
         body        :exception => exception
     end
-    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable)
+    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, failed_measurements)
         subject     "faulty monitoring node report"
         from        "failures@cs.washington.edu"
         recipients  "failures@cs.washington.edu"
         body         :outdated_nodes => outdated_nodes,
                      :problems_at_the_source => problems_at_the_source,
-                     :not_sshable => not_sshable
+                     :not_sshable => not_sshable,
+                     :failed_measurements => failed_measurements
     end
     def dot_graph(jpg_path)
         name = File.basename(jpg_path)

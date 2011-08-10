@@ -7,44 +7,22 @@ require 'log_iterator'
 require 'ip_info'
 require 'set'
 
-dispatcher = FailureDispatcher.new
-ipInfo = IpInfo.new
-analyzer = FailureAnalyzer.new(ipInfo,dispatcher)
-
 total = 0
 passed = 0
 directions = Hash.new(0)
-forward_measured_working = Hash.new(0)
-
-spoof_revtr_syms = File.new("forward_failure_syms.dat", "w")
 
 # TODO: encapsulate all of these data items into a single object!
-LogIterator::iterate do  |file, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters|
+LogIterator::iterate do  |o|
     total += 1
-    if passed_filters
+    if o.passed_filters
         passed += 1
-        directions[direction] += 1
-
-        if direction == Direction::FORWARD and spoofed_revtr.valid?
-            spoof_revtr_syms.puts spoofed_revtr.num_sym_assumptions
-            forward_measured_working[spoofed_revtr.num_sym_assumptions] += 1
-        elsif direction == Direction::FORWARD
-            forward_measured_working["spoofed revtr missing"] += 1  
-        end
-    end
+        directions[o.direction] += 1
+   end
 end
 
 puts "total: #{total}"
 puts "passed: #{passed}"
 puts "directions: #{directions.inspect}"
-puts "forward measured working: #{forward_measured_working.to_a.sort_by { |x| x[0] }.inspect}"
 
 #hist_out.close
 #spoof_out.close

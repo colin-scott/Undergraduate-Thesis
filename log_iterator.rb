@@ -1,7 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 require 'yaml'
-require 'ip_info'
+#require 'ip_info'
 require 'hops'
 require 'isolation_module'
 require 'set'
@@ -16,7 +16,7 @@ require 'outage'
 # Gotta love versioning
 
 module LogIterator
-    IPINFO = IpInfo.new # hmmm
+#    IPINFO = IpInfo.new # hmmm
 
     def LogIterator::jpg2yml_rev4(jpg)
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
@@ -86,7 +86,7 @@ module LogIterator
         bin = filename.gsub(/yml$/, "bin")
         return if File.exists? bin
         arr = YAML.load_file(filename)
-        return if !arr || arr.empty?
+        return if !arr || arr.empty? 
         tmp = File.new(bin, "w")
         Marshal.dump(arr, tmp)
         tmp.close
@@ -108,8 +108,35 @@ module LogIterator
         end
     end
 
+    def LogIterator::convert_and_migrate_symmetric(filename)
+        bin = FailureIsolation::Snapshot+"/"+filename.gsub(/yml$/, "bin")
+        return if File.exists? bin
+        arr = YAML.load_file(filename)
+        return if !arr || arr.empty? || arr.include?(nil)
+        arr.insert(0, filename)
+        tmp = File.new(bin,  "w")
+        Marshal.dump(SymmetricOutage.new(*arr), tmp)
+        tmp.close
+    end
+
+    def LogIterator::convert_and_migrate_symmetric_all()
+          Dir.chdir FailureIsolation::SymmetricIsolationResultsFinal do
+                files = Dir.glob("*yml").sort
+                total = files.size
+                files.each do |file|
+                    begin
+                        $stderr.puts file
+                        self.convert_and_migrate_symmetric(file)
+                    rescue Errno::ENOENT, ArgumentError, TypeError
+                        $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                    end
+                end
+          end
+    end
+
+    # TODO: Change me back to FailureIsolation::IsolationResults?
     def LogIterator::iterate(debugging=false, &block)
-        Dir.chdir FailureIsolation::IsolationResults do
+        Dir.chdir FailureIsolation::Snapshot do
             files = Dir.glob("*bin").sort
             total = files.size
             curr = 0
@@ -120,7 +147,26 @@ module LogIterator
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
                     self.read_log_rev4(file, &block)
                     $stderr.print ".." if debugging
-                rescue Errno::ENOENT, ArgumentError, TypeError
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::replace_logs(dispatcher, &block)
+        Dir.chdir FailureIsolation::Snapshot do
+            files = Dir.glob("*bin").sort
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    new_outage = self.read_log_rev4(file, &block)
+                    $stderr.puts new_outage.class
+                    dispatcher.log_isolation_results(new_outage) if new_outage
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
                     $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
                 end
             end
@@ -230,29 +276,35 @@ module LogIterator
     end
  
     def LogIterator::read_log_rev4(file, &block)
-        input = File.new(file)
-        src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters = Marshal.load(input)
+        new_outage = nil
+        begin
+            input = File.new(file)
+            src, dst, dataset, direction, formatted_connected, 
+                                              formatted_unconnected, pings_towards_src,
+                                              tr, spoofed_tr,
+                                              historical_tr, historical_trace_timestamp,
+                                              spoofed_revtr, historical_revtr,
+                                              suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                              alternate_paths, measured_working_direction, path_changed,
+                                              measurement_times, passed_filters = Marshal.load(input)
 
-        if src.is_a?(Outage) # we changed over to only logging outage objects at some point. BLLARRRGGGHHH
-           yield src
-        else
-           yield Outage.new(file, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters, [])
+            if src.is_a?(Outage) # we changed over to only logging outage objects at some point. BLLARRRGGGHHH
+               new_outage = yield src
+            else
+               new_outage = yield Outage.new(file, src, dst, dataset, direction, formatted_connected, 
+                                              formatted_unconnected, pings_towards_src,
+                                              tr, spoofed_tr,
+                                              historical_tr, historical_trace_timestamp,
+                                              spoofed_revtr, historical_revtr,
+                                              suspected_failure, as_hops_from_dst, as_hops_from_src, 
+                                              alternate_paths, measured_working_direction, path_changed,
+                                              measurement_times, passed_filters, [])
+            end
+        ensure
+            input.close if input
         end
-        input.close
+
+        return new_outage
     end
 
     def LogIterator::read_sym_log_rev2(file)
@@ -413,5 +465,5 @@ if __FILE__ == $0
     #         historical_tr, spoofed_revtr, historical_revtr, "testing.jpg")
     #end
     
-    LogIterator::convert_all()
+    LogIterator::convert_and_migrate_symmetric_all()
 end

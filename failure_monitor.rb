@@ -1,4 +1,5 @@
 require 'failure_dispatcher'
+require 'vp_house_cleaning'
 require 'yaml'
 
 # responsible for pulling state from ping monitors, classifying outages, and
@@ -14,6 +15,10 @@ class FailureMonitor
         @@upper_rounds_bound = 500
         @@lower_rounds_bound = 4
         @@vp_bound = 1
+
+        # if a VP misses more than 10 measurements,swap it out
+        @@failed_measurement_threshold = 10  
+
         # if more than 70% of a node's targets are unreachable, we ignore the
         # node
         @@source_specific_problem_threshold = 0.35
@@ -58,7 +63,9 @@ class FailureMonitor
         # so that we don't probe the hell out of failed routers
         # target -> time
         @nodetarget2lastisolationattempt = {}
-        @@isolation_interval = 6 # we isolate at most every 6*10.33 =~ 60 minutes
+        # minimum time in between successive isolation measurements sent from
+        # a source to a destination
+        @@isolation_interval = 30 # we isolate at most every 6*10.33 =~ 60 minutes
 
         @current_round = 0
     end
@@ -97,7 +104,7 @@ class FailureMonitor
             $stderr.flush
             @current_round += 1
             
-            audit_faulty_nodes if (@current_round % @@node_audit_period) == 0
+            swap_out_faulty_nodes if (@current_round % @@node_audit_period) == 0
 
             sleep_period =  period - (Time.new - start)
 
@@ -158,10 +165,43 @@ class FailureMonitor
         node2targetstate
     end
 
-    def audit_faulty_nodes()
-        Emailer.deliver_faulty_node_report(@outdated_nodes,
-                                           @problems_at_the_source,
-                                           @not_sshable)
+    def swap_out_faulty_nodes()
+        # First check if no nodes are left to swap out
+        if File.size(FailureIsolation::AllNodesPath) == File.size(FailureIsolation::BlackListPath)
+            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: ~revtr/spoofed_traceroute/blacklisted_isolation_nodes.txt")
+            return
+        end
+
+        already_blacklisted = IO.read(FailureIsolation::BlackListPath).split("\n")
+
+        to_swap_out = []
+
+        # XXX clear node_2_failed_measurements state
+        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
+        to_swap_out += failed_measurements.keys
+        
+        outdated = @outdated_nodes.find_all { |node,time| time > @@outdated_threshold }
+        @outdated_nodes -= outdated
+        to_swap_out += outdated.keys
+        
+        source_problems = @problems_at_the_source
+        @problems_at_the_source = {}
+        to_swap_out += source_problems.keys
+
+        not_sshable = @not_sshable
+        @not_sshable = []
+        to_swap_out += not_sshable
+
+        to_swap_out -= already_blacklisted
+
+        return if to_swap_out.empty?
+
+        Emailer.deliver_faulty_node_report(outdated,
+                                           source_problems,
+                                           not_sshable,
+                                           failed_measurements)
+
+        HouseCleaning::swap_out_faulty_nodes(to_swap_out)
     end
 
     def update_auxiliary_state(node2targetstate)

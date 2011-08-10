@@ -1,3 +1,6 @@
+# NOTE!
+# I suspect that the memory leak might be in this file...
+
 require 'set'
 
 module SpoofedTR
@@ -12,7 +15,7 @@ module SpoofedTR
         #$LOG.puts "SpoofedTR::sendProbes(), source #{hostname}, dests #{dests} receivers are #{receivers.join(',')}"
         receiver2spoofer2targets = {}
         spoofer2targets = { hostname => dests }
-        receivers.each { |reciever| receiver2spoofer2targets[reciever] = spoofer2targets.clone } 
+        receivers.each { |reciever| receiver2spoofer2targets[reciever] = spoofer2targets.clone }
         #$LOG.puts "SpoofedTR::sendProbes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
         results,unsuccessful_receivers,privates,blacklisted = controller.spoof_tr(receiver2spoofer2targets)
 
@@ -21,7 +24,6 @@ module SpoofedTR
         SpoofedTR::parse_path(results, id2dest)
     end
 
-    # NOT thread safe
     def SpoofedTR::sendBatchProbes(srcdst2receivers, controller)
         receiver2spoofer2targets = {}
         srcdst2receivers.each do |srcdst, receivers|
@@ -45,9 +47,18 @@ module SpoofedTR
     def SpoofedTR::allocate_ids(dests)
         id = 0
         id2dest = {}
+
+        # infinite loop?????????????? this might be the point where strings
+        # are allocated infinitely
+        max_iterations = dests.size
+        curr_iteration = 0
+
         dests.each_with_index do |tr, i|
+            curr_iteration += 1
+            raise "found the memory leak!!!!" if curr_iteration > max_iterations
+
             if tr.is_a?(Array)
-                id2dest[id] =  tr[0]
+                id2dest[id] = tr[0]
                 tr.insert(1, id)
             else # just a string representing the destination
                 id2dest[id] = tr
@@ -63,9 +74,15 @@ module SpoofedTR
     def SpoofedTR::allocate_batch_ids(receiver2spoofer2targets)
         id = 0
         id2srcdst = {}
+
         receiver2spoofer2targets.each do |receiver, spoofer2targets|
             spoofer2targets.each do |spoofer, targets|
+                # memory leak???
+                max_iterations = targets.size 
+                curr_iteration = 0
                 targets.each_with_index do |tr, i|
+                    curr_iteration += 1
+                    raise "found the memory leak!!!" if curr_iteration > max_iterations
                     id2srcdst[id] = [spoofer, tr]
                     targets[i] = [tr, id]
                     id += 1
@@ -80,6 +97,9 @@ module SpoofedTR
     def SpoofedTR::parse_path(results, id2dest)
         # DRb can't unmarshall hashes initialized with blocks...
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
+
+        # XXX doubtful... but....
+        raise "found the memory leak!" if results.size > 10000
 
         results.each do |probes, receiver| 
             # We associate a spoofer id with each destination
@@ -103,11 +123,27 @@ module SpoofedTR
         # We saw one case where one of the hops was attached to a nil key, not
         # the target
         if id2dest.size == 1 and dest2ttl2rtrs.size > 1 and dest2ttl2rtrs.include?(intended_target = id2dest.values[0])
+            # memory leak???
+            # XXX
+            max_iterations = dest2ttl2rtrs.size
+            curr_iteration = 0
+
             dest2ttl2rtrs.each do |dest, ttl2rtrs|
+                curr_iteration += 1
+                raise "found the memory leak!" if curr_iteration > max_iterations
+
                 next if dest.eql? intended_target
+
+                # BAHHH
+                inner_iteration = 0 
+
                 dest2ttl2rtrs[dest].each do |ttl, rtrs|
+                    inner_iteration += 1
+                    raise "found the memory leak!" if inner_iteration > max_iterations
+
                     dest2ttl2rtrs[intended_target][ttl] = Set.new unless dest2ttl2rtrs[intended_target].include? ttl
                     dest2ttl2rtrs[intended_target][ttl] |= rtrs
+
                 end
             end
         end
@@ -115,7 +151,15 @@ module SpoofedTR
         #$LOG.puts "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
         
         dest2sortedttlrtrs = {}
+
+        # XXX
+        max_iterations = dest2ttl2rtrs.size
+        curr_iteration = 0
+
         dest2ttl2rtrs.keys.each do |dest|
+            curr_iteration += 1 
+            raise "found the memory leak!" if curr_iteration > max_iterations
+
             # get rid of extraneous hole punches
             dest2ttl2rtrs[dest].delete(0)
 
@@ -148,6 +192,8 @@ module SpoofedTR
    # fill in gaps with "0.0.0.0"
    def self.fill_in_zeroes!(sortedttlrtrs)
      return if sortedttlrtrs.empty?
+     #raise "insensible input! max ttl shouldn't be greater than 45...\n#{sortedttlrtrs.inspect}" if sortedttlrtrs[-1][0]-1 > 45 #XXX
+     return if sortedttlrtrs[-1][0]-1 > 45 # packet corruption perhaps...
      0.upto(sortedttlrtrs[-1][0]-1) do |i|
          sortedttlrtrs.insert(i, [i+1, ["0.0.0.0"]]) unless sortedttlrtrs[i][0] == i+1
      end

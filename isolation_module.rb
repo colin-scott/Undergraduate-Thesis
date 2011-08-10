@@ -1,3 +1,5 @@
+# CONSTANTS!!!
+
 $config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require 'set'
 require $config
@@ -67,6 +69,8 @@ module FailureIsolation
     FailureIsolation::SymmetricIsolationResults = "#{$DATADIR}/symmetric_isolation_results_rev3"
     FailureIsolation::SymmetricIsolationResultsFinal = "#{$DATADIR}/symmetric_isolation_results_final"
 
+    FailureIsolation::Snapshot = "#{$DATADIR}/isolation_results_snapshot"
+
     FailureIsolation::DotFiles = "#{$DATADIR}/dots"
 
     FailureIsolation::WebDirectory = "/homes/network/revtr/www/isolation_graphs"
@@ -84,4 +88,12 @@ module FailureIsolation
             return "Unkown"
         end
     end
+
+    FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
+    FailureIsolation::BlackListPath = "/homes/network/revtr/spoofed_traceroute/blacklisted_isolation_nodes.txt"
+    FailureIsolation::CurrentNodesPath = "/homes/network/revtr/spoofed_traceroute/cloudfront_spoofing_monitoring_nodes.txt"
+    FailureIsolation::ToilNodesPath = "/home/cs/colin/ping_monitoring/cloudfront_monitoring/cloudfront_spoofing_monitoring_nodes.txt"
+    FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state"
+    FailureIsolation::NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
+    FailureIsolation::NumActiveNodes = 12
 end

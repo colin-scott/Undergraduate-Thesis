@@ -54,8 +54,10 @@ class Path
        @hops.map { |hop| hop.asn }
    end
 
-   def prefix_path
-       @hops.map { |hop| hop.prefix }
+   # we take an ip_info for the logged hops without prefixes
+   def prefix_path(ip_info=nil)
+       #                get rid of MockHops or invalid Hops
+       @hops.find_all { |hop| hop.is_a?(Hop) }.map { |hop| (ip_info) ? ip_info.getPrefix(hop.ip) : hop.prefix }
    end
 
    def compressed_prefix_path
@@ -269,6 +271,7 @@ end
 class ForwardPath < Path
    def reached_dst_AS?(dst, ipInfo)
        dst = dst.is_a?(Hop) ? dst.ip : dst
+       return false if dst.nil?
        dst_as = ipInfo.getASN(dst)
        last_non_zero_hop = last_non_zero_ip
        last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
@@ -290,12 +293,17 @@ class ForwardPath < Path
         !@hops.find { |hop| hop.ip == dst }.nil?
    end
 
-   def ping_responsive_except_dst?(dst)
+   def ping_responsive_except_dst?(dst=nil)
        return false if @hops.empty?
 
        for hop in @hops[0..-2]
           return false if !hop.ping_responsive && hop.historically_pingable?
        end
+
+       # also filter out if there are a bunch of 0.0.0.0s before the
+       # destination
+
+       return false if @hops.size > 3 and @hops[-2].ip == "0.0.0.0" and @hops[-3].ip == "0.0.0.0"
 
        return true
    end

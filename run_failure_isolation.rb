@@ -1,5 +1,13 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+# Main isolation process. Allocates several objects: 
+#    - Failure Monitor (pulls ping logs, identifies partial outages)
+#    - Failure Dispatcher (handed outages, issues isolation measurements, and
+#    sends emails)
+#    - Failure Analyzer (the "brains" of the business. Given isolation
+#    measurements, runs isolation / other algorithms)
+
+
 require 'file_lock'
 Lock::acquire_lock("isolation_lock.txt")
 
@@ -55,6 +63,15 @@ begin
 
    Signal.trap("USR2") do
       monitor.remove_node(IO.read($node_to_remove).chomp)
+   end
+
+   Signal.trap("ALRM") do
+     fork do
+       ObjectSpace.each_object(Thread) do |th|
+         th.raise Exception, "Stack Dump" unless Thread.current == th
+       end
+       raise Exception, "Stack Dump"
+     end
    end
 
     monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)

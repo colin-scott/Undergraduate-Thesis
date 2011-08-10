@@ -262,10 +262,9 @@ class FailureAnalyzer
             if !same_last_hop.next.nil? && same_last_hop.next.no_longer_pingable?
                 return :crytal_clear_forward_path
             else
-                if !same_last_hop.next.ping_responsive
-                    $stderr.puts "not historcally pingable: #{outage.file}"
-                end
                 # TODO: consider wether next is in the same AS. Better if so
+                #
+                # BROKEN? do we arrive here if suspecteD_failure is nil?
                 return :unclear_forward_path
             end
         else # Direction::REVERSE
@@ -314,5 +313,35 @@ class FailureAnalyzer
             #    return :no_clear_reachability_horizon
             
         end
+    end
+
+    def pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
+        pingable_targets = []
+
+        if (direction == Direction::FORWARD or direction == Direction::BOTH) and !suspected_failure.nil? and !suspected_failure.ttl.nil?
+            pingable_targets += historical_tr.find_all { |hop| !hop.nil? && !hop.ttl.nil? && hop.ttl > suspected_failure.ttl && hop.ping_responsive }
+        end
+
+        pingable_targets
+    end
+
+    def pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
+        pingable_targets = []
+
+        pingable_targets += historical_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
+        pingable_targets += spoofed_revtr.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive }
+
+        return pingable_targets if historical_tr.empty?
+
+        dst_as = historical_tr[-1].asn
+        
+        return pingable_targets if dst_as.nil?
+
+        historical_tr.reverse.each do |hop|
+            break if hop.asn != dst_as
+            pingable_targets += hop.reverse_path.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive } unless hop.reverse_path.nil? or !hop.reverse_path.valid?
+        end
+
+        pingable_targets
     end
 end
