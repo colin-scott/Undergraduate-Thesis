@@ -1,10 +1,12 @@
 # CONSTANTS!!!
 
-$config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require 'set'
+$config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require $config
 
 module FailureIsolation
+    FailureIsolation::DefaultPeriodSeconds = 360
+
     # out of place...
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp

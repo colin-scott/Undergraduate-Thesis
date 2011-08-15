@@ -7,12 +7,14 @@
 #    - Failure Analyzer (the "brains" of the business. Given isolation
 #    measurements, runs isolation / other algorithms)
 
-
 require 'file_lock'
 Lock::acquire_lock("isolation_lock.txt")
 
-# TODO: ugggggly. These should be partitioned into the inidividual classes,
+# TODO: These should be partitioned into the inidividual classes,
 # but I don't have time to deal with it...
+require 'utilities'
+$LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
+
 require 'isolation_module'
 require 'drb'
 require 'drb/acl'
@@ -34,13 +36,13 @@ require 'failure_monitor'
 
 # XXX Don't hardcode!!!
 $pptasks = "~ethan/scripts/pptasks"
-$default_period_seconds = 360
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 Thread.abort_on_exception = true
 
 begin
-   dispatcher = FailureDispatcher.new
-   monitor = FailureMonitor.new(dispatcher)
+   db = DatabaseInterface.new
+   dispatcher = FailureDispatcher.new(db)
+   monitor = FailureMonitor.new(dispatcher, db)
 
    Signal.trap("TERM") { monitor.persist_state; exit }
    Signal.trap("KILL") { monitor.persist_state; exit }
@@ -56,9 +58,9 @@ begin
        load 'failure_dispatcher.rb'
        load 'failure_monitor.rb'
 
-       dispatcher = FailureDispatcher.new
-       monitor = FailureMonitor.new(dispatcher)
-       monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
+       dispatcher = FailureDispatcher.new(db)
+       monitor = FailureMonitor.new(dispatcher, db)
+       monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
    end
 
    Signal.trap("USR2") do
@@ -74,7 +76,7 @@ begin
      end
    end
 
-    monitor.start_pull_cycle((ARGV.empty?) ? $default_period_seconds : ARGV.shift.to_i)
+   monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
 rescue Exception => e
    Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
    monitor.persist_state

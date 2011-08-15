@@ -162,20 +162,23 @@ class Emailer < ActionMailer::Base
                     :additional_traces => additional_traces,
                     :upstream_reverse_paths => upstream_reverse_paths
     end
-    def isolation_exception(exception, recipient="cs@cs.washington.edu")
+    def isolation_exception(exception, recipient="failures@cs.washington.edu")
         subject     "Isolation Module Exception"
         from        "failures@cs.washington.edu"
         recipients  recipient
         body        :exception => exception
     end
-    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, failed_measurements)
+    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, failed_measurements,
+                          bad_srcs, possibly_bad_srcs)
         subject     "faulty monitoring node report"
         from        "failures@cs.washington.edu"
         recipients  "failures@cs.washington.edu"
         body         :outdated_nodes => outdated_nodes,
                      :problems_at_the_source => problems_at_the_source,
                      :not_sshable => not_sshable,
-                     :failed_measurements => failed_measurements
+                     :failed_measurements => failed_measurements,
+                     :bad_srcs => bad_srcs,
+                     :possibly_bad_srcs => possibly_bad_srcs
     end
     def dot_graph(jpg_path)
         name = File.basename(jpg_path)

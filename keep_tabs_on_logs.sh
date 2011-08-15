@@ -2,8 +2,10 @@
 
 old_isolation=`cat isolation_log_size`
 old_controller=`cat controller_log_size`
-du -b isolation.log | cut -f1 > isolation_log_size
-du -b controller.log | cut -f1 > controller_log_size
+#du -b isolation.log | cut -f1 > isolation_log_size
+#du -b controller.log | cut -f1 > controller_log_size
+du -b ~/revtr_logs/isolation_logs/isolation.log | cut -f1 > isolation_log_size
+du -b ~/revtr_logs/isolation_logs/controller.log | cut -f1 > controller_log_size
 new_isolation=`cat isolation_log_size`
 new_controller=`cat controller_log_size`
 

@@ -21,6 +21,7 @@ require 'socket'
 require 'set'
 require 'resolv'
 
+
 # we use this for test pings
 $ZOOTER_IP="128.208.2.159"
 #$ZOOTER_IP="128.208.2.159".to_sym
@@ -37,11 +38,11 @@ $ZOOTER_IP="128.208.2.159"
 
 class SockTimeout < Timeout::Error
     def initialize(extended_msg="timed out")
-Thread.current[:name]=__method__
+
         @extended_msg=extended_msg
     end
     def to_s
-Thread.current[:name]=__method__
+
         super + ":#{@extended_msg}"
     end
 end
@@ -50,12 +51,12 @@ end
 class VPError < RuntimeError
     attr :hostname
     def initialize(hostname,msg=nil)
-Thread.current[:name]=__method__
+
         @hostname = hostname
         super(msg)
     end
     def to_s
-Thread.current[:name]=__method__
+
         super + ":" + hostname
     end
 end
@@ -69,19 +70,19 @@ class BadPingError < VPError
     # although this says ping, the ping method actually returns an array, so
     # this will be an array
     def initialize(hostname,ping,msg=nil)
-Thread.current[:name]=__method__
+
         @ping=ping
         super(hostname,msg)
     end
     def to_s
-Thread.current[:name]=__method__
+
         super + "\n" + @ping.join("\n")
     end
 end
 
 class QuarantineFailure < VPError
     def initialize(hostname,original_exception,quarantine_exception)
-Thread.current[:name]=__method__
+
         @original_exception=original_exception
         @quarantine_exception=quarantine_exception
         super(hostname)
@@ -90,14 +91,14 @@ Thread.current[:name]=__method__
     attr_reader :hostname, :original_exception, :quarantine_exception
 
     def to_s
-Thread.current[:name]=__method__
+
         super + "[#{@original_exception},#{@quarantine_exception}]"
     end
 end
 
 class Registrar
     def initialize(controller)
-        Thread.current[:name]=__method__
+        
         @controller=controller
     end
 
@@ -105,7 +106,7 @@ class Registrar
     # note that this is different behavior than controller.register, which
     # just returns the exception
     def register(vp)
-Thread.current[:name]=__method__
+
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -119,7 +120,7 @@ Thread.current[:name]=__method__
 
     # unregisters this VP at this URI only
     def unregister(vp)
-Thread.current[:name]=__method__
+
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -128,13 +129,13 @@ Thread.current[:name]=__method__
     end
 
     def garbage_collect()
-Thread.current[:name]=__method__
+
         GC.start
     end
 
     # vp can either be a string or a Prober object (via DRb)
      def client_reverse_traceroute(vp,dsts,backoff_endhost=true)
-Thread.current[:name]=__method__
+
         $LOG.puts("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
         pings=[]
         uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -187,7 +188,7 @@ Thread.current[:name]=__method__
 
     # default ttl range is (1..30)
     def client_spoofed_traceroute(source, dests, receivers=nil, already_registered=false)
-Thread.current[:name]=__method__
+
         if receivers.nil?
             receivers = @controller.hosts.clone[0..5] # TODO: randomize the receivers
             # XXX 5 is a magic number
@@ -199,12 +200,12 @@ Thread.current[:name]=__method__
     end
 
     def batch_spoofed_traceroute(srcdst2stillconnected)
-Thread.current[:name]=__method__
+
         SpoofedTR::sendBatchProbes(srcdst2stillconnected, @controller)
     end
 
     def receive_batched_spoofed_pings(srcdst2stillconnected)
-Thread.current[:name]=__method__
+
         SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
     end
 
@@ -212,32 +213,32 @@ Thread.current[:name]=__method__
     # This is only temporary so that we can play around with outages by hand before
     # we build the full blown system
     def receive_all_spoofed_pings(source, dests, already_registered=false)
-Thread.current[:name]=__method__
+
         receive_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
     end
 
     # sends out spoofed pings from the given set of nodes as the source 
     def receive_spoofed_pings(source, dests, spoofers, already_registered=false)
-Thread.current[:name]=__method__
+
         pingspoof_interface(source, dests, spoofers, already_registered) do |hostname, dests, spoofers|
             SpoofedPing::receiveProbes(hostname, dests, spoofers, @controller)
         end
     end
 
     def send_all_spoofed_pings(source, dests, already_registered=false)
-Thread.current[:name]=__method__
+
         send_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
     end
 
     def send_spoofed_pings(source, dests, receivers, already_registered=false)
-Thread.current[:name]=__method__
+
         pingspoof_interface(source, dests, receivers, already_registered) do |hostname, dests, receivers|
             SpoofedPing::sendProbes(hostname, dests, receivers, @controller)
         end
     end
 
     def ping(source, dests, already_registered=false)
-Thread.current[:name]=__method__
+
         # reduuundanttt
         if !already_registered
            register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
@@ -258,7 +259,7 @@ Thread.current[:name]=__method__
 
     # TODO: automatically check if the VP is already registered
     def traceroute(source, dests, already_registered=false)
-Thread.current[:name]=__method__
+
         # reduuundanttt
         if !already_registered
            register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
@@ -280,7 +281,7 @@ Thread.current[:name]=__method__
     private
 
     def pingspoof_interface(source, dests, helper_vps, already_registered, &block)
-Thread.current[:name]=__method__
+
         raise ArgumentError.new "Cannot distinguish more than 2047 paths at once" if dests.size > 2047
         hostname = source.is_a?(String) ? source : source.hostname
         helper_vps.delete(hostname) if helper_vps.is_a?(Array)
@@ -315,18 +316,18 @@ end
 
 class Controller
     def Controller::calculate_ping_timeout(numtargs)
-Thread.current[:name]=__method__
+
         # figure 30 parallel threads, max time for 1 is 2 seconds
         (numtargs.to_f/30.0).ceil * 2 + 10
     end
 
     def Controller::calculate_spoof_timeout(numtargs)
-Thread.current[:name]=__method__
+
         (numtargs.to_f/20.0).ceil * 2 + 10
     end
 
     def Controller::calculate_traceroute_timeout(numtargs)
-Thread.current[:name]=__method__
+
         # figure 30 parallel threads, max time for 1 is 20 seconds
         (numtargs.to_f/30.0).ceil * 20 + 10  
     end
@@ -336,7 +337,7 @@ Thread.current[:name]=__method__
     $rename_vp={ "planetlab1.esl" => "planetlab1.cs.colorado.edu", "planetlab2.esl" => "planetlab2.cs.colorado.edu", "swsat1502.mpi-sws.mpg.de" => "planetlab03.mpi-sws.mpg.de", "swsat1500.mpi-sws.mpg.de" => "planetlab01.mpi-sws.mpg.de", "swsat1501.mpi-sws.mpg.de" => "planetlab02.mpi-sws.mpg.de", "swsat1505.mpi-sws.mpg.de" => "planetlab06.mpi-sws.mpg.de", "swsat1503.mpi-sws.mpg.de" => "planetlab04.mpi-sws.mpg.de", "planetslug7.soe.ucsc.edu" => "planetslug7.cse.ucsc.edu" }
 
     def Controller::rename_uri_and_host(uri,hostname=nil)
-Thread.current[:name]=__method__
+
         if hostname.nil? and uri.nil?
             return [nil,nil]
         end
@@ -361,20 +362,20 @@ Thread.current[:name]=__method__
     end
 
     def set_max_alert_level(newlevel)
-Thread.current[:name]=__method__
+
         @controller_log.set_max_alert_level(newlevel)
         @controller_log.puts "Changing alert level from " + @controller_log.max_alert.to_s + " to " + newlevel.to_s
     end
 
     # is this used, or is $LOG.puts used?
     def log(msg, level=3)
-Thread.current[:name]=__method__
+
         @controller_log.puts(msg, level)
     end
 
     # if test_controller is true, won't do things like dump VPs
     def initialize(test_controller,configfn,vpfn=nil)
-Thread.current[:name]=__method__
+
         @test=test_controller
         @configfn=configfn
         @controller_log=$stderr
@@ -405,19 +406,19 @@ Thread.current[:name]=__method__
     attr_reader :ulimit, :drb
 
     def version
-Thread.current[:name]=__method__
+
         return $VERSION
     end
 
     def uri
-Thread.current[:name]=__method__
+
         self.drb.uri
     end
     
     # if touch and prune, we try to issue a command on them and only retain
     # those that respond
     def hosts(touchAndPrune=false)
-Thread.current[:name]=__method__
+
         hosts=@vp_lock.synchronize{@hostname2vp.keys}
         if touchAndPrune
             check_up_hosts(hosts)
@@ -433,7 +434,7 @@ Thread.current[:name]=__method__
     # in other words, it always prunes now, but it may add back if
     # quarantining is successful
     def check_up_hosts(hostlisthash, settings={ :retry => true, :maxalert => NO_EMAIL, :timeout => 30})
-Thread.current[:name]=__method__
+
         if hostlisthash.class==Array
             hostlisthash=hostlisthash.to_h(true)
         end
@@ -466,7 +467,7 @@ Thread.current[:name]=__method__
 
     # locked is whether we care about locking the count
     def vp_count(locked=false)
-Thread.current[:name]=__method__
+
         if locked
             return @vp_lock.synchronize{@hostname2vp.length}
         else 
@@ -475,14 +476,14 @@ Thread.current[:name]=__method__
     end
 
     def has_host?(hostname)
-Thread.current[:name]=__method__
+
         first_result = @vp_lock.synchronize{@hostname2vp.has_key?(hostname.downcase)}
         return true if first_result # uglyyyy
         @vp_lock.synchronize{@hostname2vp.has_key?(@resolver.getaddress(hostname).to_s)}
     end
     # raises UnknownVPError if can't find it
     def get_vp(hostname)
-Thread.current[:name]=__method__
+
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
 
         if vp.nil?
@@ -493,7 +494,7 @@ Thread.current[:name]=__method__
     end
 
     def dump_vps(filename)
-Thread.current[:name]=__method__
+
         vp_s=""
         @vp_lock.synchronize do
             @hostname2uri.each_pair{|host,uri|
@@ -512,7 +513,7 @@ Thread.current[:name]=__method__
 
     # raises UnknownVPError if can't find it
     def get_uri(hostname)
-Thread.current[:name]=__method__
+
         uri=@vp_lock.synchronize{@hostname2uri[hostname.downcase]}
 
         if uri.nil?
@@ -525,12 +526,12 @@ Thread.current[:name]=__method__
     # note that this will return the IP, not the hostname, if the given URI
     # has an IP instead of hostname
     def Controller::uri2hostname(uri)
-Thread.current[:name]=__method__
+
         uri.chomp("\n").split("/").at(-1).split(":").at(0).downcase
     end
 
     def shutdown(code=7)
-Thread.current[:name]=__method__
+
         begin
             $LOG.puts("Exiting controller: Received shutdown message #{code}")
             fn=""
@@ -563,7 +564,7 @@ Thread.current[:name]=__method__
     end
 
     def restart
-Thread.current[:name]=__method__
+
         shutdown($UPGRADE_RESTART)
     end
 
@@ -571,7 +572,7 @@ Thread.current[:name]=__method__
     # it must operate without requiring any calls to the vp
     # if uri is set, will only unregister if the registered uri matches
     def unregister_host(hostname,uri=nil)
-Thread.current[:name]=__method__
+
         uri,hostname=Controller::rename_uri_and_host(uri,hostname)
         open_fds=lsof.length
         unregistered=false
@@ -600,7 +601,7 @@ Thread.current[:name]=__method__
     # get list of open FDs
     # plus will also include . and ..
     def lsof
-Thread.current[:name]=__method__
+
         Dir.new("/proc/#{Process.pid}/fd/").entries
     end
 
@@ -609,7 +610,7 @@ Thread.current[:name]=__method__
     # otherwise return the exception (does not raise it - returns it as the
     # return value)
     def vp_broken?(vp)
-Thread.current[:name]=__method__
+
         begin
             Timeout::timeout(30, SockTimeout.new("#{vp.uri} timed out after 30 on a test ping")){
                 pings=vp.ping([$ZOOTER_IP]).split("\n")
@@ -628,7 +629,7 @@ Thread.current[:name]=__method__
     end
 
     def vp_at_uri_broken?(uri)
-Thread.current[:name]=__method__
+
         begin
             vp=DRbObject.new nil, uri
             return vp_broken?(vp)
@@ -643,7 +644,7 @@ Thread.current[:name]=__method__
     # need to parallelize
     # also need to make multithreaded access to the hashes safe
     def register(uri, hostname=nil)
-Thread.current[:name]=__method__
+
         open_fds=lsof.length
         begin
             uri,hostname=Controller::rename_uri_and_host(uri,hostname)
@@ -687,7 +688,7 @@ Thread.current[:name]=__method__
     end
 
     def register_vp(vp,retries,wait=0)
-Thread.current[:name]=__method__
+
         open_fds=lsof.length
         if ( self.ulimit - open_fds < vp_count )
             $LOG.puts("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
@@ -718,7 +719,7 @@ Thread.current[:name]=__method__
 
     # return the set of VPs (hostnames) currently under quarantine
     def under_quarantine
-Thread.current[:name]=__method__
+
         @quarantine_lock.synchronize{@under_quarantine.keys}
     end
      
@@ -730,7 +731,7 @@ Thread.current[:name]=__method__
     # so this threads out and therefor the thread should be able to handle its
     # own exceptions
     def quarantine(hostname,maxalert,exception=nil)
-Thread.current[:name]=__method__
+
         Thread.new(hostname,exception){|my_hostname,except|
             @quarantine_lock.synchronize do
                 if @under_quarantine.include?(my_hostname)
@@ -766,12 +767,12 @@ Thread.current[:name]=__method__
     end
 
     def probe_from_all(timeout=30, &probe_method)
-Thread.current[:name]=__method__
+
         probe_from_all_w_opt_retry(timeout,false,&probe_method)
     end
 
     def probe_from_all_w_opt_retry (timeout, retry_command=false, &probe_method)
-Thread.current[:name]=__method__
+
         results=[]
         threads = []
         unsuccessful_hosts=[]
@@ -813,7 +814,7 @@ Thread.current[:name]=__method__
     # if no hosts given, upgrade all.  otherwise, given list of hostnames,
     # upgrade them
     def upgrade_vps(hosts=nil)
-Thread.current[:name]=__method__
+
         $LOG.puts("Upgrading vps")
         if hosts
             if hosts.is_a?(Array)
@@ -826,19 +827,19 @@ Thread.current[:name]=__method__
     end
 
     def ping_from_all(targets,retry_failed=false)
-Thread.current[:name]=__method__
+
         $LOG.puts("Pinging #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_ping_timeout(targets.length),retry_failed){|vp| vp.ping(targets)}
     end
 
     def traceroute_from_all(targets,retry_failed=false)
-Thread.current[:name]=__method__
+
         $LOG.puts("Traceroute #{targets.length} from all.  Timeout=#{Controller::calculate_traceroute_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_traceroute_timeout(targets.length),retry_failed){|vp| vp.traceroute(targets)}
     end
 
     def ts_from_all(targets,retry_failed=false)
-Thread.current[:name]=__method__
+
         $LOG.puts("Timestamp #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_ping_timeout(targets.length),retry_failed){|vp| vp.ts(targets)}
     end
@@ -924,18 +925,18 @@ Thread.current[:name]=__method__
     end
 
     def issue_command_on_hosts_w_maxalert(hostname2params,timeout,retry_command,maxalert=TEXT,&method)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2params,{ :timeout => timeout, :retry => retry_command, :maxalert => maxalert}, &method)
     end
 
     def issue_command_on_hosts_w_opt_retry(hostname2params,timeout,retry_command=false,&method)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2params,{ :timeout => timeout, :retry => retry_command, :maxalert => TEXT}, &method)
     end
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def ping(hostname2targets,settings={ :timeout => 180, :retry => false, :maxalert => TEXT})
-        Thread.current[:name]=__method__
+        
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -951,7 +952,7 @@ Thread.current[:name]=__method__
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def traceroute(hostname2targets,settings={ :timeout => 180, :retry => false, :maxalert => TEXT})
-Thread.current[:name]=__method__
+
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -968,7 +969,7 @@ Thread.current[:name]=__method__
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def rr(hostname2targets,settings={ :retry => false, :maxalert => TEXT})
-Thread.current[:name]=__method__
+
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -985,7 +986,7 @@ Thread.current[:name]=__method__
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def ts(hostname2targets,settings={ :retry => false, :maxalert => TEXT})
-Thread.current[:name]=__method__
+
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -1013,7 +1014,7 @@ Thread.current[:name]=__method__
     # option to specify a max number of parallel receivers
     # maxalert and retry may not be supported yet
     def spoof_rr(receiver2spoofer2targets, settings={ :retry => true, :parallel_receivers => :all})
-Thread.current[:name]=__method__
+
         # this is for backwards compatability
         if settings.is_a?(Numeric) or settings.is_a?(Symbol)
             settings={ :parallel_receivers => settings }
@@ -1046,13 +1047,13 @@ Thread.current[:name]=__method__
     end
 
     def spoof_ts(receiver2spoofer2targets, settings={ :retry => true } )
-Thread.current[:name]=__method__
+
         settings[ :probe_type ] = :ts
         spoof_and_receive_probes(receiver2spoofer2targets, settings) {|x| x.collect{|y| y.at(0)}} 
     end
 
     def spoof_tr(receiver2spoofer2targets, settings={ :retry => true } )
-Thread.current[:name]=__method__
+
         settings[ :probe_type ] = :tr
         spoof_and_receive_probes(receiver2spoofer2targets, settings) {|x| x.collect{|y| y[0]}} 
     end
@@ -1066,7 +1067,7 @@ Thread.current[:name]=__method__
     # spoofer measurement, so retry_command is for the receiver onlyc
     # not positive if retry is always safe with our tools?
     def spoof_and_receive_probes(receiver2spoofer2targets, settings={ :probe_type => :rr, :retry => false }, &probe_requests_to_destinations )
-Thread.current[:name]=__method__
+
         # thread out on receivers
         # iterate through until the next one will add too many targets
         # each time, add the targets to the receiver targets
@@ -1248,7 +1249,7 @@ Thread.current[:name]=__method__
 
 ### WILL NEED TO KILL MORE THAN ONE PROCESS FOR SINGLE IP?
     def get_results(in_progress)
-Thread.current[:name]=__method__
+
         hostname2pid = {}
         in_progress.each { |pid, hostname|
             hostname2pid[hostname] = pid
@@ -1257,22 +1258,22 @@ Thread.current[:name]=__method__
     end
 
     def execute_ping(hostname2targets)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_ping(dests) }
     end
 
     def execute_rr(hostname2targets)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_rr(dests) }
     end
 
     def execute_traceroute(hostname2targets)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_traceroute(dests) }
     end
 
     def execute_ts(hostname2targets)
-Thread.current[:name]=__method__
+
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_ts(dests) }
     end
 end
@@ -1317,6 +1318,9 @@ end
 optparse.parse!
 
 require options[:config]
+
+$LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+
 require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
 require "#{$REV_TR_TOOL_DIR}/traceroute"

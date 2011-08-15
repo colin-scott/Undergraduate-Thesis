@@ -1,12 +1,16 @@
 require 'failure_dispatcher'
 require 'vp_house_cleaning'
+require 'isolation_module'
+require 'isolation_probe_status'
+require 'set'
 require 'yaml'
 
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
 class FailureMonitor
-    def initialize(dispatcher, email="failures@cs.washington.edu")
+    def initialize(dispatcher, db=DatabaseInterface.new, email="failures@cs.washington.edu")
         @dispatcher = dispatcher
+        @db = db
         @email = email
 
         # TODO: handle these with optparse
@@ -23,7 +27,9 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
         # how often we send out faulty_node_audit reports
-        @@node_audit_period = 60*60*24 / $default_period_seconds / 3
+        @@node_audit_period = 60*60*24 / FailureIsolation::DefaultPeriodSeconds / 3
+
+        @@outdated_node_threshold = 20
 
         @target_set_size = 0
 
@@ -59,6 +65,7 @@ class FailureMonitor
 
         @outdated_nodes = {}
         @problems_at_the_source = {}
+        @not_sshable = Set.new
 
         # so that we don't probe the hell out of failed routers
         # target -> time
@@ -172,27 +179,28 @@ class FailureMonitor
             return
         end
 
-        already_blacklisted = IO.read(FailureIsolation::BlackListPath).split("\n")
+        already_blacklisted = Set.new(IO.read(FailureIsolation::BlackListPath).split("\n"))
 
-        to_swap_out = []
+        to_swap_out = Set.new
 
-        outdated = @outdated_nodes.find_all { |node,time| time > @@outdated_threshold }
-        # wish there was a Hash.partition -> returns hash of selected, and
-        # hash of not selected
-        outdated.each { |k,v| @outdated_nodes.delete k }
-        to_swap_out += outdated.map { |k,v| k }
+        outdated = @outdated_nodes
+        @outdated_nodes = {}
+        to_swap_out |= outdated.map { |k,v| k }
         
         source_problems = @problems_at_the_source
         @problems_at_the_source = {}
-        to_swap_out += source_problems.keys
+        to_swap_out |= source_problems.keys
 
         not_sshable = @not_sshable
-        @not_sshable = []
-        to_swap_out += not_sshable
+        @not_sshable = Set.new
+        to_swap_out |= not_sshable
 
         # XXX clear node_2_failed_measurements state
         failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
-        to_swap_out += failed_measurements.map { |k,v| k }
+        to_swap_out |= failed_measurements.map { |k,v| k }
+
+        bad_srcs, possibly_bad_srcs = HouseCleaning::check_source_probing_status(@db)
+        to_swap_out += bad_srcs
 
         to_swap_out -= already_blacklisted
 
@@ -201,7 +209,9 @@ class FailureMonitor
         Emailer.deliver_faulty_node_report(outdated,
                                            source_problems,
                                            not_sshable,
-                                           failed_measurements)
+                                           failed_measurements,
+                                           bad_srcs,
+                                           possibly_bad_srcs)
 
         HouseCleaning::swap_out_faulty_nodes(to_swap_out)
     end

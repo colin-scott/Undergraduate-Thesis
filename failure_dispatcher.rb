@@ -23,9 +23,7 @@ require 'outage'
 class FailureDispatcher
     attr_accessor :node_2_failed_measurements  # assume that the size of this field is constant
 
-    def initialize
-        @@revtr_timeout = 200
-        
+    def initialize(db=DatabaseInterface.new)
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
@@ -35,7 +33,7 @@ class FailureDispatcher
 					allow 127.0.0.1
 					])
 
-        @mutex = Mutex.new
+        @drb_mutex = Mutex.new
         @spoof_tr_mutex = Mutex.new
 
         connect_to_drb() # sets @rtrSvc
@@ -45,9 +43,7 @@ class FailureDispatcher
 
         @failure_analyzer = FailureAnalyzer.new(@ipInfo)
         
-        @db = DatabaseInterface.new
-
-        @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+        @db = db
 
         @revtr_cache = RevtrCache.new(@db, @ipInfo)
 
@@ -56,14 +52,14 @@ class FailureDispatcher
 
         Thread.new do
             loop do
-                sleep 60 * 60 * 24
                 @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+                sleep 60 * 60 * 24
             end
         end
     end
 
     def connect_to_drb()
-        @mutex.synchronize do
+        @drb_mutex.synchronize do
             if !@have_retried_connection
                 begin
                     @have_retried_connection = true
@@ -80,7 +76,6 @@ class FailureDispatcher
 
     # precondition: stillconnected are able to reach dst
     def isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
-        @registrar.garbage_collect # XXX HACK. andddd, we still have a memory leak...
         @have_retried_connection = false
 
         # first filter out any outages where no nodes are actually registered
@@ -99,12 +94,11 @@ class FailureDispatcher
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
         srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
-        #$LOG.puts "srcdst2pings_towards_src: #{srcdst2pings_towards_src.inspect}"
 
         # if we control one of the targets, send out spoofed traceroutes in
         # the opposite direction for ground truth information
         symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
-        
+
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         measurement_times << ["spoof_tr", Time.new]
         srcdst2spoofed_tr = {}
@@ -133,7 +127,7 @@ class FailureDispatcher
         end
     end
 
-   # private
+    # private
 
     def check4targetswecontrol(srcdst2stillconnected, registered_hosts)
        srcdst2dstsrc = {}
@@ -641,6 +635,11 @@ class FailureDispatcher
     end
 
     def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
+        # there might be multiple hops with the same ip, so we can't have a
+        # nice hashmap from ips -> hops
+        targets = non_responsive_hops.map { |hop| hop.ip }
+
+        pingable_ips = Set.new
         # there might be multiple hops with the same ip, so we can't have a
         # nice hashmap from ips -> hops
         targets = non_responsive_hops.map { |hop| hop.ip }

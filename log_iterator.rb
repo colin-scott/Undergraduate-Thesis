@@ -1,5 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
+# This code is such a piece of shit.
+
 require 'yaml'
 #require 'ip_info'
 require 'hops'
@@ -134,10 +136,32 @@ module LogIterator
           end
     end
 
-    # TODO: Change me back to FailureIsolation::IsolationResults?
-    def LogIterator::iterate(debugging=false, &block)
-        Dir.chdir FailureIsolation::Snapshot do
+    # HACK! Don't iterate over the snapshot, iterate over all logs
+    # STOP COPYING AND PASTING
+    def LogIterator::iterate_all_logs(debugging=false, &block)
+        Dir.chdir FailureIsolation::IsolationResults do
             files = Dir.glob("*bin").sort
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts file if debugging
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    self.read_log_rev4(file, &block)
+                    $stderr.print ".." if debugging
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+        end
+    end
+
+    # TODO: Change me back to FailureIsolation::IsolationResults?
+    def LogIterator::iterate(files=nil, debugging=false, &block)
+        Dir.chdir FailureIsolation::Snapshot do
+            files ||= Dir.glob("*bin").sort
+
             total = files.size
             curr = 0
             files.each do |file|
@@ -356,15 +380,15 @@ module LogIterator
         #    unfortunately the files in isolation_results_rev3 and
         #    isolation_results_rev4 were overwritten, so they all have the same
         #    mtimes
-        rev2 = FailureIsolation::LastIsolationResults+"/"+filename
-        if File.exists?(rev2)
-            f = File.open(rev2, "r")
-            mtime = f.mtime
-            f.close
-            return mtime 
-        end
+        #rev2 = FailureIsolation::LastIsolationResults+"/"+filename
+        #if File.exists?(rev2)
+        #    f = File.open(rev2, "r")
+        #    mtime = f.mtime
+        #    f.close
+        #    return mtime 
+        #end
     
-        timestamp = filename.split('_')[-1].gsub(/\.yml/, "")
+        timestamp = filename.split('_')[-1].split('.')[0]
     
         ## heuristic 3: I have .jpgs in the ~/www folder with
         ##      month/day/ subdirectories...
@@ -388,32 +412,33 @@ module LogIterator
            hour = timestamp[2..3]
            minute = timestamp[4..5]
            second = timestamp[6..7]
-        elsif timestamp.size == "DDHHMMSS".size - 1
-           # one of them is compressed   
-           guesses = LogIterator::infer_one_digit_fields(timestamp, days_in_month)
-           #return nil unless guesses.reduce(:|)
-           return nil if !guesses[0] || !(guesses[-1] && !guesses[0..-2].reduce(:|))  # if the first field doesn't make sense, it's unambiguous
-           day, hour, minute, second = LogIterator::parse_given_single_digit(timestamp, guesses, 1)
-        elsif timestamp.size == "DDHHMMSS".size - 2
-           # two of them are compressed
-           #guesses = infer_one_digit_fields(timestamp, days_in_month)
-           return nil # unless guesses.reduce(:|)
-        elsif timestamp.size == "DDHHMMSS".size - 3
-           # three of them are compressed
-           #guesses = infer_one_digit_fields(timestamp, days_in_month)
-           return nil # unless guesses.reduce(:|)
-        elsif timestamp.size == "DDHHMMSS".size - 4
-           # all of them are compressed
-           day = timestamp[0..0]
-           hour = timestamp[1..1]
-           minute = timestamp[2..2]
-           second = timestamp[3..3] 
+        #elsif timestamp.size == "DDHHMMSS".size - 1
+        #   # one of them is compressed   
+        #   guesses = LogIterator::infer_one_digit_fields(timestamp, days_in_month)
+        #   #return nil unless guesses.reduce(:|)
+        #   return nil if !guesses[0] || !(guesses[-1] && !guesses[0..-2].reduce(:|))  # if the first field doesn't make sense, it's unambiguous
+        #   day, hour, minute, second = LogIterator::parse_given_single_digit(timestamp, guesses, 1)
+        #elsif timestamp.size == "DDHHMMSS".size - 2
+        #   # two of them are compressed
+        #   #guesses = infer_one_digit_fields(timestamp, days_in_month)
+        #   return nil # unless guesses.reduce(:|)
+        #elsif timestamp.size == "DDHHMMSS".size - 3
+        #   # three of them are compressed
+        #   #guesses = infer_one_digit_fields(timestamp, days_in_month)
+        #   return nil # unless guesses.reduce(:|)
+        #elsif timestamp.size == "DDHHMMSS".size - 4
+        #   # all of them are compressed
+        #   day = timestamp[0..0]
+        #   hour = timestamp[1..1]
+        #   minute = timestamp[2..2]
+        #   second = timestamp[3..3] 
         else
            return nil
         end
     
         #$stderr.puts timestamp
         #$stderr.puts "day: #{day} hour: #{hour} minute: #{minute} second: #{second}"
+        #$stderr.puts filename
         return Time.local(year, month, day, hour, minute, second)
     end
     
