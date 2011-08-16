@@ -24,27 +24,21 @@ module SpoofedTR
         SpoofedTR::parse_path(results, id2dest)
     end
 
-    def SpoofedTR::sendBatchProbes(srcdst2outage, controller)
+    def SpoofedTR::sendBatchProbes(srcdst2receivers, controller)
         receiver2spoofer2targets = {}
-
-        srcdst2receivers.each do |srcdst, outage|
+        srcdst2receivers.each do |srcdst, receivers|
             src, dst = srcdst
-            outage.receivers.each do |receiver|
+            receivers.each do |receiver|
                 receiver2spoofer2targets[receiver] = {} unless receiver2spoofer2targets.include? receiver
                 receiver2spoofer2targets[receiver][src] = [] unless receiver2spoofer2targets[receiver].include? src
                 receiver2spoofer2targets[receiver][src] << dst
-
-                if outage.symmetric
-                    receiver2spoofer2targets[receiver][outage.dst_hostname] = [] unless receiver2spoofer2targets[receiver].include? outage.dst_hostname
-                    receiver2spoofer2targets[receiver][outage.dst_hostname] << outage.src_ip
-                end
             end
         end
 
         id2srcdst = SpoofedTR::allocate_batch_ids(receiver2spoofer2targets)
 
         results,unsuccessful_receivers,privates,blacklisted = controller.spoof_tr(receiver2spoofer2targets)
-        srcdst2sortedttlrtrs = SpoofedTR::parse_path(results, id2srcdst) # this actually works with either id2srcdst or id2dst...
+        SpoofedTR::parse_path(results, id2srcdst) # this actually works with either id2srcdst or id2dst...
     end
 
     private
@@ -198,7 +192,8 @@ module SpoofedTR
    # fill in gaps with "0.0.0.0"
    def self.fill_in_zeroes!(sortedttlrtrs)
      return if sortedttlrtrs.empty?
-     raise "insensible input!!!\n#{sortedttlrtrs.inspect}" if sortedttlrtrs[-1][0]-1 > 45 #XXX
+     #raise "insensible input! max ttl shouldn't be greater than 45...\n#{sortedttlrtrs.inspect}" if sortedttlrtrs[-1][0]-1 > 45 #XXX
+     return if sortedttlrtrs[-1][0]-1 > 45 # packet corruption perhaps...
      0.upto(sortedttlrtrs[-1][0]-1) do |i|
          sortedttlrtrs.insert(i, [i+1, ["0.0.0.0"]]) unless sortedttlrtrs[i][0] == i+1
      end

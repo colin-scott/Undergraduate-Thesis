@@ -15,9 +15,11 @@ require 'failure_analyzer'
 require 'mail'
 require 'outage'
 
-# TODO: log additional traceroutes
+# This guy is just in charge of issuing measurements and logging/emailing results
 #
-# just in charge of issuing measurements and logging/emailing results
+# TODO: log additional traceroutes
+# TODO: make use of logger levels so we don't have to comment out log
+# statements
 class FailureDispatcher
     attr_accessor :node_2_failed_measurements  # assume that the size of this field is constant
 
@@ -80,8 +82,8 @@ class FailureDispatcher
         # with the controller
         $LOG.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
         registered_vps = @controller.hosts.clone
-        srcdst2outage.delete_if do |srcdst, still_connected|
-            !registered_vps.include?(srcdst[0]) || (registered_vps & still_connected).empty?
+        srcdst2outage.delete_if do |srcdst, outage|
+            !registered_vps.include?(srcdst[0]) || (registered_vps & outage.receivers).empty?
         end
         $LOG.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
 
@@ -164,14 +166,7 @@ class FailureDispatcher
 
             # TODO: make deliver_isolation_results polymorphic for
             #       symmetric outages
-            Emailer.deliver_isolation_results(outage.src, @ipInfo.format(outage.dst), outage.dataset, outage.direction, outage.connected, 
-                                          outage.unconnected, outage.pings_towards_src,
-                                          outage.tr, outage.spoofed_tr,
-                                          outage.historical_tr, outage.historical_trace_timestamp,
-                                          outage.spoofed_revtr, outage.historical_revtr, outage.graph_url, outage.measurement_times,
-                                          outage.suspected_failure, outage.as_hops_from_dst, outage.as_hops_from_src, 
-                                          outage.alternate_paths, outage.measured_working_direction, outage.path_changed,
-                                          outage.measurements_reissued, outage.additional_traceroutes, outage.upstream_reverse_paths, testing)
+            Emailer.deliver_isolation_results(outage, testing)
 
             $LOG.puts "Attempted to send isolation_results email for #{outage.src} #{outage.dst} testing #{testing}..."
         else
@@ -373,7 +368,7 @@ class FailureDispatcher
 
     def issue_pings_towards_srcs(srcdst2outage)
         # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2outage)
+        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2outage.map_values { |outage| outage.receivers })
 
         #$LOG.puts "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
@@ -389,7 +384,13 @@ class FailureDispatcher
 
     def issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage={})
         @spoof_tr_mutex.synchronize do
-            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2outage)
+            # for symmetric outages
+            merged_srcdst2outage = dstsrc2outage.merge(srcdst2outage)
+            # TODO: add in the other node as the receiver, since we have
+            # control over it?
+
+            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(
+                                                merged_srcdst2outage.map_values { |outage| outage.receivers })
 
             srcdst2outage.each do |srcdst, outage|
                 outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)

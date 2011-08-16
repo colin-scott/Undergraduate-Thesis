@@ -70,6 +70,7 @@ class Emailer < ActionMailer::Base
         bcc         "revtr@cs.washington.edu"
         body        :source => source, :dest => destination
     end
+
     def blocked(email, source, destination)
         subject     "Reverse traceroute from #{destination} back to #{source}"
         from        "revtr@cs.washington.edu"
@@ -77,12 +78,14 @@ class Emailer < ActionMailer::Base
         bcc         "revtr@cs.washington.edu"
         body        :dest => destination
     end
+    
     def check_up_vps_issue(vps, issue)
         subject     "VPs having trouble with #{issue}"
         from        "revtr@cs.washington.edu"
         recipients  "revtr@cs.washington.edu"
         body        :vps => vps.join("<br />"), :issue => issue
     end
+
     def outage_detected(target, dataset, disconnected, connected, never_seen,
                         problems_at_the_source, outdated_nodes,
                         not_sshable, testing=false)
@@ -94,73 +97,15 @@ class Emailer < ActionMailer::Base
                     :problems_at_the_source => problems_at_the_source,
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
-    def isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
-                          formatted_unconnected, pings_towards_src,
-                          normal_forward_path, spoofed_forward_path,
-                          historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, historical_revtr, jpg_url, measurement_times,
-                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                          alternate_paths, measured_working_direction, path_changed,
-                          measurements_reissued,additional_traces,
-                          upstream_reverse_paths,testing=false)
-        subject     "Isolation Results #{src} #{dst}"
+
+    def isolation_results(outage, testing=false)
+        subject     (outage.symmetric) ? "Ground Truth Isolation Results #{src} #{dst}" \
+                                       : "Isolation Results #{src} #{dst}"
+        
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
 
-        body :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
-                    :spoofers_w_connectivity => spoofers_w_connectivity,
-                    :formatted_unconnected => formatted_unconnected,
-                    :pings_towards_src => pings_towards_src,
-                    :normal_forward_path => normal_forward_path,
-                    :spoofed_forward_path => spoofed_forward_path,
-                    :historical_forward_path => historical_forward_path,
-                    :historical_fpath_timestamp => historical_fpath_timestamp,
-                    :spoofed_revtr => spoofed_revtr, :historical_revtr => historical_revtr,
-                    :suspected_failure => suspected_failure,
-                    :as_hops_from_dst => as_hops_from_dst,
-                    :as_hops_from_src => as_hops_from_src, 
-                    :alternate_paths => alternate_paths, 
-                    :measured_working_direction => measured_working_direction, 
-                    :path_changed => path_changed,
-                    :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => measurements_reissued,
-                    :additional_traces => additional_traces,
-                    :upstream_reverse_paths => upstream_reverse_paths
-    end
-    def symmetric_isolation_results(src, dst, dataset, direction, spoofers_w_connectivity,
-                          formatted_unconnected, pings_towards_src,
-                          normal_forward_path, spoofed_forward_path,
-                          dst_normal_forward_path, dst_spoofed_forward_path,
-                          historical_forward_path, historical_fpath_timestamp,
-                          spoofed_revtr, historical_revtr, jpg_url, measurement_times,
-                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                          alternate_paths, measured_working_direction, path_changed,
-                          measurements_reissued, additional_traces,
-                          upstream_reverse_paths,testing=false)
-        subject     "Ground Truth Isolation Results #{src} #{dst}"
-        from        "failures@cs.washington.edu"
-        recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
-        body        :src => src, :dst => dst, :dataset => dataset, :direction => direction, 
-                    :spoofers_w_connectivity => spoofers_w_connectivity,
-                    :formatted_unconnected => formatted_unconnected,
-                    :pings_towards_src => pings_towards_src,
-                    :normal_forward_path => normal_forward_path,
-                    :spoofed_forward_path => spoofed_forward_path,
-                    :historical_forward_path => historical_forward_path,
-                    :historical_fpath_timestamp => historical_fpath_timestamp,
-                    :spoofed_revtr => spoofed_revtr, :historical_revtr => historical_revtr,
-                    :dst_normal_forward_path => dst_normal_forward_path,
-                    :dst_spoofed_forward_path => dst_spoofed_forward_path,
-                    :suspected_failure => suspected_failure,
-                    :as_hops_from_dst => as_hops_from_dst,
-                    :as_hops_from_src => as_hops_from_src, 
-                    :alternate_paths => alternate_paths, 
-                    :measured_working_direction => measured_working_direction, 
-                    :path_changed => path_changed,
-                    :jpg_url => jpg_url, :measurement_times => measurement_times,
-                    :measurements_reissued => measurements_reissued,
-                    :additional_traces => additional_traces,
-                    :upstream_reverse_paths => upstream_reverse_paths
+        body        :outage => outage
     end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
         subject     "Isolation Module Exception"

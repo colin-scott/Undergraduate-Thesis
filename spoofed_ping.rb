@@ -34,11 +34,11 @@ module SpoofedPing
         SpoofedPing::parse_results results
     end
 
-    def SpoofedPing::receiveBatchProbes(srcdst2outage, controller)
+    def SpoofedPing::receiveBatchProbes(srcdst2spoofers, controller)
         receiver2spoofer2targets = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = [] } }
-        srcdst2outage.each do |srcdst, outage|
+        srcdst2spoofers.each do |srcdst, spoofers|
             src, dst = srcdst
-            outage.spoofers.each do |spoofer|
+            spoofers.each do |spoofer|
                 receiver2spoofer2targets[src][spoofer] << dst
             end
         end
