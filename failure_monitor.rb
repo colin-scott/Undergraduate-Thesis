@@ -4,6 +4,7 @@ require 'isolation_module'
 require 'isolation_probe_status'
 require 'set'
 require 'yaml'
+require 'outage'
 
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
@@ -103,9 +104,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2outage = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected)
+            @dispatcher.isolate_outages(srcdst2outage)
 
             $LOG.puts "round #{@current_round} completed"
             $stderr.flush
@@ -284,40 +285,25 @@ class FailureMonitor
     end
 
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
-        formatted_problems_at_the_source = @problems_at_the_source.to_a.map { |x| "#{x[0]} [#{x[1]*100}%]" }
-        formatted_outdated_nodes = @outdated_nodes.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]" }
-        formatted_not_sshable = @not_sshable.to_a
-
-        # [node observing outage, target] -> [node1 still connected, node2... ]
-        srcdst2stillconnected = {}
-
-        # [node observing outage, target] -> nodes with connectivity
-        srcdst2formatted_connected = {}
-        # [node observing outage, target] -> nodes without connectivity
-        srcdst2formatted_unconnected = {}
+        # [node observing outage, target] -> outage struct
+        srcdst2outage = {}
 
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-           # Boy... this is a mess. XXX
+           # Boy... this is a mess.
            if target2stillconnected[target].size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and
                   observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and
                   !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and
                   !observingnode2rounds.empty?
 
+
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
               formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
               formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
               formatted_never_seen = target2neverseen[target]
-
-              dataset = FailureIsolation::get_dataset(target)
-
-              log_outage_detected(target, dataset, formatted_unconnected,
-                                              formatted_connected, formatted_never_seen, 
-                                              formatted_problems_at_the_source,
-                                              formatted_outdated_nodes, formatted_not_sshable)
 
               # don't issue isolation measurements for nodes which have
               # already issued measuremnt for this target in the last
@@ -327,17 +313,14 @@ class FailureMonitor
 
               observingnode2rounds.keys.each do |src|
                  @nodetarget2lastisolationattempt[[src,target]] = @current_round
-                 srcdst2stillconnected[[src,target]] = target2stillconnected[target]
-                 # TODO: encapsulate these into objects rather than passing
-                 # formatted/unformatted hash maps around
-                 srcdst2formatted_connected[[src,target]] = formatted_connected
-                 srcdst2formatted_unconnected[[src,target]] = formatted_unconnected
+                 # XXX Multiplex on Symmetry here?
+                 srcdst2outage[[src,target]] = Outage.new(src, target, formatted_connected, formatted_unconnected, formatted_never_seen)
               end
            end
         end
-        [srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected]
-    end
 
+        srcdst2outage
+    end
 
     def log_outage_detected(*args)
         t = Time.new

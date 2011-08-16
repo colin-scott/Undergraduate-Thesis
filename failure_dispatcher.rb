@@ -16,9 +16,7 @@ require 'mail'
 require 'outage'
 
 # TODO: log additional traceroutes
-#       convert logs to OBJECT dumps to allow for forward /and/ backward
-#       compatability yo
-
+#
 # just in charge of issuing measurements and logging/emailing results
 class FailureDispatcher
     attr_accessor :node_2_failed_measurements  # assume that the size of this field is constant
@@ -75,248 +73,150 @@ class FailureDispatcher
     end
 
     # precondition: stillconnected are able to reach dst
-    def isolate_outages(srcdst2stillconnected, srcdst2formatted_connected, srcdst2formatted_unconnected, testing=false) # this testing flag is terrrrible
+    def isolate_outages(srcdst2outage, testing=false) # this testing flag is terrrrible
         @have_retried_connection = false
 
         # first filter out any outages where no nodes are actually registered
         # with the controller
-        $LOG.puts "before filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        $LOG.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
         registered_vps = @controller.hosts.clone
-        srcdst2stillconnected.delete_if do |srcdst, still_connected|
+        srcdst2outage.delete_if do |srcdst, still_connected|
             !registered_vps.include?(srcdst[0]) || (registered_vps & still_connected).empty?
         end
-        $LOG.puts "after filtering, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
+        $LOG.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
 
-        return if srcdst2stillconnected.empty? # optimization
+        return if srcdst2outage.empty? # optimization
 
         measurement_times = []
 
+        # We issue spoofed pings/traces globally to avoid race conditions over spoofer
+        # ids
+       
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
-        srcdst2pings_towards_src = issue_pings_towards_srcs(srcdst2stillconnected)
+        issue_pings_towards_srcs(srcdst2outage)
 
-        # if we control one of the targets, send out spoofed traceroutes in
+        # if we control one of the targets, (later) send out spoofed traceroutes in
         # the opposite direction for ground truth information
-        symmetric_srcdst2stillconnected, srcdst2dstsrc = check4targetswecontrol(srcdst2stillconnected, registered_vps)
+        dstsrc2outage = check4targetswecontrol(srcdst2outage, registered_vps)
 
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         measurement_times << ["spoof_tr", Time.new]
-        srcdst2spoofed_tr = {}
-        @spoof_tr_mutex.synchronize do
-          srcdst2spoofed_tr = issue_spoofed_traceroutes(symmetric_srcdst2stillconnected)
-        end
-        #$LOG.puts "srcdst2spoofed_tr: #{srcdst2spoofed_tr.inspect}"
+        issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage)
 
         # thread out on each src, dst
-        srcdst2stillconnected.keys.each do |srcdst|
-            src, dst = srcdst
+        srcdst2outage.each do |srcdst, outage|
             Thread.new do
-                if srcdst2dstsrc.include? srcdst
-                    dsthostname, srcip = srcdst2dstsrc[srcdst]
-                    analyze_results_with_symmetry(src, dst, dsthostname, srcip, srcdst2stillconnected[srcdst],
-                                    srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
-                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    srcdst2spoofed_tr[srcdst2dstsrc[srcdst]], deep_copy(measurement_times), testing)
-                else
-                    analyze_results(src, dst, srcdst2stillconnected[srcdst],
-                                    srcdst2formatted_connected[srcdst], srcdst2formatted_unconnected[srcdst],
-                                    srcdst2pings_towards_src[srcdst], srcdst2spoofed_tr[srcdst],
-                                    deep_copy(measurement_times), testing)
-                end
+                outage.measurements_times = deep_copy(measurement_times)
+                analyze_results(outage, testing)
             end
         end
     end
 
     # private
 
-    def check4targetswecontrol(srcdst2stillconnected, registered_hosts)
-       srcdst2dstsrc = {}
-       symmetric_srcdst2stillconnected = srcdst2stillconnected.clone
-       srcdst2stillconnected.each do |srcdst, stillconnected|
+    def check4targetswecontrol(srcdst2outage, registered_hosts)
+       dstsrc2outage = {}
+
+       srcdst2outage.each do |srcdst, outage|
             src, dst = srcdst
             if FailureIsolation::SpooferTargets.include? dst
-                hostname = FailureIsolation::SpooferIP2Hostname[dst]
-                if registered_hosts.include? hostname
-                    swapped = [hostname, $pl_host2ip[src]]
-                    #$LOG.puts "check4targetswecontrol(), swapped #{swapped.inspect} srcdst #{srcdst.inspect}"
-                    srcdst2dstsrc[srcdst] = swapped
-                    symmetric_srcdst2stillconnected[swapped] = stillconnected
+                dst_hostname = FailureIsolation::SpooferIP2Hostname[dst]
+
+                if registered_hosts.include? dst_hostname
+                    outage.symmetric = true
+                    # XXX Possible problem with ip2hostname mappings??
+                    outage.src_ip = $pl_host2ip[src]
+                    outage.dst_hostname = dst_hostname
+                    dstsrc2outage[[outage.dst_hostname, outage.src_ip]] = outage
                 end
             end
        end
 
-       [symmetric_srcdst2stillconnected, srcdst2dstsrc]
+       dstsrc2outage
     end
 
+    def analyze_results(outage, testing=false)
+        $LOG.puts "analyze_results: #{outage.src}, #{outage.dst}"
 
-    # I should /not/ have made a damn distinction between analyze and analyze_symmetric 
-    def analyze_results(src, dst, spoofers_w_connectivity, formatted_connected, formatted_unconnected,
-                        pings_towards_src, spoofed_tr, measurement_times, testing=false)
-        $LOG.puts "analyze_results: #{src}, #{dst}"
+        gather_additional_data(outage, testing)
 
-        # wow, this is a mouthful
-        direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
-            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
-            upstream_reverse_paths, measurements_reissued = gather_additional_data(
-                                                       src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
+        outage.log_name = get_uniq_filename(outage.src, outage.dst)
 
-        insert_measurement_durations(measurement_times)
+        outage.passed_filters = @failure_analyzer.passes_filtering_heuristics?(outage.src, outage.dst, outage.tr, outage.spoofed_tr,
+                                                             outage.ping_responsive, outage.historical_tr, outage.historical_revtr, 
+                                                             outage.direction, testing)
 
-        log_name = get_uniq_filename(src, dst)
+        $LOG.puts "analyze_results: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
 
-        passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr,
-                                                             ping_responsive, historical_tr, historical_revtr, direction, testing)
-
-        $LOG.puts "analyze_results: #{src}, #{dst}, passed_filters: #{passed_filters}"
+        outage.build
 
         if(!testing)
-            log_isolation_results(Outage.new(log_name, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters, additional_traceroutes,
-                                          upstream_reverse_paths))
+            log_isolation_results(outage)
         end
 
-        if(passed_filters)
-            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
+        if(outage.passed_filters)
+            jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
+                             outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
+                             outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
 
             graph_url = generate_web_symlink(jpg_output)
 
-            Emailer.deliver_isolation_results(src, @ipInfo.format(dst), dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr, graph_url, measurement_times,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurements_reissued, additional_traceroutes, upstream_reverse_paths, testing)
+            # TODO: make deliver_isolation_results polymorphic for
+            #       symmetric outages
+            Emailer.deliver_isolation_results(outage.src, @ipInfo.format(outage.dst), outage.dataset, outage.direction, outage.connected, 
+                                          outage.unconnected, outage.pings_towards_src,
+                                          outage.tr, outage.spoofed_tr,
+                                          outage.historical_tr, outage.historical_trace_timestamp,
+                                          outage.spoofed_revtr, outage.historical_revtr, outage.graph_url, outage.measurement_times,
+                                          outage.suspected_failure, outage.as_hops_from_dst, outage.as_hops_from_src, 
+                                          outage.alternate_paths, outage.measured_working_direction, outage.path_changed,
+                                          outage.measurements_reissued, outage.additional_traceroutes, outage.upstream_reverse_paths, testing)
 
-            $LOG.puts "Attempted to send isolation_results email for #{src} #{dst} testing #{testing}..."
+            $LOG.puts "Attempted to send isolation_results email for #{outage.src} #{outage.dst} testing #{testing}..."
         else
-            $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
+            $LOG.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
 
-        return passed_filters
+        return outage.passed_filters
     end
 
-    # HMMMM, terribly redundant. How can I factor this out?
-    def analyze_results_with_symmetry(src, dst, dsthostname, srcip, spoofers_w_connectivity,
-                                      formatted_connected, formatted_unconnected, pings_towards_src,
-                                      spoofed_tr, dst_spoofed_tr, measurement_times, testing=false)
-        $LOG.puts "analyze_results_with_symmetry: #{src}, #{dst}"
+    def gather_additional_data(outage, testing)
+        reverse_problem = outage.pings_towards_src.empty?
+        forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
-        # wow, this is a mouthful
-        direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
-            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            alternate_paths, measured_working_direction, path_changed, additional_traceroutes,
-            upstream_reverse_paths, measurements_reissued = gather_additional_data(src, dst, pings_towards_src,
-                                                    spoofed_tr, measurement_times, spoofers_w_connectivity,testing)
-
-        dst_tr = issue_normal_traceroutes(dsthostname, [srcip])[srcip]
-
-        insert_measurement_durations(measurement_times)
-
-        log_name = get_uniq_filename(src, dst)
-
-        passed_filters = @failure_analyzer.passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive,
-                                                                        historical_tr, historical_revtr, direction, testing)
-        
-        if(!testing)
-            log_isolation_results(SymmetricOutage.new(log_name, src, dst, dataset, direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          dst_tr, dst_spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurement_times, passed_filters, additional_traceroutes, upstream_reverse_paths))
-        end
-
-        if(passed_filters)
-            jpg_output = generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
- 
-            graph_url = generate_web_symlink(jpg_output)
-
-            Emailer.deliver_symmetric_isolation_results(src, @ipInfo.format(dst), dataset,
-                                          direction, formatted_connected, 
-                                          formatted_unconnected, pings_towards_src,
-                                          tr, spoofed_tr,
-                                          dst_tr, dst_spoofed_tr,
-                                          historical_tr, historical_trace_timestamp,
-                                          spoofed_revtr, historical_revtr, graph_url, measurement_times,
-                                          suspected_failure, as_hops_from_dst, as_hops_from_src, 
-                                          alternate_paths, measured_working_direction, path_changed,
-                                          measurements_reissued, additional_traceroutes, upstream_reverse_paths,
-                                          testing)
-
-            $LOG.puts "Attempted to send symmetric isolation_results email for #{src} #{dst} testing #{testing}..."
-        else
-            $LOG.puts "Heuristic failure! measurement times: #{measurement_times.inspect}"
-        end
-    end
-
-    def paths_diverge?(src, dst, spoofed_tr, tr)
-        spoofed_tr_loop = spoofed_tr.contains_loop?()
-        tr_loop = tr.contains_loop?()
-
-        compressed_spooftr = spoofed_tr.compressed_prefix_path
-        compressed_tr = tr.compressed_prefix_path
-        
-        divergence = !Path.share_common_path_prefix?(compressed_spooftr, compressed_tr)
-
-        $LOG.puts "spooftr_loop!(#{src}, #{dst}) #{spoofed_tr.map { |h| h.ip }}" if spoofed_tr_loop
-        $LOG.puts "tr_loop!(#{src}, #{dst}) #{tr.map { |h| h.ip}}" if tr_loop
-        $LOG.puts "divergence!(#{src}, #{dst}) #{compressed_spooftr} --tr-- #{compressed_tr}" if divergence
-
-        return spoofed_tr_loop || tr_loop || divergence
-    end
-
-    # this is really ugly -- but it elimanates redundancy between
-    # analyze_results() and analyze_results_with_symmetry()
-    def gather_additional_data(src, dst, pings_towards_src, spoofed_tr, measurement_times, spoofers_w_connectivity, testing)
-        reverse_problem = pings_towards_src.empty?
-        forward_problem = !spoofed_tr.reached?(dst)
-
-        direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
+        outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
 
         # HistoricalForwardHop objects
-        historical_tr, historical_trace_timestamp = retrieve_historical_tr(src, dst)
+        outage.historical_tr, outage.historical_trace_timestamp = retrieve_historical_tr(outage.src, outage.dst)
 
-        historical_tr.each do |hop|
-            # XXX thread out on this to make it faster? Ask Dave for a faster
+        outage.historical_tr.each do |hop|
+            # thread out on this to make it faster? Ask Dave for a faster
             # way?
-            hop.reverse_path = fetch_historical_revtr(src, hop.ip)
+            hop.reverse_path = fetch_historical_revtr(outage.src, hop.ip)
         end
 
-        historical_revtr = fetch_historical_revtr(src, dst)
+        outage.historical_revtr = fetch_historical_revtr(outage.src, outage.dst)
 
-        # maybe not threadsafe, but fukit
+        # maybe not accurate given multiple threads, but fukit
         tr_time = Time.new
-        measurement_times << ["tr_time", tr_time]
-        tr = issue_normal_traceroutes(src, [dst])[dst]
+        outage.measurement_times << ["tr_time", tr_time]
+        outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
 
-        if tr.empty?
-            $LOG.puts "empty traceroute! (#{src}, #{dst})"
+        if outage.tr.empty?
+            $LOG.puts "empty traceroute! (#{outage.src}, #{outage.dst})"
             sleep 10
             tr_time2 = Time.new
-            tr = issue_normal_traceroutes(src, [dst])[dst]
-            if tr.empty?
-                $LOG.puts "still empty! (#{src}, #{dst})" 
-                @node_2_failed_measurements[src] += 1
+            outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+            if outage.tr.empty?
+                $LOG.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @node_2_failed_measurements[outage.src] += 1
             end
         end
 
         measurements_reissued = false
 
-        if paths_diverge?(src, dst, spoofed_tr, tr)
+        if outage.paths_diverge?
             # path divergence!
             # reissue traceroute and spoofed traceroute until they don't
             # diverge
@@ -324,87 +224,105 @@ class FailureDispatcher
 
             3.times do 
                 sleep 30
-                tr = issue_normal_traceroutes(src, [dst])[dst]
-                @spoof_tr_mutex.synchronize do
-                    spoofed_tr = issue_spoofed_traceroutes({[src,dst] => spoofers_w_connectivity})[[src,dst]]
-                end
+                outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+                issue_spoofed_traceroutes({[src,dst] => outage})
 
-                break if !paths_diverge?(src, dst, spoofed_tr, tr)
+                break if !outage.paths_diverge?
                 measurements_reissued += 1
             end
         end
 
+        # TODO: implement retries for symmetric traceroutes?
+
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
-        measurement_times << ["non-revtr pings", Time.new]
-        ping_responsive, non_responsive_hops = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+        outage.measurement_times << ["non-revtr pings", Time.new]
+        ping_responsive, non_responsive_hops = issue_pings(outage)
 
         if ping_responsive.empty?
-            $LOG.puts "empty pings! (#{src}, #{dst})"
+            $LOG.puts "empty pings! (#{outage.src}, #{outage.dst})"
             sleep 10
-            ping_responsive, non_responsive_hops = issue_pings(src, dst, historical_tr, spoofed_tr, historical_revtr)
+            ping_responsive, non_responsive_hops = issue_pings(outage)
             if ping_responsive.empty?
-                $LOG.puts "still empty! (#{src}, #{dst})" 
-                @node_2_failed_measurements[src] += 1
+                $LOG.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @node_2_failed_measurements[outage.src] += 1
             end
         end
 
-        measurement_times << ["pings_to_nonresponsive_hops", Time.new]
-        check_pingability_from_other_vps!(spoofers_w_connectivity, non_responsive_hops)
+        outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
+        check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
 
         if direction != Direction::REVERSE and direction != Direction::BOTH and !testing
-            measurement_times << ["revtr", Time.new]
-            spoofed_revtr = issue_spoofed_revtr(src, dst, historical_tr.map { |hop| hop.ip })
+            outage.measurement_times << ["revtr", Time.new]
+            outage.spoofed_revtr = issue_spoofed_revtr(outage.src, outage.dst, outage.historical_tr.map { |hop| hop.ip })
         else
-            spoofed_revtr = SpoofedReversePath.new
+            outage.spoofed_revtr = SpoofedReversePath.new
         end
 
-        if spoofed_revtr.valid?
-           measurement_times << ["revtr pings", Time.new]
-           revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(src, spoofed_revtr)
+        if outage.spoofed_revtr.valid?
+           outage.measurement_times << ["revtr pings", Time.new]
+           revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(outage.src, outage.spoofed_revtr)
            ping_responsive |= revtr_ping_responsive
         end
 
-        measurement_times << ["measurements completed", Time.new]
+        outage.measurement_times << ["measurements completed", Time.new]
 
-        fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, historical_revtr)
+        fetch_historical_pingability!(outage)
 
-        dataset = FailureIsolation::get_dataset(dst)
-        
-        suspected_failure = @failure_analyzer.identify_fault(src, dst, direction, tr, spoofed_tr,
-                                                             historical_tr, spoofed_revtr, historical_revtr)
+        outage.suspected_failure = @failure_analyzer.identify_fault(outage.src, outage.dst, outage.direction, outage.tr, 
+                                                             outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
+                                                             outage.historical_revtr)
 
-        as_hops_from_src = @failure_analyzer.as_hops_from_src(suspected_failure, tr, spoofed_tr, historical_tr)
-        as_hops_from_dst = @failure_analyzer.as_hops_from_dst(suspected_failure, historical_revtr, spoofed_revtr,
-                                                spoofed_tr, tr, as_hops_from_src)
+        outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
+        outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
+                                                outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
 
-        working_historical_paths = @failure_analyzer.find_alternate_paths(src, dst, direction, tr,
-                                                    spoofed_tr, historical_tr, spoofed_revtr, historical_revtr)
+        outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
+                                                    outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
 
-        measured_working_direction = @failure_analyzer.measured_working_direction?(direction, spoofed_revtr)
+        outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
 
-        path_changed = @failure_analyzer.path_changed?(historical_tr, tr, spoofed_tr, direction)
+        outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
 
         # now... if we found any pingable hops beyond the failure... send
         # traceroutes to them... their paths must differ somehow
-        additional_traceroutes = measure_traces_to_pingable_hops(src, suspected_failure, direction, historical_tr, spoofed_revtr,
-                                                                 historical_revtr)
+        outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
+                                                                   outage.spoofed_revtr, outage.historical_revtr)
 
         # TODO: an upstream router in a reverse traceroute at the reachability
         # horizon: was there a path change? Issue spoofed reverse traceroute,
         # and compare to historical reverse traceroute.
-        upstream_reverse_paths = {}
-        if(direction == Direction::REVERSE && historical_revtr.valid? && !suspected_failure.nil? &&
-               !suspected_failure.next.nil? && suspected_failure.next.ping_responsive)
+        if(outage.direction == Direction::REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
+               !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
             # TODO: should the key be the ip, or the Hop object?
-           upstream_revtr = issue_spoofed_revtr(src, suspected_failure.next.ip) # historical traceroute?
-           upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
+           upstream_revtr = issue_spoofed_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
+           outage.upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
         end
-        
-        [direction, historical_tr, historical_trace_timestamp, spoofed_revtr, historical_revtr,
-            ping_responsive, tr, dataset, suspected_failure, as_hops_from_dst, as_hops_from_src, 
-            working_historical_paths, measured_working_direction, path_changed, additional_traceroutes,
-            upstream_reverse_paths, measurements_reissued]
+
+        if outage.symmetric
+            outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
+        end
+    end
+
+    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
+        # TODO: put this into its own function
+        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
+
+        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+                             historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
+
+        jpg_output
+    end
+
+    def generate_web_symlink(jpg_output)
+        t = Time.new
+        subdir = "#{t.year}.#{t.month}.#{t.day}"
+        abs_path = FailureIsolation::WebDirectory+"/"+subdir
+        FileUtils.mkdir_p(abs_path)
+        basename = File.basename(jpg_output)
+        File.symlink(jpg_output, abs_path+"/#{basename}")
+        "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
     def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
@@ -421,38 +339,6 @@ class FailureDispatcher
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
         targ2trace
-    end
-
-    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
-        # TODO: put this into its own function
-        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
-
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
-
-        jpg_output
-    end
-
-    # given an array of the form:
-    #   [[measurement_type, time], ...]
-    # Transform it into:
-    #   [[measurement_type, time, duration], ... ]
-    def insert_measurement_durations(measurement_times)
-        0.upto(measurement_times.size - 2) do |i|
-            duration = measurement_times[i+1][1] - measurement_times[i][1] 
-            measurement_times[i] << "(#{duration} seconds)"
-        end
-    end
-
-    def generate_web_symlink(jpg_output)
-        t = Time.new
-        subdir = "#{t.year}.#{t.month}.#{t.day}"
-        abs_path = FailureIsolation::WebDirectory+"/"+subdir
-        FileUtils.mkdir_p(abs_path)
-        basename = File.basename(jpg_output)
-        File.symlink(jpg_output, abs_path+"/#{basename}")
-        "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
     def fetch_historical_revtr(src,dst)
@@ -485,46 +371,46 @@ class FailureDispatcher
             historical_trace_timestamp]
     end
 
-    def issue_pings_towards_srcs(srcdst2stillconnected)
+    def issue_pings_towards_srcs(srcdst2outage)
         # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2stillconnected)
+        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2outage)
 
         #$LOG.puts "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
-        srcdst2pings_towards_src = {}
-
-        srcdst2stillconnected.keys.each do |srcdst|
+        srcdst2outage.each do |srcdst, outage|
             src, dst = srcdst
             if spoofed_ping_results.nil? || spoofed_ping_results[dst].nil? || spoofed_ping_results[dst][src].nil?
-                srcdst2pings_towards_src[srcdst] = []
+                outage.pings_towards_src = []
             else
-                srcdst2pings_towards_src[srcdst] = spoofed_ping_results[dst][src]
+                outage.pings_towards_src = spoofed_ping_results[dst][src]
             end
         end
-
-        srcdst2pings_towards_src
     end
 
-    def issue_spoofed_traceroutes(srcdst2stillconnected)
-        #$LOG.puts "isolate_spoofed_traceroutes, srcdst2stillconnected: #{srcdst2stillconnected.inspect}"
-        srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
+    def issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage={})
+        @spoof_tr_mutex.synchronize do
+            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2outage)
 
-        srcdst2spoofed_tr = {}
+            srcdst2outage.each do |srcdst, outage|
+                outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
+            end
 
-        #$LOG.puts "isolate_spoofed_traceroutes, srcdst2ttl2rtrs: #{srcdst2sortedttlrtrs.inspect}"
-
-        srcdst2stillconnected.keys.each do |srcdst|
-            src, dst = srcdst
-            if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
-                srcdst2spoofed_tr[srcdst] = ForwardPath.new
-            else
-                srcdst2spoofed_tr[srcdst] = ForwardPath.new(srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
-                    SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
-                end)
+            dstsrc2outage.each do |dstsrc, outage|
+                outage.dst_spoofed_tr = retrieve_spoofed_tr(dstsrc, srcdst2sortedttlrtrs)
             end
         end
+    end
 
-        srcdst2spoofed_tr
+    def retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
+        if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
+            path = ForwardPath.new
+        else
+            path = ForwardPath.new(srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
+                SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
+            end)
+        end
+
+        path
     end
 
     # precondition: targets is a single element array
@@ -591,14 +477,14 @@ class FailureDispatcher
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
-    def issue_pings(source, dest, historical_tr, spoofed_tr, historical_revtr)
-        all_hop_sets = [[Hop.new(dest), Hop.new(FailureIsolation::TestPing)], historical_tr, spoofed_tr, historical_revtr]
+    def issue_pings(outage)
+        all_hop_sets = [[Hop.new(outage.dst), Hop.new(FailureIsolation::TestPing)], outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
 
-        for hop in historical_tr
+        for hop in outage.historical_tr
             all_hop_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
         end
 
-        request_pings(source, all_hop_sets)
+        request_pings(outage.src, all_hop_sets)
     end
 
     # we issue the pings separately for the revtr, since the revtr can take an
@@ -657,17 +543,16 @@ class FailureDispatcher
     end
 
     # XXX Am I giving Ethan all of these hops properly?
-    def fetch_historical_pingability!(historical_tr, spoofed_tr, spoofed_revtr, historical_revtr)
-        # TODO: redundannnnttt
-        all_hop_sets = [historical_tr, spoofed_tr, historical_revtr]
+    def fetch_historical_pingability!(outage)
+        all_hop_sets = [outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
 
-        for hop in historical_tr
+        for hop in outage.historical_tr
             if !(hop.reverse_path.nil?) && hop.reverse_path.valid?
                 all_hop_sets << hop.reverse_path 
             end
         end
 
-        all_hop_sets << spoofed_revtr if spoofed_revtr.valid? # might contain a symbol. hmmm... XXX
+        all_hop_sets << outage.spoofed_revtr if outage.spoofed_revtr.valid? # might contain a symbol. hmmm... XXX
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 

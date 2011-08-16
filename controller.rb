@@ -98,7 +98,6 @@ end
 
 class Registrar
     def initialize(controller)
-        
         @controller=controller
     end
 
@@ -106,7 +105,6 @@ class Registrar
     # note that this is different behavior than controller.register, which
     # just returns the exception
     def register(vp)
-
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -120,7 +118,6 @@ class Registrar
 
     # unregisters this VP at this URI only
     def unregister(vp)
-
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -129,13 +126,11 @@ class Registrar
     end
 
     def garbage_collect()
-
         GC.start
     end
 
     # vp can either be a string or a Prober object (via DRb)
      def client_reverse_traceroute(vp,dsts,backoff_endhost=true)
-
         $LOG.puts("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
         pings=[]
         uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -199,27 +194,23 @@ class Registrar
         end
     end
 
-    def batch_spoofed_traceroute(srcdst2stillconnected)
-
-        SpoofedTR::sendBatchProbes(srcdst2stillconnected, @controller)
+    def batch_spoofed_traceroute(srcsdst2outage)
+        SpoofedTR::sendBatchProbes(srcsdst2outage, @controller)
     end
 
-    def receive_batched_spoofed_pings(srcdst2stillconnected)
-
-        SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
+    def receive_batched_spoofed_pings(srcsdst2outage)
+        SpoofedPing::receiveBatchProbes(srcsdst2outage, @controller)
     end
 
     # sends out spoofed pings from all other nodes as this source 
     # This is only temporary so that we can play around with outages by hand before
     # we build the full blown system
     def receive_all_spoofed_pings(source, dests, already_registered=false)
-
         receive_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
     end
 
     # sends out spoofed pings from the given set of nodes as the source 
     def receive_spoofed_pings(source, dests, spoofers, already_registered=false)
-
         pingspoof_interface(source, dests, spoofers, already_registered) do |hostname, dests, spoofers|
             SpoofedPing::receiveProbes(hostname, dests, spoofers, @controller)
         end
