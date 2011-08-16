@@ -14,6 +14,7 @@ Lock::acquire_lock("isolation_lock.txt")
 # but I don't have time to deal with it...
 require 'utilities'
 $LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
+$LOG.level = Logger::INFO
 
 require 'isolation_module'
 require 'drb'

@@ -1,8 +1,9 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-
 require 'file_lock'
 Lock::acquire_lock("controller_lock.txt")
+
+require 'utilities'
 
 #  Is controller_log used?
 #  it does update controller on all VPs in the main thread, but now that will
@@ -14,6 +15,7 @@ Lock::acquire_lock("controller_lock.txt")
 # don't allow restarts in middle of measurements
 $ID = "$Id: controller.rb,v 1.100 2010/08/21 01:56:48 ethan Exp $"
 $VERSION = $ID.split(" ").at(2).to_f
+
 require 'drb'
 require 'drb/acl'
 require 'timeout'
@@ -1318,6 +1320,7 @@ optparse.parse!
 require options[:config]
 
 $LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+$LOG.level = Logger::INFO
 
 require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
