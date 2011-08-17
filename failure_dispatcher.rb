@@ -276,7 +276,7 @@ class FailureDispatcher
 
         if outage.direction != Direction::REVERSE and outage.direction != Direction::BOTH and !testing
             outage.measurement_times << ["revtr", Time.new]
-            outage.spoofed_revtr = issue_spoofed_revtr(outage.src, outage.dst, outage.historical_tr.map { |hop| hop.ip })
+            outage.spoofed_revtr = issue_revtr(outage.src, outage.dst, outage.historical_tr.map { |hop| hop.ip })
         else
             outage.spoofed_revtr = SpoofedReversePath.new
         end
@@ -323,7 +323,7 @@ class FailureDispatcher
         if(outage.direction == Direction::REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
                !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
             # TODO: should the key be the ip, or the Hop object?
-           upstream_revtr = issue_spoofed_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
+           upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
            outage.upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
            $LOG.debug("upstream revtr issued")
         end
@@ -470,10 +470,7 @@ class FailureDispatcher
         targ2paths 
     end
 
-    # XXX change me later to deal with revtrs from forward hops
-    # issue_spoofed_revtrs()
-    #
-    def issue_spoofed_revtr(src, dst, historical_hops=[])
+    def issue_revtr(src, dst, historical_hops=[], spoofed=true)
         srcdst2revtr = {}
         begin
                 srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
@@ -491,7 +488,7 @@ class FailureDispatcher
 
         $LOG.debug "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
-        raise "issue_spoofed_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" unless srcdst2revtr.is_a?(Hash) or srcdst2revtr.is_a?(DRb::DRbObject)
+        raise "issue_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" unless srcdst2revtr.is_a?(Hash) or srcdst2revtr.is_a?(DRb::DRbObject)
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return SpoofedReversePath.new([:nil_return_value])
@@ -637,9 +634,11 @@ class FailureDispatcher
           $LOG.debug "splice_alternate_paths() ingress router reachable"
 
           src_trace_to_ingress = issue_normal_traceroutes(outage.src, [ingress.ip])[ingress.ip]
+          $LOG.debug "normal trace: #{src_trace_to_ingress}"
           return unless src_trace_to_ingress.valid?
           # TODO: normal revtr
-          dst_revtr_from_ingress = issue_spoofed_revtr(outage.dst_hostname, ingress.ip) # historical hops?
+          dst_revtr_from_ingress = issue_revtr(outage.dst_hostname, ingress.ip, [], false)
+          $LOG.debug "dst revtr: #{dst_revtr_from_ingress}"
           return unless dst_revtr_from_ingress.valid?
 
           outage.spliced_paths << SplicedPath.new(outage.src, outage.dst_hostname, ingress, src_trace_to_ingress, dst_revtr_from_ingress)
