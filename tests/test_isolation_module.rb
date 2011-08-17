@@ -13,7 +13,7 @@ $LOG = LoggerLog.new($stderr)
 
 dispatcher = FailureDispatcher.new
 
-hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.clone
+hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.sort_by { rand }.clone
 src = hosts.shift
 receivers = hosts[0..5]
 

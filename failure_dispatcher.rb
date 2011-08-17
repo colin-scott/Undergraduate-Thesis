@@ -616,24 +616,30 @@ class FailureDispatcher
 
        if outage.direction == Direction::FORWARD
           # TODO: use other data for finding ingresses
+          return if outage.tr.empty? # spooftr
+          return if outage.historical_tr.empty?
           current_as_path = outage.tr.compressed_as_path  # spooftr?
           old_as_path = outage.historical_tr.compressed_as_path
 
           divergent_as = Path.first_point_of_divergence(old_as_path, current_as_path)
           return if divergent_as.nil?
 
-          ingress = old_as_path.ingress_router_to_as(divergent_as)
+          ingress = outage.historical_tr.ingress_router_to_as(divergent_as)
           return if ingress.nil?
 
           # ping ingress from s and d
-          src2reachable = issue_pings([outage.src, outage.dst_hostname], [ingress])
+          $LOG.debug "splice_alternate_paths() issuing pings"
+          src2reachable = issue_pings([outage.src, outage.dst_hostname], [ingress.ip])
+          $LOG.debug "src2reachable: #{src2reachable.inspect}"
+          
+          return if !(src2reachable[outage.src].include? ingress.ip and src2reachable[outage.dst_hostname].include? ingress.ip)
 
-          return if !(src2reachable[outage.src].include? ingress and src2reachable[outage.dst_hostname].include? ingress)
+          $LOG.debug "splice_alternate_paths() ingress router reachable"
 
-          src_trace_to_ingress = issue_normal_traceroutes(outage.src, [ingress])[ingress]
+          src_trace_to_ingress = issue_normal_traceroutes(outage.src, [ingress.ip])[ingress.ip]
           return unless src_trace_to_ingress.valid?
           # TODO: normal revtr
-          dst_revtr_from_ingress = issue_spoofed_revtr(outage.dst_hostname, ingress) # historical hops?
+          dst_revtr_from_ingress = issue_spoofed_revtr(outage.dst_hostname, ingress.ip) # historical hops?
           return unless dst_revtr_from_ingress.valid?
 
           outage.spliced_paths << SplicedPath.new(outage.src, outage.dst_hostname, ingress, src_trace_to_ingress, dst_revtr_from_ingress)
