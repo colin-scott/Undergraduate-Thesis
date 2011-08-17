@@ -170,14 +170,15 @@ class FailureDispatcher
         # XXX thread safe? I doubt it...
         if outage_correlation.complete?
            log_outage_correlation(outage_correlation) 
+           $LOG.debug("logged outage correlation")
         end
 
         if(outage.passed_filters)
-            jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
+            outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
                              outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
 
-            graph_url = generate_web_symlink(jpg_output)
+            outage.graph_url = generate_web_symlink(outage.jpg_output)
 
             # TODO: make deliver_isolation_results polymorphic for
             #       symmetric outages
@@ -572,7 +573,8 @@ class FailureDispatcher
         # nice hashmap from ips -> hops
         targets = non_responsive_hops.map { |hop| hop.ip }
 
-        pingable_ips = @registrar.all_pairs_ping(connected_vps, targets).values.reduce { |sum,set| sum | set }
+        src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
+        pingable_ips = src2reachable.values.reduce([]) { |sum,set| sum | set }
 
         non_responsive_hops.each do |hop|
             hop.reachable_from_other_vps = pingable_ips.include? hop.ip

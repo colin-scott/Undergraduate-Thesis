@@ -259,7 +259,7 @@ class Registrar
     #   src -> [pingable dsts]
     # precondition: all srcs and dsts already registered
     def all_pairs_ping(srcs, dsts)
-        Ping::all_pairs_ping(srcs,dsts)
+        return Ping::all_pairs_ping(srcs,dsts,@controller)
     end
 
     # TODO: automatically check if the VP is already registered

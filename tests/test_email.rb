@@ -1,5 +1,4 @@
 #!/homes/network/revtr/ruby/bin/ruby
-$: << File.expand_path("../")
 
 require 'mail'
 require 'base64'

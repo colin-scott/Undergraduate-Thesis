@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
-$: << File.expand_path("../")
 
+require 'drb'
 require 'isolation_module'
 require '../spooftr_config.rb'
 

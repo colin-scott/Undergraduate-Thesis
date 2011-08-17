@@ -1,25 +1,34 @@
 #!/homes/network/revtr/ruby/bin/ruby
 $: << File.expand_path("../")
 
+require 'isolation_module'
+require 'drb'
 require 'failure_dispatcher'
+require 'outage'
+require 'outage_correlation'
+
+require 'utilities'
+Thread.abort_on_exception = true
+$LOG = LoggerLog.new($stderr)
+
 dispatcher = FailureDispatcher.new
 
+hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.clone
+src = hosts.shift
+receivers = hosts[0..5]
+
 if ARGV.empty?
-    srcdst = ["planetlab-node3.it-sudparis.eu", "132.252.152.193"]
-    dispatcher.isolate_outages({ srcdst =>
-               ["pl1.6test.edu.cn", "planetlab2.eecs.umich.edu", "planetlab1.nvlab.org",
-                  "plgmu4.ite.gmu.edu", "deimos.cecalc.ula.ve"]},
-               {srcdst => []}, {srcdst => []}, true)
+    target = "132.252.152.193"
+    srcdst = [src, target]
+    outage = Outage.new(src, target, receivers, [], [])
+    outage_correlation = OutageCorrelation.new(target, [src], receivers)
+    dispatcher.isolate_outages({srcdst => outage},{target => outage_correlation}, true)
 else
     src = ARGV.shift
     dst = ARGV.shift
     srcdst = [src, dst]
-    passed = dispatcher.isolate_outages({ srcdst => (ARGV.empty?) ? ["pl1.6test.edu.cn", "planetlab2.eecs.umich.edu", "planetlab1.nvlab.org",
-                  "plgmu4.ite.gmu.edu", "deimos.cecalc.ula.ve"] :  ARGV.map { |str| str.gsub(/,$/, '')  }},
+    dispatcher.isolate_outages({ srcdst => ARGV.map { |str| str.gsub(/,$/, '')  }},
                                {srcdst => []}, {srcdst => []}, true)
-
-    $stderr.puts "passed?: #{passed}"
 end
 
-$stderr.puts "#{Thread.list.inspect}"
 sleep

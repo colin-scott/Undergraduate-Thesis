@@ -1,5 +1,4 @@
 #!/homes/network/revtr/ruby/bin/ruby
-$: << File.expand_path("../")
 ##!/usr/bin/ruby -w
 require 'drb'
 require 'net/http'
