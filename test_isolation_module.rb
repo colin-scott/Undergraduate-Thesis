@@ -5,6 +5,10 @@ require 'drb'
 require 'failure_dispatcher'
 require 'outage'
 
+require 'utilities'
+Thread.abort_on_exception = true
+$LOG = LoggerLog.new($stderr)
+
 dispatcher = FailureDispatcher.new
 
 hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.clone

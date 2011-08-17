@@ -39,6 +39,7 @@ module HouseCleaning
         end
         
         while current_nodes.size < FailureIsolation::NumActiveNodes
+            raise "no more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
             $stderr.puts "choosing: #{new_vp}"
             current_nodes.add new_vp

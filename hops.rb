@@ -92,6 +92,14 @@ class Path
        return adjacents_removed.uniq.size != adjacents_removed.size
    end
 
+   def ingress_router_to_as(as)
+      for hop in self
+        # is hop.asn is assigned?
+        return hop if hop.asn == as 
+      end
+      return nil
+   end
+
    def to_s
        @hops.inspect
    end
@@ -105,17 +113,25 @@ class Path
    end
 
    def self.share_common_path_prefix?(path1, path2)
-        # trs and spooftrs sometimes differ in length. We look at the common
-        [path1.size, path2.size].min.times do |i|
-           # occasionally spooftr will get *'s where tr doesn't, or vice
-           # versa. Look to make sure the next hop isn't the same
-           if path1[i] != path2[i] and 
-               path1[i] != path2[i+1] and path1[i+1] != path2[i]
-               return false
-           end
-        end
+      # trs and spooftrs sometimes differ in length. We look at the common
+      [path1.size, path2.size].min.times do |i|
+         # occasionally spooftr will get *'s where tr doesn't, or vice
+         # versa. Look to make sure the next hop isn't the same
+         if path1[i] != path2[i] and 
+             path1[i] != path2[i+1] and path1[i+1] != path2[i]
+             return false
+         end
+      end
 
-        return true
+      return true
+   end
+
+   # returns the first hop in path1 that diverges from path2
+   def self.first_point_of_divergence(path1, path2)
+      path1.size.times do |i| 
+          return path1[i] if path1[i] != path2[i]
+      end
+      return nil
    end
 end
 
@@ -318,6 +334,17 @@ class ForwardPath < Path
    def valid?()
       return @hops.size > 1 || (@hops.size == 1 && !@hops[0].is_a?(MockHop))
    end
+end
+
+class SplicedPath
+    attr_accessor :src, :dst, :ingress, :trace, :revtr
+    def initialize(src, dst, ingress, trace, revtr)
+        @src = src
+        @dst = dst
+        @ingress = ingress
+        @trace = trace
+        @revtr = revtr
+    end
 end
 
 # =============================================================================

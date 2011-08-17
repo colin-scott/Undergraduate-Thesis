@@ -5,6 +5,7 @@ require 'isolation_probe_status'
 require 'set'
 require 'yaml'
 require 'outage'
+require 'outage_correlation'
 
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
@@ -70,7 +71,7 @@ class FailureMonitor
 
         # so that we don't probe the hell out of failed routers
         # target -> time
-        @nodetarget2lastisolationattempt = {}
+        @target2lastisolationattempt = {}
         # minimum time in between successive isolation measurements sent from
         # a source to a destination
         @@isolation_interval = 30 # we isolate at most every 6*10.33 =~ 60 minutes
@@ -104,9 +105,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2outage = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2outage, dst2outage_correlation = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(srcdst2outage)
+            @dispatcher.isolate_outages(srcdst2outage, dst2outage_correlation)
 
             $LOG.puts "round #{@current_round} completed"
             $stderr.flush
@@ -287,17 +288,17 @@ class FailureMonitor
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
+        dst2outage_correlation =  {}
 
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-           # Boy... this is a mess.
-           if target2stillconnected[target].size >= @@vp_bound and
-                  observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and
-                  observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and
-                  !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and
-                  !observingnode2rounds.empty?
 
+            if target2stillconnected[target].size >= @@vp_bound and  # (at least one VP has connectivity)
+                # observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and # (don't issue from nodes that just started seeing the outage)
+                # observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and # (don't issue from nodes that have been experiencing the outage for a very long time)
+                !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and # at least one connected host has been consistently connected for at least 4 rounds
+                !observingnode2rounds.empty? # at least one observing node remains
 
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
@@ -305,21 +306,22 @@ class FailureMonitor
               formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
               formatted_never_seen = target2neverseen[target]
 
-              # don't issue isolation measurements for nodes which have
-              # already issued measuremnt for this target in the last
-              # @@isolation_interval rounds
-              observingnode2rounds.delete_if { |node, rounds| @nodetarget2lastisolationattempt.include?([node,target]) and 
-                  (@current_round - @nodetarget2lastisolationattempt[[node,target]] <= @@isolation_interval) }
+              # don't issue isolation measurements for targets which have
+              # already been probed recently
+              next if @target2lastisolationattempt.include? target and (@current_round - @target2lastisolationattempt[target] <= @@isolation_interval)
+
+              @target2lastisolationattempt[target] = @current_round
+
+              dst2outage_correlation[target] = OutageCorrelation.new(target, observingnode2rounds.keys, target2stillconnected[target])
 
               observingnode2rounds.keys.each do |src|
-                 @nodetarget2lastisolationattempt[[src,target]] = @current_round
                  # XXX Multiplex on Symmetry here?
                  srcdst2outage[[src,target]] = Outage.new(src, target, formatted_connected, formatted_unconnected, formatted_never_seen)
               end
            end
         end
 
-        srcdst2outage
+        [srcdst2outage, dst2outage_correlation]
     end
 
     def log_outage_detected(*args)

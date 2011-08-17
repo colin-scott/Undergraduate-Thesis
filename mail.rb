@@ -99,8 +99,8 @@ class Emailer < ActionMailer::Base
     end
 
     def isolation_results(outage, testing=false)
-        subject     (outage.symmetric) ? "Ground Truth Isolation Results #{src} #{dst}" \
-                                       : "Isolation Results #{src} #{dst}"
+        subject     (outage.symmetric) ? "Ground Truth Isolation Results #{outage.src} #{outage.dst}" \
+                                       : "Isolation Results #{outage.src} #{outage.dst}"
         
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"

@@ -162,7 +162,7 @@ class Registrar
          end
         host=vp.hostname
         $LOG.puts("Measuring reverse traceroute from #{dsts.join(",")} back to #{host}")    
-         reached, failed, reached_trivial, dst_not_reachable =reverse_traceroute(dsts.collect{|dst| [host,dst]},"/tmp",backoff_endhost)
+        reached, failed, reached_trivial, dst_not_reachable =reverse_traceroute(dsts.collect{|dst| [host,dst]},"/tmp",backoff_endhost)
  
         results={}
         all_reached=[]
@@ -214,7 +214,6 @@ class Registrar
     # This is only temporary so that we can play around with outages by hand before
     # we build the full blown system
     def receive_all_spoofed_pings(source, dests, already_registered=false)
-
         receive_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
     end
 
@@ -238,7 +237,6 @@ class Registrar
     end
 
     def ping(source, dests, already_registered=false)
-
         # reduuundanttt
         if !already_registered
            register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
@@ -255,6 +253,13 @@ class Registrar
         end
 
         results
+    end
+
+    # returns hash
+    #   src -> [pingable dsts]
+    # precondition: all srcs and dsts already registered
+    def all_pairs_ping(srcs, dsts)
+        Ping::all_pairs_ping(srcs,dsts)
     end
 
     # TODO: automatically check if the VP is already registered
@@ -1319,8 +1324,10 @@ optparse.parse!
 
 require options[:config]
 
-$LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
-$LOG.level = Logger::INFO
+if $0 =~ /controller.rb/
+    $LOG = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+    $LOG.level = Logger::INFO
+end
 
 require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
