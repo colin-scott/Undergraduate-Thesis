@@ -52,6 +52,8 @@ class FailureDispatcher
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)
 
+        @dot_generator = DotGenerator.new(@logger)
+
         Thread.new do
             loop do
                 @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
@@ -344,7 +346,7 @@ class FailureDispatcher
         # TODO: put this into its own function
         jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
 
-        Dot::generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
+        @dot_generator.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
                              historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
 
         jpg_output

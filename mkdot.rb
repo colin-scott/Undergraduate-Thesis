@@ -17,25 +17,30 @@ require 'hops'
 require 'set'
 require 'ip_info'
 require 'resolv'
+require 'utilities'
 
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
-module Dot
-    Dot::Colors = ["aquamarine",  "blue", "blueviolet", "brown", "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "crimson", "cyan", "darkgoldenrod1", "darkgreen", 
+class DotGenerator
+    def initialize(logger = LoggerLog.new($stderr))
+        @logger = logger
+    end
+
+    DotGenerator::Colors = ["aquamarine",  "blue", "blueviolet", "brown", "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "crimson", "cyan", "darkgoldenrod1", "darkgreen", 
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
-    def self.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces,
+    def generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces,
                          upstream_reverse_paths, output)
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
-        self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, dot_output)
+        create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
         # locally rather than pushing the bits across the wire
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
-    def self.create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, output)
+    def create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, output)
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
         oooo_marker = "a" # FUUCKKK. this is ugly 
@@ -146,15 +151,15 @@ module Dot
 
     private
 
-    def self.assign_colors!(node2asn, node_attributes)
+    def assign_colors!(node2asn, node_attributes)
         all_ases = node2asn.values.uniq
         asn2color = {}
         i = 0
         all_ases.each do |asn|
            next if asn.nil?     # nil asn's get assigned to black by default
-           asn2color[asn] = Dot::Colors[i] 
+           asn2color[asn] = DotGenerator::Colors[i] 
            i += 1
-           raise "too many asns!" if i >= Dot::Colors.size
+           raise "too many asns!" if i >= DotGenerator::Colors.size
         end
 
         node2asn.each do |node, asn|
@@ -162,7 +167,7 @@ module Dot
         end
     end
     
-    def self.add_path(path, type, node2names, node2pingable, node2historicallypingable,
+    def add_path(path, type, node2names, node2pingable, node2historicallypingable,
                      node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
                      node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         return if !path.valid?
@@ -183,7 +188,7 @@ module Dot
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
 
-          $LOG.puts "add_path(), hop doesn't have reachable_from_other_vps: #{hop}, #{path}" unless hop.methods.include? "reachable_from_other_vps"
+          @logger.puts "add_path(), hop doesn't have reachable_from_other_vps: #{hop}, #{path}" unless hop.methods.include? "reachable_from_other_vps"
           node2othervpscanreach[current] ||= hop.reachable_from_other_vps
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability
@@ -226,7 +231,7 @@ module Dot
     
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
-    def self.output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
+    def output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
@@ -348,7 +353,8 @@ if $0 == __FILE__
 #        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
 
     require 'log_iterator' 
+    d = DotGenerator.new
     LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/plgmu4.ite.gmu.edu_77.221.192.1_2011224142939.bin") do |outage|
-       Dot::generate_jpg(outage.src, outage.dst, outage.direction, outage.dataset, outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr, "testing.jpg")
+       d.generate_jpg(outage.src, outage.dst, outage.direction, outage.dataset, outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr, "testing.jpg")
     end
 end
