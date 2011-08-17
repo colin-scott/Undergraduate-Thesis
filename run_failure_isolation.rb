@@ -10,11 +10,8 @@
 require 'file_lock'
 Lock::acquire_lock("isolation_lock.txt")
 
-# TODO: These should be partitioned into the inidividual classes,
+# TODO: These dependancies  should be partitioned into the inidividual classes,
 # but I don't have time to deal with it...
-require 'utilities'
-$LOG=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
-$LOG.level = Logger::INFO
 
 require 'isolation_module'
 require 'drb'
@@ -41,9 +38,11 @@ $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to
 Thread.abort_on_exception = true
 
 begin
-   db = DatabaseInterface.new
-   dispatcher = FailureDispatcher.new(db)
-   monitor = FailureMonitor.new(dispatcher, db)
+   logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
+   logger.level = Logger::INFO
+   db = DatabaseInterface.new(logger)
+   dispatcher = FailureDispatcher.new(db, logger)
+   monitor = FailureMonitor.new(dispatcher, db, logger) 
 
    Signal.trap("TERM") { monitor.persist_state; exit }
    Signal.trap("KILL") { monitor.persist_state; exit }
@@ -59,8 +58,8 @@ begin
        load 'failure_dispatcher.rb'
        load 'failure_monitor.rb'
 
-       dispatcher = FailureDispatcher.new(db)
-       monitor = FailureMonitor.new(dispatcher, db)
+       dispatcher = FailureDispatcher.new(db, logger)
+       monitor = FailureMonitor.new(dispatcher, db, logger)
        monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
    end
 
@@ -69,12 +68,12 @@ begin
    end
 
    Signal.trap("ALRM") do
-     fork do
-       ObjectSpace.each_object(Thread) do |th|
-         th.raise Exception, "Stack Dump" unless Thread.current == th
-       end
-       raise Exception, "Stack Dump"
-     end
+     #fork do
+     #  ObjectSpace.each_object(Thread) do |th|
+     #    th.raise Exception, "Stack Dump" unless Thread.current == th
+     #  end
+     #  raise Exception, "Stack Dump"
+     #end
    end
 
    monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)

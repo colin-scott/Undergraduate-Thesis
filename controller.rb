@@ -41,11 +41,9 @@ $ZOOTER_IP="128.208.2.159"
 
 class SockTimeout < Timeout::Error
     def initialize(extended_msg="timed out")
-
         @extended_msg=extended_msg
     end
     def to_s
-
         super + ":#{@extended_msg}"
     end
 end
@@ -54,12 +52,10 @@ end
 class VPError < RuntimeError
     attr :hostname
     def initialize(hostname,msg=nil)
-
         @hostname = hostname
         super(msg)
     end
     def to_s
-
         super + ":" + hostname
     end
 end
@@ -73,7 +69,6 @@ class BadPingError < VPError
     # although this says ping, the ping method actually returns an array, so
     # this will be an array
     def initialize(hostname,ping,msg=nil)
-
         @ping=ping
         super(hostname,msg)
     end
@@ -101,7 +96,6 @@ end
 
 class Registrar
     def initialize(controller)
-        
         @controller=controller
     end
 
@@ -132,14 +126,13 @@ class Registrar
     end
 
     def garbage_collect()
-
         GC.start
     end
 
     # vp can either be a string or a Prober object (via DRb)
      def client_reverse_traceroute(vp,dsts,backoff_endhost=true)
 
-        $LOG.puts("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
+        @controller.log("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
         pings=[]
         uri= (vp.is_a?(String) ? vp : vp.uri)
         #         begin
@@ -147,13 +140,13 @@ class Registrar
         #                 pings=vp.ping([$ZOOTER_IP]).split("\n")
         #                 raise EmptyPingError.new(host, "Test ping to #{$ZOOTER_IP} came back empty.  Aborting reverse traceroute.") if pings.nil? or pings.length==0
         #                 if (pings.length==1 and pings[0].split(" ")[0]==$ZOOTER_IP)
-        #                     $LOG.puts("Successful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}")
+        #                     @controller.log("Successful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}")
         #                 else
         #                     raise BadPingError.new(host,pings, "Test ping to #{$ZOOTER_IP} failed.  Aborting reverse traceroute.")
         #                 end
         #             }
         #         rescue
-        #             $LOG.puts("Unsuccessful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}.  FAILING!\n#{$!.class}: #{$!.to_s}")
+        #             @controller.log("Unsuccessful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}.  FAILING!\n#{$!.class}: #{$!.to_s}")
         #             raise RuntimeError.new("#{$!.class}: #{$!.to_s}")
         #         end
         result=@controller.register_vp(vp,1)
@@ -161,7 +154,7 @@ class Registrar
              raise result
          end
         host=vp.hostname
-        $LOG.puts("Measuring reverse traceroute from #{dsts.join(",")} back to #{host}")    
+        @controller.log("Measuring reverse traceroute from #{dsts.join(",")} back to #{host}")    
         reached, failed, reached_trivial, dst_not_reachable =reverse_traceroute(dsts.collect{|dst| [host,dst]},"/tmp",backoff_endhost)
  
         results={}
@@ -184,7 +177,7 @@ class Registrar
                  @controller.unregister_host(host)
              end
          rescue
-            $LOG.puts "Unable to unregister #{vp}: #{$!}"
+            @controller.log "Unable to unregister #{vp}: #{$!}"
          end
         return results
     end
@@ -248,7 +241,7 @@ class Registrar
         begin
            unregister(source) unless already_registered
         rescue
-           $LOG.puts "Unable to unregister #{source}: #{$!}"
+           @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
 
@@ -276,7 +269,7 @@ class Registrar
         begin
            unregister(source) unless already_registered
         rescue
-           $LOG.puts "Unable to unregister #{source}: #{$!}"
+           @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
 
@@ -303,7 +296,7 @@ class Registrar
         begin
            unregister(source) unless already_registered
         rescue
-           $LOG.puts "Unable to unregister #{source}: #{$!}"
+           @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
          
@@ -367,23 +360,23 @@ class Controller
     end
 
     def set_max_alert_level(newlevel)
-
         @controller_log.set_max_alert_level(newlevel)
         @controller_log.puts "Changing alert level from " + @controller_log.max_alert.to_s + " to " + newlevel.to_s
     end
 
-    # is this used, or is $LOG.puts used?
-    def log(msg, level=3)
-
+    # is this used, or is $LOG log used?
+    def log(msg=nil, level=3)
+        return @controller_log unless msg # hack -- allow clients to set log level, call log.debug, etc. 
         @controller_log.puts(msg, level)
     end
 
     # if test_controller is true, won't do things like dump VPs
-    def initialize(test_controller,configfn,vpfn=nil)
-
+    def initialize(test_controller,configfn,log_level,vpfn=nil)
         @test=test_controller
         @configfn=configfn
-        @controller_log=$stderr
+        @controller_log=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+        @controller_log.level = log_level
+
         acl=ACL.new(%w[deny all
                     allow *.cs.washington.edu
                     allow localhost
@@ -399,7 +392,7 @@ class Controller
         ProbeController::set_server(:controller,self)
         @ulimit=`ulimit -n;`.chomp("\n").to_i
         if not vpfn.nil?
-            $LOG.puts("loading VPs from #{vpfn}")
+            log("loading VPs from #{vpfn}")
             File.open(vpfn, "r"){|f|
                 f.each_line{|vp|
                     Thread.new(vp){|my_vp| self.register(*(my_vp.chomp("\n").split(" ")))}
@@ -458,7 +451,7 @@ class Controller
         results.each{|vp|
              uphosts <<  ($rename_vp.has_key?(vp.at(0)) ? $rename_vp[vp.at(0)] : vp.at(0))
             if vp.at(0) != vp.at(1)
-                $LOG.puts "check_up_hosts(): vp.at(0) != vp.at(1):  #{vp.join(" ")}"
+                log "check_up_hosts(): vp.at(0) != vp.at(1):  #{vp.join(" ")}"
             end
         }
 #         if prune
@@ -492,7 +485,7 @@ class Controller
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
 
         if vp.nil?
-            $LOG.puts("no matching vp for #{hostname}")
+            log("no matching vp for #{hostname}")
             raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
         end
         return vp
@@ -522,7 +515,7 @@ class Controller
         uri=@vp_lock.synchronize{@hostname2uri[hostname.downcase]}
 
         if uri.nil?
-            $LOG.puts("no matching vp for #{hostname}")
+            log("no matching vp for #{hostname}")
             raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
         end
         return uri
@@ -538,17 +531,17 @@ class Controller
     def shutdown(code=7)
 
         begin
-            $LOG.puts("Exiting controller: Received shutdown message #{code}")
+            log("Exiting controller: Received shutdown message #{code}")
             fn=""
             if (not vp_count==0) and (not @test)
                 `mkdir -p #{$DATADIR}/vp_dumps`
                 curr_date=Time.new.strftime("%Y.%m.%d.%H%M.%S")
                 fn="#{$DATADIR}/vp_dumps/vp_dump.#{curr_date}"
-                $LOG.puts "Dumping current VPs to #{fn}"
+                log "Dumping current VPs to #{fn}"
                 self.dump_vps(fn)
             end
             if code==$UPGRADE_RESTART
-                $LOG.puts "Restarting with #{@configfn} #{fn}"
+                log "Restarting with #{@configfn} #{fn}"
                 #Kernel::system("echo \"ulimit -n 100000; ulimit -n > timestamp/reverse_traceroute/data/ulimit_n.txt; sleep 5; ./controller.rb #{@configfn} #{fn} 1>> #{$stderr_FILE} 2>&1 \"|at now")
                 is_test= (@test ? "-t":"")
                 Kernel::system("echo \" ulimit -n 100000; ./controller.rb #{is_test} -c #{@configfn} -v #{fn} 1>> #{$stderr_FILE} 2>&1 \"| at now")
@@ -557,7 +550,7 @@ class Controller
             # sleep to make sure at least one controller is up at all times, to
             # avoid triggering the cronjob
         rescue
-            $LOG.puts "Exception shutting down #{$!.class} #{$!}"
+            log "Exception shutting down #{$!.class} #{$!}"
         ensure
         # need to thread out, so that we return the DRb call before shutting
         # down
@@ -589,9 +582,9 @@ class Controller
             end
         end
         if unregistered
-            $LOG.puts("Unregistered #{hostname}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
+            log("Unregistered #{hostname}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
         else
-            $LOG.puts("Not unregistering #{hostname}: given URI #{uri} does not match stored one #{@hostname2uri[hostname]}")
+            log("Not unregistering #{hostname}: given URI #{uri} does not match stored one #{@hostname2uri[hostname]}")
         end
     end
 
@@ -654,12 +647,12 @@ class Controller
         begin
             uri,hostname=Controller::rename_uri_and_host(uri,hostname)
         rescue
-            $LOG.puts("Unable to rename #{hostname} as #{uri}: #{$!}")
+            log("Unable to rename #{hostname} as #{uri}: #{$!}")
             return $!
         end
 
         if ( self.ulimit - open_fds < vp_count )
-            $LOG.puts("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
+            log("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
             return
         end
 
@@ -682,13 +675,13 @@ class Controller
                     @hostname2vp[hostname]=new_vp
                     @hostname2uri[hostname]=uri
                 end
-                $LOG.puts("Registered #{hostname} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
+                log("Registered #{hostname} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
                 return nil
             end
-            $LOG.puts("Unsuccessful register #{hostname} as #{uri}, retrying: #{except}")
+            log("Unsuccessful register #{hostname} as #{uri}, retrying: #{except}")
             wait= (wait==0)? 10 : wait*10
         end
-        $LOG.puts("Unable to register #{hostname} as #{uri}: #{except}")
+        log("Unable to register #{hostname} as #{uri}: #{except}")
         return except
     end
 
@@ -696,7 +689,7 @@ class Controller
 
         open_fds=lsof.length
         if ( self.ulimit - open_fds < vp_count )
-            $LOG.puts("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
+            log("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
             return
         end
         hostname=vp.hostname
@@ -712,13 +705,13 @@ class Controller
                     @hostname2vp[hostname]=vp
                     @hostname2uri[hostname]=uri.downcase
                 end
-                $LOG.puts("Registered #{hostname} directly #{vp} at #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
+                log("Registered #{hostname} directly #{vp} at #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
                 return nil
             end
-            $LOG.puts("Unsuccessful register #{hostname} directly #{vp} at #{uri}, retrying: #{except}")
+            log("Unsuccessful register #{hostname} directly #{vp} at #{uri}, retrying: #{except}")
             wait= (wait==0)? 10 : wait*10
         end
-        $LOG.puts("Unable to register #{hostname} directly #{vp} at #{uri}: #{except}")
+        log("Unable to register #{hostname} directly #{vp} at #{uri}: #{except}")
         return except
     end
 
@@ -740,12 +733,12 @@ class Controller
         Thread.new(hostname,exception){|my_hostname,except|
             @quarantine_lock.synchronize do
                 if @under_quarantine.include?(my_hostname)
-                    $LOG.puts("Quarantine in effect for #{my_hostname} for #{except}")
+                    log("Quarantine in effect for #{my_hostname} for #{except}")
                     return 
                 end
                 @under_quarantine[my_hostname] = true
             end
-            $LOG.puts("Quarantining #{my_hostname} for #{except}:\n#{except.backtrace.join("\n")}")
+            log("Quarantining #{my_hostname} for #{except}:\n#{except.backtrace.join("\n")}")
             reg_return=nil
             begin
                 uri=get_uri(my_hostname)
@@ -762,10 +755,10 @@ class Controller
             end
             if reg_return
                 qf=QuarantineFailure.new(my_hostname,except,reg_return)
-                $LOG.puts(["Quarantining #{my_hostname} unsuccessful: #{except.class}", "EXCEPTION!  for #{my_hostname}:\n#{qf.to_s}\n#{qf.original_exception.backtrace.join("\n")}\n\nTest ping failure:\n#{qf.quarantine_exception.backtrace.join("\n")}"], [EMAIL,maxalert].max)
+                log(["Quarantining #{my_hostname} unsuccessful: #{except.class}", "EXCEPTION!  for #{my_hostname}:\n#{qf.to_s}\n#{qf.original_exception.backtrace.join("\n")}\n\nTest ping failure:\n#{qf.quarantine_exception.backtrace.join("\n")}"], [EMAIL,maxalert].max)
                 return qf
             else
-                $LOG.puts("Quarantining #{my_hostname} successful")
+                log("Quarantining #{my_hostname} successful")
                 return nil
             end
         }
@@ -805,7 +798,7 @@ class Controller
             }
         end
         threads.each { |t|  
-            $LOG.puts("waiting for #{t[:host]}")
+            log("waiting for #{t[:host]}")
             t.join 
             if t[:success]
                 results << [t[:results],t[:host]]
@@ -820,7 +813,7 @@ class Controller
     # upgrade them
     def upgrade_vps(hosts=nil)
 
-        $LOG.puts("Upgrading vps")
+        log("Upgrading vps")
         if hosts
             if hosts.is_a?(Array)
                 hosts=hosts.to_h(true)
@@ -833,19 +826,19 @@ class Controller
 
     def ping_from_all(targets,retry_failed=false)
 
-        $LOG.puts("Pinging #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
+        log("Pinging #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_ping_timeout(targets.length),retry_failed){|vp| vp.ping(targets)}
     end
 
     def traceroute_from_all(targets,retry_failed=false)
 
-        $LOG.puts("Traceroute #{targets.length} from all.  Timeout=#{Controller::calculate_traceroute_timeout(targets.length)}")
+        log("Traceroute #{targets.length} from all.  Timeout=#{Controller::calculate_traceroute_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_traceroute_timeout(targets.length),retry_failed){|vp| vp.traceroute(targets)}
     end
 
     def ts_from_all(targets,retry_failed=false)
 
-        $LOG.puts("Timestamp #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
+        log("Timestamp #{targets.length} from all.  Timeout=#{Controller::calculate_ping_timeout(targets.length)}")
         probe_from_all_w_opt_retry(Controller::calculate_ping_timeout(targets.length),retry_failed){|vp| vp.ts(targets)}
     end
 
@@ -896,29 +889,29 @@ class Controller
 #                 rescue UnknownVPError
 #                     # sleep and retry?  quarantine on its own won't do
 #                     # anything, since it requires the URI
-#                     $LOG.puts(["Unknown VP #{my_hostname}", "EXCEPTION! issue_command_on_hosts unknown host #{my_hostname}, " + $!.to_s], [$UNKNOWN_VP_ERROR,maxalert].max)
+#                     log(["Unknown VP #{my_hostname}", "EXCEPTION! issue_command_on_hosts unknown host #{my_hostname}, " + $!.to_s], [$UNKNOWN_VP_ERROR,maxalert].max)
 #                 rescue SockTimeout
 #                     # quarantine since it already took a lot of time?
-#                     $LOG.puts(["RPC Timeout at #{my_hostname}", "EXCEPTION! RPC to vp timeout " + $!.to_s], [$SOCK_TIMEOUT_ERROR,maxalert].max)
+#                     log(["RPC Timeout at #{my_hostname}", "EXCEPTION! RPC to vp timeout " + $!.to_s], [$SOCK_TIMEOUT_ERROR,maxalert].max)
 #                 rescue DRb::DRbConnError
 #                     # retry most likely to work here?
-#                     $LOG.puts(["#{my_hostname} refused connection", "EXCEPTION! #{my_hostname} refused connection: " + $!.to_s], [$DRB_CONNECT_ERROR,maxalert].max)
+#                     log(["#{my_hostname} refused connection", "EXCEPTION! #{my_hostname} refused connection: " + $!.to_s], [$DRB_CONNECT_ERROR,maxalert].max)
 #                     self.unregister_host(my_hostname)
 #                 rescue SystemCallError
 #                     # retry probably unlikely to work here?
-#                     $LOG.puts(["System call error at #{my_hostname}", "EXCEPTION VP SystemCallError::Error issue_command_on_hosts #{my_hostname} " +$!.to_s], [$VP_SYSCALL_ERROR,maxalert].max)
-#                     $LOG.puts($!.backtrace.join("\n"))
+#                     log(["System call error at #{my_hostname}", "EXCEPTION VP SystemCallError::Error issue_command_on_hosts #{my_hostname} " +$!.to_s], [$VP_SYSCALL_ERROR,maxalert].max)
+#                     log($!.backtrace.join("\n"))
 #                 rescue Timeout::Error
-#                     $LOG.puts(["Unexpected timeout from #{my_hostname}", "EXCEPTION Unexpected Timeout::Error issue_command_on_hosts " + $!.to_s], [$TIMEOUT_ERROR,maxalert].max)
-#                     $LOG.puts($!.backtrace.join("\n"))
+#                     log(["Unexpected timeout from #{my_hostname}", "EXCEPTION Unexpected Timeout::Error issue_command_on_hosts " + $!.to_s], [$TIMEOUT_ERROR,maxalert].max)
+#                     log($!.backtrace.join("\n"))
 #                 rescue 
-#                     $LOG.puts(["Unhandled exception from #{my_hostname}", "EXCEPTION! #{my_hostname} threw a probing error #{$!.class}: " + $!.to_s], [$GENERAL_ERROR,maxalert].max)
+#                     log(["Unhandled exception from #{my_hostname}", "EXCEPTION! #{my_hostname} threw a probing error #{$!.class}: " + $!.to_s], [$GENERAL_ERROR,maxalert].max)
 #                 end
         
             }
         }
         threads.each { |t|  
-            $LOG.puts("waiting for #{t[:host]}")
+            log("waiting for #{t[:host]}")
             t.join
             if t[:success]
                  results << [t[:results],t[:host]]
@@ -951,7 +944,7 @@ class Controller
         if not settings.include?(:timeout)
             settings[:timeout]=Controller::calculate_ping_timeout(max_length)
         end
-        $LOG.puts("Ping up to #{max_length}.  Timeout=#{settings[:timeout]}")
+        log("Ping up to #{max_length}.  Timeout=#{settings[:timeout]}")
         return issue_command_on_hosts(hostname2targets,settings){|vp,targets| vp.ping(targets)} << privates << blacklisted
     end
 
@@ -968,7 +961,7 @@ class Controller
         if not settings.include?(:timeout)
             settings[:timeout]=Controller::calculate_traceroute_timeout(max_length)
         end
-        $LOG.puts("Traceroute up to #{max_length}.  Timeout=#{settings[:timeout]}")
+        log("Traceroute up to #{max_length}.  Timeout=#{settings[:timeout]}")
         return issue_command_on_hosts(hostname2targets,settings){|vp,targets| vp.traceroute(targets)} << privates << blacklisted
     end
 
@@ -985,7 +978,7 @@ class Controller
         if not settings.include?(:timeout)
             settings[:timeout]=Controller::calculate_ping_timeout(max_length)
         end
-        $LOG.puts("RecordRoute up to #{max_length}.  Timeout=#{settings[:timeout]}")
+        log("RecordRoute up to #{max_length}.  Timeout=#{settings[:timeout]}")
         return issue_command_on_hosts(hostname2targets,settings){|vp,targets| vp.rr(targets)} << privates << blacklisted
     end
 
@@ -1002,7 +995,7 @@ class Controller
         if not settings.include?(:timeout)
             settings[:timeout]=Controller::calculate_ping_timeout(max_length)
         end
-        $LOG.puts("Timestamp up to #{max_length}.  Timeout=#{settings[:timeout]}")
+        log("Timestamp up to #{max_length}.  Timeout=#{settings[:timeout]}")
         return issue_command_on_hosts(hostname2targets,settings){|vp,targets| vp.ts(targets)} << privates << blacklisted
     end
 
@@ -1040,7 +1033,7 @@ class Controller
                 curr_receivers.each{|r|
                     h[r]=receiver2spoofer2targets[r]
                 }
-                $LOG.puts("Receivers are #{curr_receivers.join(" ")}")
+                log("Receivers are #{curr_receivers.join(" ")}")
                 res,uns, pri,bla=spoof_and_receive_probes(h, settings){|x| x}
                 results += res
                 unsuccessful_receivers += uns
@@ -1092,9 +1085,9 @@ class Controller
             }
             spoofer2targets.delete_if {|spoofer,targets| targets.empty?}
         }
-        $LOG.puts "spoof_and_receive_probes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
+        log "spoof_and_receive_probes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
         for receiver in receiver2spoofer2targets.keys
-            $LOG.puts("receiver is " + receiver + " total targs " + receiver2spoofer2targets[receiver].values.collect{|requests| probe_requests_to_destinations.call(requests)}.flatten.length.to_s + " total spoofers " + receiver2spoofer2targets[receiver].length.to_s)
+            log("receiver is " + receiver + " total targs " + receiver2spoofer2targets[receiver].values.collect{|requests| probe_requests_to_destinations.call(requests)}.flatten.length.to_s + " total spoofers " + receiver2spoofer2targets[receiver].length.to_s)
             receiver_threads << Thread.new(receiver,settings[:retry]) { |my_receiver_name,my_retry_command|
                 begin # exception block for the receiver thread
                     total_targets=receiver2spoofer2targets[my_receiver_name].values.collect{|requests| probe_requests_to_destinations.call(requests)}.flatten.length.to_s
@@ -1121,21 +1114,21 @@ class Controller
                     holes_to_punch=[]
                     probes_to_send=Hash.new { |hash, key| hash[key] = [] } 
                     spoofer_count=0
-                    $LOG.puts("Before each_pair: #{my_receiver_name} #{receiver2spoofer2targets.inspect}")
+                    log("Before each_pair: #{my_receiver_name} #{receiver2spoofer2targets.inspect}")
                     receiver2spoofer2targets[my_receiver_name].each_pair{|spoofer,targets|
-                        $LOG.puts("Before while loop: #{my_receiver_name} spoofer #{spoofer} targets #{targets.inspect}")
+                        log("Before while loop: #{my_receiver_name} spoofer #{spoofer} targets #{targets.inspect}")
                         spoofer_count += 1
                         while targets.length>0
-                            $LOG.puts("top of targets.length loop: spoofer for #{my_receiver_name} is " + spoofer + " #{targets.length} " + probe_requests_to_destinations.call(targets).join(","))
+                            log("top of targets.length loop: spoofer for #{my_receiver_name} is " + spoofer + " #{targets.length} " + probe_requests_to_destinations.call(targets).join(","))
                             if (holes_to_punch.length + targets.length >= $MAX_HOLES) or (spoofer_count==receiver2spoofer2targets[my_receiver_name].keys.length)
                                 num_to_take=[$MAX_HOLES-holes_to_punch.length,targets.length].min
                                 init_length=holes_to_punch.length
                                 probes_to_send[spoofer] += targets[0...num_to_take]
                                 holes_to_punch += probe_requests_to_destinations.call(targets[0...num_to_take])
                                 targets[0...num_to_take]=[]
-                                $LOG.puts("before send probes: spoofer for #{my_receiver_name} is " + spoofer + " down to #{targets.length} " )
+                                log("before send probes: spoofer for #{my_receiver_name} is " + spoofer + " down to #{targets.length} " )
                                 # send probes
-                                $LOG.puts(my_receiver_name + " punching holes " + holes_to_punch.join(" "))
+                                log(my_receiver_name + " punching holes " + holes_to_punch.join(" "))
                                 begin 
                                     receiver_timeout=Controller::calculate_ping_timeout(holes_to_punch.length)
                                     Timeout::timeout(receiver_timeout, SockTimeout.new("#{my_receiver_name} timed out after #{receiver_timeout} punching #{holes_to_punch.length} holes")) {
@@ -1150,7 +1143,7 @@ class Controller
                                         sleep 2
                                         retry
                                     else
-                                        $LOG.puts(["#{my_receiver_name} timed out punching holes", "EXCEPTION! " + $!.to_s], $SOCK_TIMEOUT_ERROR)
+                                        log(["#{my_receiver_name} timed out punching holes", "EXCEPTION! " + $!.to_s], $SOCK_TIMEOUT_ERROR)
                                     end
                                 rescue
                                     if my_retry_command
@@ -1175,7 +1168,7 @@ class Controller
 
                                             # may raise UnknownVPError
                                             my_spoofer=self.get_vp(my_spoofer_name)
-                                            $LOG.puts("spoofing as #{my_receiver_name} from #{my_spoofer_name}: #{probes_to_send[my_spoofer_name].length} #{probe_requests_to_destinations.call(probes_to_send[my_spoofer_name]).join(" ")}")
+                                            log("spoofing as #{my_receiver_name} from #{my_spoofer_name}: #{probes_to_send[my_spoofer_name].length} #{probe_requests_to_destinations.call(probes_to_send[my_spoofer_name]).join(" ")}")
                                                     
                                             Timeout::timeout(spoofer_timeout, SockTimeout.new("#{my_spoofer_name} timed out after #{spoofer_timeout} spoofing #{probes_to_send[my_spoofer_name].length} probes as #{my_receiver_name}")){
                                                 case settings[:probe_type]
@@ -1191,7 +1184,7 @@ class Controller
                                             if settings.include?(:backtrace)
                                                 $!.set_backtrace($!.backtrace + settings[:backtrace])
                                             end
-                                            $LOG.puts "Spoofer error"
+                                            log "Spoofer error"
                                             quarantine(my_spoofer_name,( settings.include?(:maxalert) ? settings[:maxalert] : TEXT ),$!)
                                          end # exception block for spoofer thread 
                                     }
@@ -1199,10 +1192,10 @@ class Controller
 # need to make sure the other threads all end (w timeouts if nothing else) to
 # make sure join returns
                                 spoofer_threads.each{|t|
-                                    $LOG.puts("Waiting for spoofer #{t[:host]}")
+                                    log("Waiting for spoofer #{t[:host]}")
                                     t.join
                                 }
-                                $LOG.puts("bottom of targets.length loop: spoofer for #{my_receiver_name} was " + spoofer + " down to #{targets.length} " )
+                                log("bottom of targets.length loop: spoofer for #{my_receiver_name} was " + spoofer + " down to #{targets.length} " )
                                 holes_to_punch=[]
                                 probes_to_send.clear
                             else # ^--  if $MAX_HOLES_TO_PUNCH or spoofer_count == # spoofers
@@ -1219,7 +1212,7 @@ class Controller
                     fetch_timeout= 20 + (total_targets.to_f/100.0).round
                     Timeout::timeout(fetch_timeout, SockTimeout.new("#{my_receiver_name} timed out after #{fetch_timeout} trying to kill and retrieve #{fid}")) {
                         probes=my_receiver.kill_and_retrieve(fid)
-                        $LOG.puts("Saving results for " + my_receiver_name)
+                        log("Saving results for " + my_receiver_name)
                         Thread.current[:results]=probes
                         Thread.current[:success]=true
                     }
@@ -1238,12 +1231,12 @@ class Controller
             } # receiver_threads << Thread.new
         end # for receiver in 
         receiver_threads.each{|rt|
-            $LOG.puts("Waiting for receiver #{rt[:receiver]}")
+            log("Waiting for receiver #{rt[:receiver]}")
 # need to make sure the other threads all end (w timeouts if nothing else) to
 # make sure join returns
             rt.join
             if rt[:success]
-                $LOG.puts("Adding results for #{rt[:receiver]}")
+                log("Adding results for #{rt[:receiver]}")
                 results << [rt[:results],rt[:receiver]]
             else
                 unsuccessful_receivers << rt[:receiver]
@@ -1296,7 +1289,6 @@ optparse = OptionParser.new do |opts|
           options[:config] = f
     end
     opts.on( '-h', '--help', 'Display this screen' ) do
-
         puts opts
         exit
     end
@@ -1311,7 +1303,11 @@ optparse = OptionParser.new do |opts|
     options[:vp_uri_list] = nil
     opts.on( '-v', '--vps [FILE]', "VP uri list [FILE] (default=nil)" ) do|f|
         $LOG.puts "setting vp uri list to #{f}"
-          options[:vp_uri_list] = f
+        options[:vp_uri_list] = f
+    end
+    options[:log_level] = Logger::INFO
+    opts.on( '-l', '--log-level [LEVEL]', "The log level to use (e.g. Logger::INFO, Logger::DEBUG)" do|l|
+        options[:log_level] = l
     end
 end
 
@@ -1324,11 +1320,6 @@ optparse.parse!
 
 require options[:config]
 
-if $0 =~ /controller.rb/
-    $LOG = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
-    $LOG.level = Logger::INFO
-end
-
 require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
 require "#{$REV_TR_TOOL_DIR}/traceroute"
@@ -1336,7 +1327,6 @@ require "#{$REV_TR_TOOL_DIR}/spoofed_ping"
 require "#{$REV_TR_TOOL_DIR}/ping"
 `mkdir /tmp/revtr`
 $stderr_FILE="/tmp/revtr/controller.out"
-$LOG.puts "Version number #{$VERSION}"
 
 if options[:kill] 
     my_pid= Process.pid
@@ -1356,10 +1346,11 @@ if options[:kill]
     }
 end
 
+c=Controller.new(options[:test],options[:config],options[:log_level],options[:vp_uri_list])
 
-c=Controller.new(options[:test],options[:config],options[:vp_uri_list])
 # # We need the uri of the service to connect a client
 puts c.uri
+c.log "Version number #{$VERSION}"
 c.log("Controller started at #{c.uri}")
 uri_port=c.uri.chomp("\n").split("/").at(-1).split(":").at(1)
 my_ip= UDPSocket.open {|s| s.connect($ZOOTER_IP, 1); s.addr.last }
@@ -1386,36 +1377,36 @@ Signal.trap("KILL"){
 
 # reload modules
 Signal.trap("USR1"){
-    $LOG.puts "reloading modules.."
+    c.log "reloading modules.."
     load "#{$REV_TR_TOOL_DIR}/spoofed_traceroute.rb"
     load "#{$REV_TR_TOOL_DIR}/traceroute.rb"
     load "#{$REV_TR_TOOL_DIR}/spoofed_ping.rb"
     load "#{$REV_TR_TOOL_DIR}/ping.rb"
-    $stderr.flush
 }
 
-# mem usage
-Signal.trap("USR2") {
-  mem_usage = `ps -o rss= -p #{Process.pid}`.to_i
-  threads = Thread.list.map { |x| "#{x[:name]}: #{x.inspect}" }
-  $LOG.puts "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}, Threads (#{threads.size}): #{threads.inspect}"
-  if mem_usage.to_i > 170000
-    ObjectSpace.each_object(String) do |s|
-       $stderr.puts s
-    end
-  end
-  $stderr.flush
-}
+## mem usage
+Signal.trap("USR2") {}
+
+#  mem_usage = `ps -o rss= -p #{Process.pid}`.to_i
+#  threads = Thread.list.map { |x| "#{x[:name]}: #{x.inspect}" }
+#  c.log "CAUGHT SIG USR2: #{mem_usage} KB, #{ObjectSpace.count_objects.inspect}, Threads (#{threads.size}): #{threads.inspect}"
+#  if mem_usage.to_i > 170000
+#    ObjectSpace.each_object(String) do |s|
+#       c.logs s
+#    end
+#  end
+#  $stderr.flush
+#}
 
 # stack dump
-Signal.trap("ALRM") do
-  fork do
-    ObjectSpace.each_object(Thread) do |th|
-      th.raise Exception, "Stack Dump" unless Thread.current == th
-    end
-    raise Exception, "Stack Dump"
-  end
-end
+Signal.trap("ALRM") {}
+#  fork do
+#    ObjectSpace.each_object(Thread) do |th|
+#      th.raise Exception, "Stack Dump" unless Thread.current == th
+#    end
+#    raise Exception, "Stack Dump"
+#  end
+#end
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_ip="druby://#{my_ip}:#{registrar_uri_port}"

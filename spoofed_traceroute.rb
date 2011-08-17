@@ -12,15 +12,15 @@ module SpoofedTR
         # probes later on
         id2dest = SpoofedTR::allocate_ids(dests)
 
-        #$LOG.puts "SpoofedTR::sendProbes(), source #{hostname}, dests #{dests} receivers are #{receivers.join(',')}"
+        controller.log.debug "SpoofedTR::sendProbes(), source #{hostname}, dests #{dests} receivers are #{receivers.join(',')}"
         receiver2spoofer2targets = {}
         spoofer2targets = { hostname => dests }
         receivers.each { |reciever| receiver2spoofer2targets[reciever] = spoofer2targets.clone }
-        #$LOG.puts "SpoofedTR::sendProbes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
+        controller.log.debug "SpoofedTR::sendProbes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
         results,unsuccessful_receivers,privates,blacklisted = controller.spoof_tr(receiver2spoofer2targets)
 
-        #$LOG.puts "SpoofedTR::sendProbes(#{hostname} #{dests.inspect}), results,unsuccessful_receivers,privates,blacklisted"
-        #$LOG.puts "#{results.inspect},#{unsuccessful_receivers.inspect},#{privates.inspect},#{blacklisted.inspect}"
+        controller.log.debug "SpoofedTR::sendProbes(#{hostname} #{dests.inspect}), results,unsuccessful_receivers,privates,blacklisted"
+        controller.log.debug "#{results.inspect},#{unsuccessful_receivers.inspect},#{privates.inspect},#{blacklisted.inspect}"
         SpoofedTR::parse_path(results, id2dest)
     end
 
@@ -116,8 +116,8 @@ module SpoofedTR
             end
         end
 
-        #$LOG.puts "parse_path(), id2dest #{id2dest.inspect}"
-        #$LOG.puts "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}"
+        #controller.log.debug "parse_path(), id2dest #{id2dest.inspect}"
+        #controller.log.debug "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}"
 
         # why would dest ever be nil?  id2dest didn't include the id...
         # We saw one case where one of the hops was attached to a nil key, not
@@ -148,7 +148,7 @@ module SpoofedTR
             end
         end
 
-        #$LOG.puts "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
+        #controller.log.debug "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
         
         dest2sortedttlrtrs = {}
 
@@ -171,7 +171,7 @@ module SpoofedTR
             # convert into [ttl, rtrs] pairs
             sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
             # get rid of redundant destination ttls at the end
-            #$LOG.puts "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
+            #controller.log.debug "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
             target = dest.is_a?(Array) ? dest[1] : dest   # sometimes dest is really srcdst.... XXX
             while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? target and sortedttlrtrs[-2][1].include? target 
                 sortedttlrtrs = sortedttlrtrs[0..-2]
@@ -183,7 +183,7 @@ module SpoofedTR
             dest2sortedttlrtrs[dest] = sortedttlrtrs
         end
 
-        #$LOG.puts "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
+        #controller.log.debug "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
 
         dest2sortedttlrtrs
    end

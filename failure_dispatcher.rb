@@ -14,6 +14,7 @@ require 'timeout'
 require 'failure_analyzer'
 require 'mail'
 require 'outage'
+require 'utilities'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -23,7 +24,8 @@ require 'outage'
 class FailureDispatcher
     attr_accessor :node_2_failed_measurements  # assume that the size of this field is constant
 
-    def initialize(db=DatabaseInterface.new)
+    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
+        @logger = logger
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
@@ -80,12 +82,12 @@ class FailureDispatcher
 
         # first filter out any outages where no nodes are actually registered
         # with the controller
-        $LOG.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
+        @logger.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
         registered_vps = @controller.hosts.clone
         srcdst2outage.delete_if do |srcdst, outage|
             !registered_vps.include?(srcdst[0]) || (registered_vps & outage.receivers).empty?
         end
-        $LOG.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
+        @logger.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
 
         return if srcdst2outage.empty? # optimization
 
@@ -97,17 +99,17 @@ class FailureDispatcher
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
         issue_pings_towards_srcs(srcdst2outage)
-        $LOG.debug("pings towards source issued")
+        @logger.debug("pings towards source issued")
 
         # if we control one of the targets, (later) send out spoofed traceroutes in
         # the opposite direction for ground truth information
         dstsrc2outage = check4targetswecontrol(srcdst2outage, registered_vps)
-        $LOG.debug("dstsrc2outage: " + dstsrc2outage.inspect)
+        @logger.debug("dstsrc2outage: " + dstsrc2outage.inspect)
 
         # we check the forward direction by issuing spoofed traceroutes (rather than pings)
         measurement_times << ["spoof_tr", Time.new]
         issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage)
-        $LOG.debug("spoofed traceroute issued")
+        @logger.debug("spoofed traceroute issued")
 
         # thread out on each src, dst
         srcdst2outage.each do |srcdst, outage|
@@ -143,7 +145,7 @@ class FailureDispatcher
     end
 
     def analyze_results(outage, outage_correlation, testing=false)
-        $LOG.debug "analyze_results: #{outage.src}, #{outage.dst}"
+        @logger.debug "analyze_results: #{outage.src}, #{outage.dst}"
 
         gather_additional_data(outage, testing)
 
@@ -153,7 +155,7 @@ class FailureDispatcher
                                                              outage.ping_responsive, outage.historical_tr, outage.historical_revtr, 
                                                              outage.direction, testing)
 
-        $LOG.debug "analyze_results: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
+        @logger.debug "analyze_results: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
 
         outage.build
 
@@ -170,7 +172,7 @@ class FailureDispatcher
         # XXX thread safe? I doubt it...
         if outage_correlation.complete?
            log_outage_correlation(outage_correlation) 
-           $LOG.debug("logged outage correlation")
+           @logger.debug("logged outage correlation")
         end
 
         if(outage.passed_filters)
@@ -184,9 +186,9 @@ class FailureDispatcher
             #       symmetric outages
             Emailer.deliver_isolation_results(outage, testing)
 
-            $LOG.puts "Attempted to send isolation_results email for #{outage.src} #{outage.dst} testing #{testing}..."
+            @logger.puts "Attempted to send isolation_results email for #{outage.src} #{outage.dst} testing #{testing}..."
         else
-            $LOG.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
+            @logger.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
 
         return outage.passed_filters
@@ -199,7 +201,7 @@ class FailureDispatcher
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
         outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
-        $LOG.debug("direction: " + outage.direction)
+        @logger.debug("direction: " + outage.direction)
 
         # HistoricalForwardHop objects
         outage.historical_tr, outage.historical_trace_timestamp = retrieve_historical_tr(outage.src, outage.dst)
@@ -212,22 +214,22 @@ class FailureDispatcher
 
         outage.historical_revtr = fetch_historical_revtr(outage.src, outage.dst)
 
-        $LOG.debug "historical paths fetched"
+        @logger.debug "historical paths fetched"
 
         # maybe not accurate given multiple threads, but fukit
         tr_time = Time.new
         outage.measurement_times << ["tr_time", tr_time]
         outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
 
-        $LOG.debug "traceroutes issued"
+        @logger.debug "traceroutes issued"
 
         if outage.tr.empty?
-            $LOG.puts "empty traceroute! (#{outage.src}, #{outage.dst})"
+            @logger.puts "empty traceroute! (#{outage.src}, #{outage.dst})"
             sleep 10
             tr_time2 = Time.new
             outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
             if outage.tr.empty?
-                $LOG.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end
@@ -257,14 +259,14 @@ class FailureDispatcher
         outage.measurement_times << ["non-revtr pings", Time.new]
         ping_responsive, non_responsive_hops = check_reachability(outage)
 
-        $LOG.debug "non-revtr pings issued"
+        @logger.debug "non-revtr pings issued"
 
         if ping_responsive.empty?
-            $LOG.puts "empty pings! (#{outage.src}, #{outage.dst})"
+            @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
-                $LOG.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end
@@ -272,7 +274,7 @@ class FailureDispatcher
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
 
-        $LOG.debug "pings to non-responsive hops issued"
+        @logger.debug "pings to non-responsive hops issued"
 
         if outage.direction != Direction::REVERSE and outage.direction != Direction::BOTH and !testing
             outage.measurement_times << ["revtr", Time.new]
@@ -281,21 +283,21 @@ class FailureDispatcher
             outage.spoofed_revtr = SpoofedReversePath.new
         end
 
-        $LOG.debug "spoofed_revtr issued"
+        @logger.debug "spoofed_revtr issued"
 
         if outage.spoofed_revtr.valid?
            outage.measurement_times << ["revtr pings", Time.new]
            revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(outage.src, outage.spoofed_revtr)
            ping_responsive |= revtr_ping_responsive
 
-           $LOG.debug "revtr pings issued"
+           @logger.debug "revtr pings issued"
         end
 
         outage.measurement_times << ["measurements completed", Time.new]
 
         fetch_historical_pingability!(outage)
 
-        $LOG.debug "historical pingability fetched"
+        @logger.debug "historical pingability fetched"
 
         outage.suspected_failure = @failure_analyzer.identify_fault(outage.src, outage.dst, outage.direction, outage.tr, 
                                                              outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
@@ -325,15 +327,15 @@ class FailureDispatcher
             # TODO: should the key be the ip, or the Hop object?
            upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
            outage.upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
-           $LOG.debug("upstream revtr issued")
+           @logger.debug("upstream revtr issued")
         end
 
         if outage.symmetric
             outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
-            $LOG.debug("destination's tr issued. valid?:#{outage.dst_tr.valid?}")
+            @logger.debug("destination's tr issued. valid?:#{outage.dst_tr.valid?}")
 
             splice_alternate_paths(outage)
-            $LOG.debug("alternate path splicing complete")
+            @logger.debug("alternate path splicing complete")
         end
     end
 
@@ -367,7 +369,7 @@ class FailureDispatcher
 
         pingable_targets.map! { |hop| hop.ip }
 
-        $LOG.debug "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
+        @logger.debug "pingable_targets, #{Time.now} #{pingable_targets.inspect}"
 
         targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
@@ -375,7 +377,7 @@ class FailureDispatcher
     end
 
     def fetch_historical_revtr(src,dst)
-        $LOG.debug "fetch_historical_revtr(#{src}, #{dst})"
+        @logger.debug "fetch_historical_revtr(#{src}, #{dst})"
 
         dst = dst.ip if dst.is_a?(Hop)
 
@@ -397,7 +399,7 @@ class FailureDispatcher
             historical_trace_timestamp = nil
         end
 
-        $LOG.debug "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
+        @logger.debug "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
         # XXX why is this a nested array?
         [ForwardPath.new(historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
@@ -408,7 +410,7 @@ class FailureDispatcher
         # hash is target2receiver2succesfulvps
         spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2outage.map_values { |outage| outage.receivers })
 
-        $LOG.debug "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
+        @logger.debug "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
         srcdst2outage.each do |srcdst, outage|
             src, dst = srcdst
@@ -486,7 +488,7 @@ class FailureDispatcher
             return SpoofedReversePath.new([:self_induced_timeout])
         end
 
-        $LOG.debug "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
+        @logger.debug "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
         raise "issue_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" unless srcdst2revtr.is_a?(Hash) or srcdst2revtr.is_a?(DRb::DRbObject)
 
@@ -505,7 +507,7 @@ class FailureDispatcher
             spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
         end
 
-        $LOG.debug "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
+        @logger.debug "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
         
         SpoofedReversePath.new(spoofed_revtr)
     end
@@ -545,7 +547,7 @@ class FailureDispatcher
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
         responsive ||= []
-        $LOG.debug "Responsive to ping: #{responsive.inspect}"
+        @logger.debug "Responsive to ping: #{responsive.inspect}"
 
         # update reachability
         all_hop_sets.each do |hop_set|
@@ -625,20 +627,20 @@ class FailureDispatcher
           return if ingress.nil?
 
           # ping ingress from s and d
-          $LOG.debug "splice_alternate_paths() issuing pings"
+          @logger.debug "splice_alternate_paths() issuing pings"
           src2reachable = issue_pings([outage.src, outage.dst_hostname], [ingress.ip])
-          $LOG.debug "src2reachable: #{src2reachable.inspect}"
+          @logger.debug "src2reachable: #{src2reachable.inspect}"
           
           return if !(src2reachable[outage.src].include? ingress.ip and src2reachable[outage.dst_hostname].include? ingress.ip)
 
-          $LOG.debug "splice_alternate_paths() ingress router reachable"
+          @logger.debug "splice_alternate_paths() ingress router reachable"
 
           src_trace_to_ingress = issue_normal_traceroutes(outage.src, [ingress.ip])[ingress.ip]
-          $LOG.debug "normal trace: #{src_trace_to_ingress}"
+          @logger.debug "normal trace: #{src_trace_to_ingress}"
           return unless src_trace_to_ingress.valid?
           # TODO: normal revtr
           dst_revtr_from_ingress = issue_revtr(outage.dst_hostname, ingress.ip, [], false)
-          $LOG.debug "dst revtr: #{dst_revtr_from_ingress}"
+          @logger.debug "dst revtr: #{dst_revtr_from_ingress}"
           return unless dst_revtr_from_ingress.valid?
 
           outage.spliced_paths << SplicedPath.new(outage.src, outage.dst_hostname, ingress, src_trace_to_ingress, dst_revtr_from_ingress)
@@ -666,7 +668,7 @@ class FailureDispatcher
 
         ip2lastresponsive = @db.fetch_pingability(all_targets.to_a)
 
-        $LOG.debug "fetch_historical_pingability(), ip2lastresponsive #{ip2lastresponsive.inspect}"
+        @logger.debug "fetch_historical_pingability(), ip2lastresponsive #{ip2lastresponsive.inspect}"
 
         # update historical reachability
         all_hop_sets.each do |hop_set|

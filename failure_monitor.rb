@@ -6,13 +6,15 @@ require 'set'
 require 'yaml'
 require 'outage'
 require 'outage_correlation'
+require 'utilities'
 
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
 class FailureMonitor
-    def initialize(dispatcher, db=DatabaseInterface.new, email="failures@cs.washington.edu")
+    def initialize(dispatcher, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
         @dispatcher = dispatcher
         @db = db
+        @logger = logger
         @email = email
 
         # TODO: handle these with optparse
@@ -109,7 +111,7 @@ class FailureMonitor
 
             @dispatcher.isolate_outages(srcdst2outage, dst2outage_correlation)
 
-            $LOG.puts "round #{@current_round} completed"
+            @logger.puts "round #{@current_round} completed"
             $stderr.flush
             @current_round += 1
             
@@ -139,7 +141,7 @@ class FailureMonitor
             if seconds_difference >= @@timestamp_bound
                 minutes_difference = seconds_difference / 60
                 @outdated_nodes[node] = minutes_difference
-                $LOG.puts "#{node}'s data is #{minutes_difference} minutes out of date"
+                @logger.puts "#{node}'s data is #{minutes_difference} minutes out of date"
                 next
             end
 
@@ -149,19 +151,19 @@ class FailureMonitor
             begin
                 hash = YAML.load_file(yaml)
             rescue
-                $LOG.puts "Corrupt YAML file: #{node}"
+                @logger.puts "Corrupt YAML file: #{node}"
                 next
             end
 
             if !hash.is_a?(Hash)
-                $LOG.puts "#{node}'s data was not a hash!!"
+                @logger.puts "#{node}'s data was not a hash!!"
                 next
             end
 
             failure_percentage = hash.size * 1.0 / @target_set_size
             if failure_percentage > @@source_specific_problem_threshold
                 @problems_at_the_source[node] = failure_percentage * 100
-                $LOG.puts "Problem at the source: #{node}"
+                @logger.puts "Problem at the source: #{node}"
                 next
             end
 
@@ -264,7 +266,7 @@ class FailureMonitor
                rounds = rounds[0] if rounds.is_a?(Array)
 
                if rounds.nil?
-                   $LOG.puts "#{node}: #{target} is nil..."
+                   @logger.puts "#{node}: #{target} is nil..."
                    next
                end
                 

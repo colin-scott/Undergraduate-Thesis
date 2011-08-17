@@ -2,25 +2,25 @@ module Traceroute
     # dests is an array of destinations
     # return a set of targets that responded
     def Traceroute::sendProbes(hostname, dests, controller)
-        $LOG.puts "Traceroute::sendProbe(): source #{hostname}, dests #{dests.inspect}"
+        controller.log.debug "Traceroute::sendProbe(): source #{hostname}, dests #{dests.inspect}"
 
-        $LOG.puts "Traceroute::sendProbe() Not registered! #{hostname}" unless controller.hosts.include? hostname
+        controller.log.warn "Traceroute::sendProbe() Not registered! #{hostname}" unless controller.hosts.include? hostname
         hostname2targets = { hostname => dests }
          
         results,unsuccessful_hosts,privates,blacklisted = controller.traceroute(hostname2targets)
 
-        $LOG.puts "Traceroute::sendProbe() unsuccesful_hosts!: #{unsuccessful_hosts.inspect}" unless unsuccessful_hosts.empty?
+        controller.log.warn "Traceroute::sendProbe() unsuccesful_hosts!: #{unsuccessful_hosts.inspect}" unless unsuccessful_hosts.empty?
 
-        Traceroute::parse_results results
+        Traceroute::parse_results(results, controller)
     end
 
     private
 
     # return a set of targets that responded
-    def Traceroute::parse_results(results)
+    def Traceroute::parse_results(results, controller)
         # results is of the form:
         # [[binary, "plgmu4.ite.gmu.edu"]]
-        $LOG.puts "Traceroute::parse_results(), raw results: #{results.inspect}"
+        controller.log.debug "Traceroute::parse_results(), raw results: #{results.inspect}"
 
         dst2ttlhoptuples = {}
 
@@ -33,7 +33,7 @@ module Traceroute
             begin
                 trs = convert_binary_traceroutes(probes)
             rescue TruncatedTraceFileException => e
-                $LOG.puts "Truncated trace! #{$!}"
+                controller.log.debug "Truncated trace! #{$!}"
             end
 
             trs.each do |tr|

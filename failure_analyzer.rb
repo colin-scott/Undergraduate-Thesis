@@ -1,4 +1,5 @@
 require 'isolation_module'
+require 'ip_info'
 
 class Direction
     FORWARD = "forward path"
@@ -17,8 +18,9 @@ end
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 class FailureAnalyzer
-    def initialize(ipInfo)
+    def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr))
         @ipInfo = ipInfo
+        @logger = logger
     end
 
     # returns the hop suspected to be close to the failure
@@ -209,7 +211,7 @@ class FailureAnalyzer
 
         historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
 
-        $LOG.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
         no_pings_at_all = (ping_responsive.empty?)
 
@@ -225,7 +227,7 @@ class FailureAnalyzer
                 :forward_meas_essss => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
                 :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
 
-            $LOG.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
+            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}): #{bool_vector.inspect}"
             return [false, bool_vector]
         else
             return [true, {}]

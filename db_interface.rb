@@ -14,20 +14,21 @@ require 'set'
 require 'isolation_module'
 
 class DatabaseInterface
-    def initialize(host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
+    def initialize(logger=$stderr, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
+        @logger = logger
         begin
           @connection = Mysql.new(host, usr, pwd, database)
         rescue Mysql::Error => e
-          $LOG.puts "DB connection error " + host
+          @logger.puts "DB connection error " + host
           throw e
         end
     end
     
     # return hash from ip -> last_responsive
     def fetch_pingability(ips)
-        #$LOG.puts "fetch_pingability(), ips=#{ips.inspect}"
+        #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
         addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton($pl_host2ip[ip]) : ip }
-        #$LOG.puts "fetch_pingability(), addrs=#{ips.inspect}"
+        #@logger.puts "fetch_pingability(), addrs=#{ips.inspect}"
         responsive = Hash.new { |h,k| h[k] = "N/A" }
 
         return responsive if addrs.empty?
@@ -36,10 +37,10 @@ class DatabaseInterface
         
         results = query(sql)
 
-        #$LOG.puts "fetch_pingability(), results=#{results.inspect}"
+        #@logger.puts "fetch_pingability(), results=#{results.inspect}"
 
         results.each_hash do |row|
-           #$LOG.puts "fetch_pingability(), row=#{row.inspect}"
+           #@logger.puts "fetch_pingability(), row=#{row.inspect}"
            #   see hops.rb for an explanation:
            row["last_responsive"] = false if row.include?("last_responsive") and row["last_responsive"].nil?
            responsive[Inet::ntoa(row["ip"].to_i)] = row["last_responsive"]
