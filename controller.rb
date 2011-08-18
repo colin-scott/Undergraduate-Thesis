@@ -1306,7 +1306,7 @@ optparse = OptionParser.new do |opts|
         options[:vp_uri_list] = f
     end
     options[:log_level] = Logger::INFO
-    opts.on( '-l', '--log-level [LEVEL]', "The log level to use (e.g. Logger::INFO, Logger::DEBUG)" do|l|
+    opts.on( '-l', '--log-level [LEVEL]', "The log level to use (e.g. Logger::INFO, Logger::DEBUG)") do|l|
         options[:log_level] = l
     end
 end

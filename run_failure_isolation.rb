@@ -48,7 +48,7 @@ begin
    Signal.trap("KILL") { monitor.persist_state; exit }
 
    Signal.trap("USR1") do 
-       $LOG.puts "reloading modules.."
+       logger.puts "reloading modules.."
        load 'ip_info.rb'
        load 'mkdot.rb'
        load 'hops.rb'

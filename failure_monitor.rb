@@ -112,12 +112,11 @@ class FailureMonitor
             @dispatcher.isolate_outages(srcdst2outage, dst2outage_correlation)
 
             @logger.puts "round #{@current_round} completed"
-            $stderr.flush
             @current_round += 1
             
-            swap_out_faulty_nodes if (@current_round % @@node_audit_period) == 0
+            clean_the_house if (@current_round % @@node_audit_period) == 0
 
-            sleep_period =  period - (Time.new - start)
+            sleep_period = period - (Time.new - start)
 
             sleep sleep_period if sleep_period > 0
         end
@@ -176,6 +175,13 @@ class FailureMonitor
         node2targetstate
     end
 
+    def clean_the_house()
+        Thread.new do
+            swap_out_faulty_nodes
+            swap_out_unresponsive_targets
+        end
+    end
+
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
         if File.size(FailureIsolation::AllNodesPath) == File.size(FailureIsolation::BlackListPath)
@@ -218,6 +224,64 @@ class FailureMonitor
                                            possibly_bad_srcs)
 
         HouseCleaning::swap_out_faulty_nodes(to_swap_out)
+    end
+
+    def swap_out_unresponsive_targets
+        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = HouseCleaning::check_target_probing_status(@db)
+        # TODO: do something with bad_hops
+        
+        dataset2unresponsivetargets = Hash.new { |h,k| h[k] = [] }
+
+        bad_targets.each do |target|
+            # identify which dataset it came from
+            dataset = FailureIsolation::get_dataset(target) 
+            raise "unknown target" if dataset == DataSets::Unknown
+
+            dataset2unresponsivetargets[dataset] << target
+        end
+
+        # =======================
+        #   Harsha's PoPs       #
+        # =======================
+        
+        $ip_to_pop_mapping = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
+
+        # generate target->pop mappings
+        
+        # regenerate top pops
+        
+        # count how many core/edge routers for each pop
+        
+        # for those pops that are completely gone,
+        # pick a new top pop, and add targets from that
+        
+        # for those pops that are partially gone,
+        # add targets from new generation
+     
+        dataset2unresponsivetargets[DataSets::HarshaPops].each do |target|
+        end 
+                
+
+        
+        # =======================
+        #  CloudFront           #
+        # =======================
+        
+        #    is static
+
+        # =======================
+        #  Spoofers             #
+        # =======================
+        
+
+        # what about pingability? I guess they will just be swapped out the
+        # next round...
+         
+        # also clear out spoofers that are consistently unresponsive to ssh
+        # spoofers are kept in the isolation_vantage_points table
+        # and responsiveness to ssh is stored in the table!
+        # may have to reload that table with new vantage points...
+        #  TODO: change isolation_module.rb also
     end
 
     def update_auxiliary_state(node2targetstate)

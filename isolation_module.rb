@@ -1,3 +1,5 @@
+#!/homes/network/revtr/ruby/bin/ruby
+
 # CONSTANTS!!!
 
 require 'set'
@@ -11,12 +13,6 @@ module FailureIsolation
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
-    # XXX terrible terrible
-    FailureIsolation::CloudfrontTargets = Set.new([ "204.246.165.221", "204.246.169.63", "216.137.33.1",
-        "216.137.35.21", "216.137.37.156", "216.137.39.152", "216.137.41.78",
-        "216.137.43.189", "216.137.45.33", "216.137.47.127", "216.137.53.96",
-        "216.137.55.170", "216.137.57.207", "216.137.59.4", "216.137.61.174",
-        "216.137.63.221" ])
 
     FailureIsolation::TargetSet = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
     
@@ -48,14 +44,26 @@ module FailureIsolation
     end
 
     FailureIsolation::DataSetDir = "/homes/network/revtr/spoofed_traceroute/datasets"
-    # targets taken from Harsha's most well connected PoPs
-    FailureIsolation::HarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_corerouters.txt").split("\n"))
-    # targets taken from routers on paths beyond Harsha's most well connected PoPs
-    FailureIsolation::BeyondHarshaPoPs = Set.new(IO.read("#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt").split("\n"))
-    # targets taken from spoofers.hosts
-    FailureIsolation::SpooferTargets = Set.new(IO.read("#{FailureIsolation::DataSetDir}/up_spoofers.ips").split("\n"))
-    FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
+    # targets taken from Harsha's most well connected PoPs
+    FailureIsolation::HarshaPoPsPath = "#{FailureIsolation::DataSetDir}/responsive_corerouters.txt"
+    FailureIsolation::HarshaPoPs = Set.new
+
+    # targets taken from routers on paths beyond Harsha's most well connected PoPs
+    FailureIsolation::BeyondHarshaPoPsPath = "#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt"
+    FailureIsolation::BeyondHarshaPoPs = Set.new
+
+    # targets taken from spoofers.hosts
+    #  XXX Take in from isolation_vantage_points table instaed of this static
+    #  list.
+    FailureIsolation::SpooferTargetsPath = "#{FailureIsolation::DataSetDir}/up_spoofers.ips"
+    FailureIsolation::SpooferTargets = Set.new
+
+    # targets taken from cloudfront ips
+    FailureIsolation::CloudfrontTargetsPath = "#{FailureIsolation::DataSetDir}/cloudfront_ips.txt"
+    FailureIsolation::CloudfrontTargets = Set.new
+
+    FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
     FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_final"
     FailureIsolation::Snapshot = "#{$DATADIR}/isolation_results_snapshot"
@@ -68,16 +76,30 @@ module FailureIsolation
 
     def FailureIsolation::get_dataset(dst)
         if FailureIsolation::HarshaPoPs.include? dst
-            return "Harsha's most well-connected PoPs"
+            return DataSets::HarshaPops
         elsif FailureIsolation::BeyondHarshaPoPs.include? dst
-            return "Routers on paths beyond Harsha's PoPs"
+            return DataSets::BeyondHarshaPoPs 
         elsif FailureIsolation::CloudfrontTargets.include? dst
-            return "CloudFront"
+            return DataSets::CloudfrontTargets
         elsif FailureIsolation::SpooferTargets.include? dst
-            return "PL/mlab nodes"
+            return DataSets::SpooferTargets
         else
-            return "Unknown"
+            return DataSets::Unknown 
         end
+    end
+
+    def FailureIsolation::ReadInDataSets()
+        FailureIsolation::HarshaPoPs.clear
+        FailureIsolation::HarshaPoPs.merge(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
+
+        FailureIsolation::BeyondHarshaPoPs.clear
+        FailureIsolation::BeyondHarshaPoPs.merge(IO.read(FailureIsolation::BeyondHarshaPoPsPath).split("\n"))
+
+        FailureIsolation::SpooferTargets.clear
+        FailureIsolation::SpooferTargets.merge(IO.read(FailureIsolation::SpooferTargetsPath).split("\n"))
+
+        FailureIsolation::CloudfrontTargets.clear
+        FailureIsolation::CloudfrontTargets.merge(IO.read(FailureIsolation::CloudfrontTargetsPath).split("\n"))
     end
 
     FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
@@ -87,4 +109,18 @@ module FailureIsolation
     FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state"
     FailureIsolation::NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
     FailureIsolation::NumActiveNodes = 12
+
+    FailureIsolation::IPToPoPMapping = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
 end
+
+# constants for names of datasets (not targets themselves)
+module DataSets
+    DataSets::HarshaPops = "Harsha's most well-connected PoPs"
+    DataSets::BeyondHarshaPoPs = "Routers on paths beyond Harsha's PoPs"
+    DataSets::CloudfrontTargets = "CloudFront"
+    DataSets::SpooferTargets = "PL/mlab nodes"
+    DataSets::Unknown = "Unknown"
+end
+
+
+FailureIsolation::ReadInDataSets()

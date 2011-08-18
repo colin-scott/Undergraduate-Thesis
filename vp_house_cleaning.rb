@@ -39,7 +39,6 @@ module HouseCleaning
         end
         
         while current_nodes.size < FailureIsolation::NumActiveNodes
-            raise "no more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
             $stderr.puts "choosing: #{new_vp}"
             current_nodes.add new_vp
@@ -48,6 +47,10 @@ module HouseCleaning
         self.update_current_nodes(current_nodes)
         self.update_blacklist(blacklist)
         system "rm #{FailureIsolation::PingStatePath}/*"
+    end
+
+    def self.swap_out_targets(old_files_list, new_files_list)
+
     end
 
     def self.add_nodes(nodes)
