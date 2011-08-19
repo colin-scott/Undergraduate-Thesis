@@ -132,6 +132,13 @@ class Emailer < ActionMailer::Base
         recipients  "failures@cs.washington.edu"
         attachment  :filename => name, :content_type => "image/jpeg", :body => File.read(jpg_path) 
     end
+    def isolation_status(bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+      subject     "Isolation target status"
+      from        "failures@cs.washington.edu"
+      recipients  "failures@cs.washington.edu"
+      body        :bad_targets => bad_targets, :possibly_bad_targets => possibly_bad_targets,
+                   :bad_hops => bad_hops, :possibly_bad_hops => possibly_bad_hops
+    end
 end
 
 def email_and_die

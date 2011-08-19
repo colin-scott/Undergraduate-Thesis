@@ -19,7 +19,11 @@ class Emailer < ActionMailer::Base
   end
 end
 
-module HouseCleaning
+class HouseCleaner
+    def initialize(logger)
+        @logger = logger
+    end
+
     # returns a tuple
     #   First, sorted pop #s by degree
     #   Second, pop2corertrs
@@ -93,10 +97,10 @@ module HouseCleaning
         chosen_replacements
     end
 
-    def self.find_substitutes_for_unresponsive_targets
+    def self.find_substitutes_for_unresponsive_targets(db)
         dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
 
-        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status()
+        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = db.check_target_probing_status()
         # TODO: do something with bad_hops
         
         dataset2pop2unresponsivetargets = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = [] } }
@@ -140,7 +144,7 @@ module HouseCleaning
         # spoofers are kept in the isolation_vantage_points table
         # and responsiveness to ssh is stored in the table!
 
-        [dataset2substitute_targets, bad_targets, bad_hops, possible_bad_hops, possibly_bad_targets]
+        [dataset2substitute_targets, bad_targets, possibly_bad_targets, bad_hops, possible_bad_hops]
     end
 
     def self.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
@@ -157,7 +161,7 @@ module HouseCleaning
         FailureIsolation::ReadInDataSets()
     end
 
-    def self.find_substitute_vps()
+    def self.find_substitute_vps(db)
         already_blacklisted = Set.new(IO.read(FailureIsolation::BlackListPath).split("\n"))
 
         to_swap_out = Set.new
@@ -178,7 +182,7 @@ module HouseCleaning
         failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
         to_swap_out |= failed_measurements.map { |k,v| k }
 
-        bad_srcs, possibly_bad_srcs = @db.check_source_probing_status()
+        bad_srcs, possibly_bad_srcs = db.check_source_probing_status()
         to_swap_out += bad_srcs
 
         to_swap_out -= already_blacklisted

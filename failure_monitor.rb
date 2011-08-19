@@ -1,5 +1,5 @@
 require 'failure_dispatcher'
-require 'vp_house_cleaning'
+require 'house_cleaner'
 require 'isolation_module'
 require 'isolation_probe_status'
 require 'set'
@@ -16,6 +16,7 @@ class FailureMonitor
         @db = db
         @logger = logger
         @email = email
+        @house_cleaner = HouseCleaner.new(logger)
 
         # TODO: handle these with optparse
         @@minutes_per_round = 2
@@ -188,7 +189,9 @@ class FailureMonitor
         end
         
         to_swap_out,outdated,source_problems,not_sshable,
-            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = HouseCleaning::find_substitute_vps()
+            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.find_substitute_vps(@vp)
+
+        @logger.debug "finished finding substitites for vps"
 
         Emailer.deliver_faulty_node_report(outdated,
                                            source_problems,
@@ -199,16 +202,17 @@ class FailureMonitor
 
         return if to_swap_out.empty?
 
-        HouseCleaning::swap_out_faulty_nodes(to_swap_out)
+        @house_cleaner.swap_out_faulty_nodes(to_swap_out)
     end
 
     def swap_out_unresponsive_targets
-        dataset2substitute_targets, bad_targets, bad_hops, possible_bad_hops, possibly_bad_targets = \
-                HouseCleaning::find_substitutes_for_unresponsive_targets
+        dataset2substitute_targets, bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops = \
+                @house_cleaner.find_substitutes_for_unresponsive_targets(@db)
+        @logger.debug "finished finding substitutes for targets"
 
-        # Emailer.deliver
+        Emailer.deliver_isolation_status(bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
         
-        HouseCleaning::swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
+        # @house_cleaner.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
     end
 
     def update_auxiliary_state(node2targetstate)

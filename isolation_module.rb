@@ -90,16 +90,16 @@ module FailureIsolation
 
     def FailureIsolation::ReadInDataSets()
         FailureIsolation::HarshaPoPs.clear
-        FailureIsolation::HarshaPoPs.merge!(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
+        FailureIsolation::HarshaPoPs.merge(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
 
         FailureIsolation::BeyondHarshaPoPs.clear
-        FailureIsolation::BeyondHarshaPoPs.merge!(IO.read(FailureIsolation::BeyondHarshaPoPsPath).split("\n"))
+        FailureIsolation::BeyondHarshaPoPs.merge(IO.read(FailureIsolation::BeyondHarshaPoPsPath).split("\n"))
 
         FailureIsolation::SpooferTargets.clear
-        FailureIsolation::SpooferTargets.merge!(IO.read(FailureIsolation::SpooferTargetsPath).split("\n"))
+        FailureIsolation::SpooferTargets.merge(IO.read(FailureIsolation::SpooferTargetsPath).split("\n"))
 
         FailureIsolation::CloudfrontTargets.clear
-        FailureIsolation::CloudfrontTargets.merge!(IO.read(FailureIsolation::CloudfrontTargetsPath).split("\n"))
+        FailureIsolation::CloudfrontTargets.merge(IO.read(FailureIsolation::CloudfrontTargetsPath).split("\n"))
 
         # pops are symbols!
         FailureIsolation::IPToPoPMapping.clear
@@ -107,7 +107,7 @@ module FailureIsolation
                                                 .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.to_hash)
 
         FailureIsolation::TargetBlacklist.clear
-        FailureIsolation::TargetBlacklist.merge!(Set.new(IO.read(FailureIsolation::TargetBlacklistPath).split("\n")))
+        FailureIsolation::TargetBlacklist.merge(IO.read(FailureIsolation::TargetBlacklistPath).split("\n"))
     end
 
     FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
