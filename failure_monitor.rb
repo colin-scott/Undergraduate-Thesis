@@ -95,8 +95,6 @@ class FailureMonitor
         loop do
             start = Time.new
 
-            @target_blacklist = Set.new(IO.read(FailureIsolation::TargetBlacklist).split("\n"))
-
             # TODO: cat directly from ssh rather than scp'ing
             system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
@@ -188,33 +186,9 @@ class FailureMonitor
             Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: ~revtr/spoofed_traceroute/blacklisted_isolation_nodes.txt")
             return
         end
-
-        already_blacklisted = Set.new(IO.read(FailureIsolation::BlackListPath).split("\n"))
-
-        to_swap_out = Set.new
-
-        outdated = @outdated_nodes
-        @outdated_nodes = {}
-        to_swap_out |= outdated.map { |k,v| k }
         
-        source_problems = @problems_at_the_source
-        @problems_at_the_source = {}
-        to_swap_out |= source_problems.keys
-
-        not_sshable = @not_sshable
-        @not_sshable = Set.new
-        to_swap_out |= not_sshable
-
-        # XXX clear node_2_failed_measurements state
-        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
-        to_swap_out |= failed_measurements.map { |k,v| k }
-
-        bad_srcs, possibly_bad_srcs = HouseCleaning::check_source_probing_status(@db)
-        to_swap_out += bad_srcs
-
-        to_swap_out -= already_blacklisted
-
-        return if to_swap_out.empty?
+        to_swap_out,outdated,source_problems,not_sshable,
+            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = HouseCleaning::find_substitute_vps()
 
         Emailer.deliver_faulty_node_report(outdated,
                                            source_problems,
@@ -223,65 +197,18 @@ class FailureMonitor
                                            bad_srcs,
                                            possibly_bad_srcs)
 
+        return if to_swap_out.empty?
+
         HouseCleaning::swap_out_faulty_nodes(to_swap_out)
     end
 
     def swap_out_unresponsive_targets
-        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = HouseCleaning::check_target_probing_status(@db)
-        # TODO: do something with bad_hops
-        
-        dataset2unresponsivetargets = Hash.new { |h,k| h[k] = [] }
+        dataset2substitute_targets, bad_targets, bad_hops, possible_bad_hops, possibly_bad_targets = \
+                HouseCleaning::find_substitutes_for_unresponsive_targets
 
-        bad_targets.each do |target|
-            # identify which dataset it came from
-            dataset = FailureIsolation::get_dataset(target) 
-            raise "unknown target" if dataset == DataSets::Unknown
-
-            dataset2unresponsivetargets[dataset] << target
-        end
-
-        # =======================
-        #   Harsha's PoPs       #
-        # =======================
+        # Emailer.deliver
         
-        $ip_to_pop_mapping = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
-
-        # generate target->pop mappings
-        
-        # regenerate top pops
-        
-        # count how many core/edge routers for each pop
-        
-        # for those pops that are completely gone,
-        # pick a new top pop, and add targets from that
-        
-        # for those pops that are partially gone,
-        # add targets from new generation
-     
-        dataset2unresponsivetargets[DataSets::HarshaPops].each do |target|
-        end 
-                
-
-        
-        # =======================
-        #  CloudFront           #
-        # =======================
-        
-        #    is static
-
-        # =======================
-        #  Spoofers             #
-        # =======================
-        
-
-        # what about pingability? I guess they will just be swapped out the
-        # next round...
-         
-        # also clear out spoofers that are consistently unresponsive to ssh
-        # spoofers are kept in the isolation_vantage_points table
-        # and responsiveness to ssh is stored in the table!
-        # may have to reload that table with new vantage points...
-        #  TODO: change isolation_module.rb also
+        HouseCleaning::swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
     end
 
     def update_auxiliary_state(node2targetstate)
@@ -325,7 +252,7 @@ class FailureMonitor
      
         node2targetstate.each do |node, target_state|
             target_state.each do |target, rounds|
-               next if @target_blacklist.include? target
+               next if FailureIsolation::TargetBlacklist.include? target
                # XXX For backwards compatibility...
                rounds = rounds[0] if rounds.is_a?(Array)
 

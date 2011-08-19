@@ -13,7 +13,6 @@ module FailureIsolation
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
-
     FailureIsolation::TargetSet = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
     
     FailureIsolation::TestPing = "128.208.4.49" # crash.cs.washington.edu
@@ -32,7 +31,8 @@ module FailureIsolation
 
     FailureIsolation::CachedRevtrTool = "~/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
 
-    FailureIsolation::TargetBlacklist = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
+    FailureIsolation::TargetBlacklistPath = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
+    FailureIsolation::TargetBlacklist = Set.new
 
     def FailureIsolation::read_in_spoofer_hostnames()
        ip2hostname = {}
@@ -90,16 +90,24 @@ module FailureIsolation
 
     def FailureIsolation::ReadInDataSets()
         FailureIsolation::HarshaPoPs.clear
-        FailureIsolation::HarshaPoPs.merge(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
+        FailureIsolation::HarshaPoPs.merge!(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
 
         FailureIsolation::BeyondHarshaPoPs.clear
-        FailureIsolation::BeyondHarshaPoPs.merge(IO.read(FailureIsolation::BeyondHarshaPoPsPath).split("\n"))
+        FailureIsolation::BeyondHarshaPoPs.merge!(IO.read(FailureIsolation::BeyondHarshaPoPsPath).split("\n"))
 
         FailureIsolation::SpooferTargets.clear
-        FailureIsolation::SpooferTargets.merge(IO.read(FailureIsolation::SpooferTargetsPath).split("\n"))
+        FailureIsolation::SpooferTargets.merge!(IO.read(FailureIsolation::SpooferTargetsPath).split("\n"))
 
         FailureIsolation::CloudfrontTargets.clear
-        FailureIsolation::CloudfrontTargets.merge(IO.read(FailureIsolation::CloudfrontTargetsPath).split("\n"))
+        FailureIsolation::CloudfrontTargets.merge!(IO.read(FailureIsolation::CloudfrontTargetsPath).split("\n"))
+
+        # pops are symbols!
+        FailureIsolation::IPToPoPMapping.clear
+        FailureIsolation::IPToPoPMapping.merge!(IO.read(FailureIsolation::IPToPoPMappingPath)\
+                                                .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.to_hash)
+
+        FailureIsolation::TargetBlacklist.clear
+        FailureIsolation::TargetBlacklist.merge!(Set.new(IO.read(FailureIsolation::TargetBlacklistPath).split("\n")))
     end
 
     FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
@@ -110,17 +118,59 @@ module FailureIsolation
     FailureIsolation::NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
     FailureIsolation::NumActiveNodes = 12
 
-    FailureIsolation::IPToPoPMapping = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
+    # =========================
+    #   Top Pops Regeneration #
+    # =========================
+    
+    # XXX Too big to store in memory?
+    FailureIsolation::IPToPoPMappingPath = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
+    FailureIsolation::IPToPoPMapping = Hash.new { |h,k| PoP::Unknown }
+
+    FailureIsolation::TopPoPsScripts = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/generate_N_top_pops.sh"
+
+    # More than actually needed
+    FailureIsolation::NumTopPoPs = 200
+
+    # Connectivity ranking for top N PoPs.       Format: <pop #> <number of traversing paths> <max paths from any one VP?> <total VPs>
+    FailureIsolation::TopN = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/top_500.txt"
+    # trace.out files for the VPs passing through the top 500 pops. Format: <trace.out> <total # paths> <# paths passing through top 100 pops>. Last line is total overall.
+    FailureIsolation::SelectedPaths = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/selected_paths.txt"
+    # PL sources and targets for top 500 PoPs. Format: <pop #> <PL node> <target>
+    FailureIsolation::SourceDests = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
+
+    FailureIsolation::CoreRtrsPerPoP = 1
+    FailureIsolation::EdgeRtrsPerPoP = 2
 end
 
 # constants for names of datasets (not targets themselves)
 module DataSets
-    DataSets::HarshaPops = "Harsha's most well-connected PoPs"
-    DataSets::BeyondHarshaPoPs = "Routers on paths beyond Harsha's PoPs"
-    DataSets::CloudfrontTargets = "CloudFront"
-    DataSets::SpooferTargets = "PL/mlab nodes"
-    DataSets::Unknown = "Unknown"
+    DataSets::HarshaPoPs = :"Harsha's most well-connected PoPs"
+    DataSets::BeyondHarshaPoPs = :"Routers on paths beyond Harsha's PoPs"
+    DataSets::CloudfrontTargets = :"CloudFront"
+    DataSets::SpooferTargets = :"PL/mlab nodes"
+    DataSets::Unknown = :"Unknown"
+
+    def self.ToPath(dataset)
+        case dataset
+        when DataSets::HarshaPoPs
+            return FailureIsolation::HarshaPoPsPath
+        when DataSets::BeyondHarshaPoPs
+            return FailureIsolation::BeyondHarshaPoPsPath
+        when DataSets::CloudfrontTargets
+            return FailureIsolation::CloudfrontTargetsPath
+        when DataSets::SpooferTargets
+            return FailureIsolation::SpooferTargetsPath
+        when DataSets::Unknown
+            return "/dev/null"
+        else
+            return "/dev/null"
+        end
+    end
 end
 
+# Harsha's Ip2PoP mappings
+module PoP
+    PoP::Unknown = :"Unknown"
+end
 
 FailureIsolation::ReadInDataSets()
