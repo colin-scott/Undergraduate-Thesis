@@ -113,7 +113,7 @@ class Emailer < ActionMailer::Base
         recipients  recipient
         body        :exception => exception
     end
-    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, failed_measurements,
+    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
                           bad_srcs, possibly_bad_srcs)
         subject     "faulty monitoring node report"
         from        "failures@cs.washington.edu"
@@ -121,6 +121,7 @@ class Emailer < ActionMailer::Base
         body         :outdated_nodes => outdated_nodes,
                      :problems_at_the_source => problems_at_the_source,
                      :not_sshable => not_sshable,
+                     :not_controllable => not_controllable,
                      :failed_measurements => failed_measurements,
                      :bad_srcs => bad_srcs,
                      :possibly_bad_srcs => possibly_bad_srcs
@@ -132,7 +133,7 @@ class Emailer < ActionMailer::Base
         recipients  "failures@cs.washington.edu"
         attachment  :filename => name, :content_type => "image/jpeg", :body => File.read(jpg_path) 
     end
-    def isolation_status(bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+    def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
       subject     "Isolation target status"
       from        "failures@cs.washington.edu"
       recipients  "failures@cs.washington.edu"

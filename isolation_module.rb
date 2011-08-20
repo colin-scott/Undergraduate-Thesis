@@ -72,6 +72,7 @@ module FailureIsolation
        ip2hostname
     end
 
+    # XXX Better: read directly from the database
     FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
 
     # ====================================

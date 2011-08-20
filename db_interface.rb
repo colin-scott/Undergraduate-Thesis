@@ -120,6 +120,33 @@ class DatabaseInterface
 
         [bad_dsts,possibly_bad_dsts,bad_dsts_ep,possibly_bad_dsts_ep]
     end
+
+    # returns {hostname -> IP addresses}
+    def uncontrollable_isolation_vantage_points()
+        hostname2ip = {}
+        sql = "select vantage_point, inet_ntoa(IP) as ip from isolation_vantage_points where sshable=0 or controllable=0;"
+
+        results = query sql
+        results.each_hash{|row|
+          hostname2ip[row["vantage_point"]] = row["ip"]
+        }
+
+        hostname2ip
+    end
+
+    # returns {hostname -> IP addresses}
+    def controllable_isolation_vantage_points()
+        hostname2ip = {}
+        sql = "select vantage_point, inet_ntoa(IP) as ip from isolation_vantage_points where sshable=1 and controllable=1;"
+
+        results = query sql
+        results.each_hash{|row|
+          hostname2ip[row["vantage_point"]] = row["ip"]
+        }
+
+        hostname2ip
+
+    end
 end
 
 if $0 == __FILE__

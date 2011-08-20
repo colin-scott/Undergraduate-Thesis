@@ -183,14 +183,15 @@ class FailureMonitor
             return
         end
         
-        to_swap_out,outdated,source_problems,not_sshable,
-            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.find_substitute_vps()
+        to_swap_out,outdated,source_problems,not_sshable,failed_measurements,
+            not_controllable,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.identify_faulty_nodes
 
         @logger.debug "finished finding substitites for vps"
 
         Emailer.deliver_faulty_node_report(outdated,
                                            source_problems,
                                            not_sshable,
+                                           not_controllable,
                                            failed_measurements,
                                            bad_srcs,
                                            possibly_bad_srcs)
@@ -205,9 +206,9 @@ class FailureMonitor
                 @house_cleaner.find_substitutes_for_unresponsive_targets()
         @logger.debug "finished finding substitutes for targets"
 
-        Emailer.deliver_isolation_status(bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+        Emailer.deliver_isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
         
-        @house_cleaner.swap_out_unresponsive_targets(dataset2unresponsivetargets, dataset2substitute_targets)
+        @house_cleaner.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
     end
 
     def update_auxiliary_state(node2targetstate)

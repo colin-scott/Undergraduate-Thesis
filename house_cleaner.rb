@@ -32,8 +32,8 @@ class HouseCleaner
     #   Third, pop2edgertrs
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
-        # possibly there is an EOF in there?
         # Why the broken pipe?? XXX
+        # possibly there is an EOF in there?
         system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
 
         @logger.debug "generating top pops..."
@@ -132,19 +132,19 @@ class HouseCleaner
         #   Harsha's PoPs       #
         # =======================
         
-        sorted_replacement_pops, pop2corertrs, pop2edgertrs = self::generate_top_pops
+        sorted_replacement_pops, pop2corertrs, pop2edgertrs = generate_top_pops
 
         # (see utilities.rb for .categorize())
         core_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::HarshaPoPs]\
                                         .categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
-        dataset2substitute_targets[DataSets::HarshaPoPs] = self::refill_pops(core_pop2unresponsive_targets,
+        dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsive_targets,
                                                                              FailureIsolation::CoreRtrsPerPoP,
                                                                              pop2corertrs, sorted_replacement_pops)
         @logger.debug "Harsha PoPs substituted"
         
         # (see utilities.rb for .categorize())
         edge_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
-        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = self::refill_pops(edge_pop2unresponsive_targets,
+        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsive_targets,
                                                                                    FailureIsolation::EdgeRtrsPerPoP,
                                                                                    pop2edgertrs, sorted_replacement_pops)
 
@@ -160,31 +160,27 @@ class HouseCleaner
         #  Spoofers             #
         # =======================
         
-        # what about pingability? I guess they will just be swapped out the
-        # next round...
-        #
-        # TODO: update spoofers list, put into DB, select all sshable
         unresponsive_spoofers = dataset2unresponsivetargets[DataSets::SpooferTargets] 
+        dataset2substitute_targets[DataSets::SpooferTargets] = @db.controllable_isolation_vantage_points.values
+        #  Only filter out faulty /isolation nodes/ not faulty vps
          
-        # also clear out spoofers that are consistently unresponsive to ssh.
-        # spoofers are kept in the isolation_vantage_points table
-        # and responsiveness to ssh is stored in the table!
-
         [dataset2substitute_targets, dataset2unresponsive_targets,
             possibly_bad_targets, bad_hops, possibly_bad_hops]
     end
 
+    # TODO: separate this into two methods: remove, and substitute
+    # precondition: bad_targets are a subset of the current datasets
     def swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
-        self.update_target_blacklist(bad_targets | FailureIsolation::TargetBlacklist)
+        update_target_blacklist(bad_targets | FailureIsolation::TargetBlacklist)
         @logger.debug "blacklist updated"
 
         dataset2substitute_targets.each do |dataset, substitute_targets|
             path = DataSets::ToPath(dataset)
 
             old_targets = IO.read(path).split("\n")
-            new_targets = old_targets - bad_targets + substitute_targets
+            new_targets = (old_targets - bad_targets + substitute_targets).uniq
             File.open(path, "w") { |f| f.puts new_targets.join "\n" }
         end
 
@@ -193,7 +189,7 @@ class HouseCleaner
         @logger.debug "target lists updated"
     end
 
-    def find_substitute_vps()
+    def identify_faulty_nodes()
         already_blacklisted = FailureIsolation::NodeBlacklist
 
         to_swap_out = Set.new
@@ -209,6 +205,12 @@ class HouseCleaner
         not_sshable = @not_sshable
         @not_sshable = Set.new
         to_swap_out |= not_sshable
+        
+        not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
+        # remove from target list
+        # substitutes implemented separately
+        swap_out_unresponsive_targets(not_controllable_hostname2ips.values, {})
+        to_swap_out |= not_controllable_hostname2ip.keys
 
         # XXX clear node_2_failed_measurements state
         failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
@@ -220,7 +222,7 @@ class HouseCleaner
         to_swap_out -= already_blacklisted
 
         return [to_swap_out,outdated,source_problems,not_sshable,
-            failed_measurements,bad_srcs,possibly_bad_srcs,outdated]
+            failed_measurements,not_controllable,bad_srcs,possibly_bad_srcs,outdated]
     end
 
     def swap_out_faulty_nodes(faulty_nodes)
@@ -280,7 +282,7 @@ class HouseCleaner
 end
 
 if $0 == __FILE__
-    sorted_pops, sortedpopcore, sortedpopedge = self::generate_top_pops(false)
+    sorted_pops, sortedpopcore, sortedpopedge = generate_top_pops(false)
     $stderr.puts sortedpopcore.inspect
     $stderr.puts sortedpopedge.inspect
 end

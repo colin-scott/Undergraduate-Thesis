@@ -141,6 +141,7 @@ class FailureDispatcher
             src, dst = srcdst
             if FailureIsolation::SpooferTargets.include? dst
                 dst_hostname = FailureIsolation::SpooferIP2Hostname[dst]
+                @logger.puts "check4targetswecontrol: dst ip is: #{dst}, dst_hostname is: #{dst_hostname}. ip mismap?"
 
                 if registered_hosts.include? dst_hostname
                     outage.symmetric = true
