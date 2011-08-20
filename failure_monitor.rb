@@ -16,7 +16,7 @@ class FailureMonitor
         @db = db
         @logger = logger
         @email = email
-        @house_cleaner = HouseCleaner.new(logger)
+        @house_cleaner = HouseCleaner.new(logger, @db)
 
         # TODO: handle these with optparse
         @@minutes_per_round = 2
@@ -36,14 +36,9 @@ class FailureMonitor
 
         @@outdated_node_threshold = 20
 
-        @target_set_size = 0
+        @target_set_size = FailureIsolation::TargetSet.size
 
-        File.foreach FailureIsolation::TargetSet do |line|
-            @target_set_size += 1
-        end
-
-        @all_targets = Set.new
-        File.foreach(FailureIsolation::TargetSet){ |line| @all_targets.add line.chomp }
+        @all_targets = FailureIsolation::TargetSet
 
         @all_nodes = Set.new
         File.foreach(FailureIsolation::MonitoringNodes){ |line| @all_nodes.add line.chomp }
@@ -189,7 +184,7 @@ class FailureMonitor
         end
         
         to_swap_out,outdated,source_problems,not_sshable,
-            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.find_substitute_vps(@vp)
+            failed_measurements,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.find_substitute_vps()
 
         @logger.debug "finished finding substitites for vps"
 
@@ -206,13 +201,13 @@ class FailureMonitor
     end
 
     def swap_out_unresponsive_targets
-        dataset2substitute_targets, bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops = \
-                @house_cleaner.find_substitutes_for_unresponsive_targets(@db)
+        dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops = \
+                @house_cleaner.find_substitutes_for_unresponsive_targets()
         @logger.debug "finished finding substitutes for targets"
 
         Emailer.deliver_isolation_status(bad_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
         
-        # @house_cleaner.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
+        @house_cleaner.swap_out_unresponsive_targets(dataset2unresponsivetargets, dataset2substitute_targets)
     end
 
     def update_auxiliary_state(node2targetstate)
@@ -297,6 +292,8 @@ class FailureMonitor
                 !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and # at least one connected host has been consistently connected for at least 4 rounds
                 !observingnode2rounds.empty? # at least one observing node remains
 
+              # TODO: encpasulate VPs into objects, so the to_s automatically
+              # yields the formatted string
               # now convert still_connected to strings of the form
               # "#{node} [#{time of last outage}"]"
               formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
@@ -313,7 +310,8 @@ class FailureMonitor
 
               observingnode2rounds.keys.each do |src|
                  # XXX Multiplex on Symmetry here?
-                 srcdst2outage[[src,target]] = Outage.new(src, target, formatted_connected, formatted_unconnected, formatted_never_seen)
+                 srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
+                                                          formatted_connected, formatted_unconnected, formatted_never_seen)
               end
            end
         end

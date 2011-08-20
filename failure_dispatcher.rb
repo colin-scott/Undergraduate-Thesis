@@ -87,7 +87,14 @@ class FailureDispatcher
         @logger.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
         registered_vps = @controller.hosts.clone
         srcdst2outage.delete_if do |srcdst, outage|
-            !registered_vps.include?(srcdst[0]) || (registered_vps & outage.receivers).empty?
+            if !registered_vps.include?(srcdst[0])
+               @logger.info "source #{srcdst[0]} not registered."
+               return true
+            elsif (registered_vps & outage.receivers).empty?
+               @logger.info "registered_vps & outage.receivers #{outage.receivers} empty"
+               return true
+            end
+            return false
         end
         @logger.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
 
@@ -95,8 +102,10 @@ class FailureDispatcher
 
         measurement_times = []
 
-        # We issue spoofed pings/traces globally to avoid race conditions over spoofer
+        # ================================================================================
+        # We issue spoofed pings/traces globally to avoid race conditions over spoofer   #
         # ids
+        # ================================================================================
        
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
@@ -226,7 +235,8 @@ class FailureDispatcher
         @logger.debug "traceroutes issued"
 
         if outage.tr.empty?
-            @logger.puts "empty traceroute! (#{outage.src}, #{outage.dst})"
+            @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
+            restart_atd(outage.src)
             sleep 10
             tr_time2 = Time.new
             outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
@@ -265,6 +275,7 @@ class FailureDispatcher
 
         if ping_responsive.empty?
             @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
+            restart_atd(outage.src)
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
@@ -339,6 +350,11 @@ class FailureDispatcher
             splice_alternate_paths(outage)
             @logger.debug("alternate path splicing complete")
         end
+    end
+
+    # TODO: move me into a VP object
+    def restart_atd(vp)
+        system "ssh uw_revtr2@#{vp} 'killall atd; sleep 1; sudo /sbin/service atd start > /dev/null 2>&1"
     end
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,

@@ -6,6 +6,37 @@ require 'set'
 $config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require $config
 
+# constants for names of datasets (not targets themselves)
+module DataSets
+    DataSets::HarshaPoPs = :"Harsha's most well-connected PoPs"
+    DataSets::BeyondHarshaPoPs = :"Routers on paths beyond Harsha's PoPs"
+    DataSets::CloudfrontTargets = :"CloudFront"
+    DataSets::SpooferTargets = :"PL/mlab nodes"
+    DataSets::Unknown = :"Unknown"
+
+    def self.ToPath(dataset)
+        case dataset
+        when DataSets::HarshaPoPs
+            return FailureIsolation::HarshaPoPsPath
+        when DataSets::BeyondHarshaPoPs
+            return FailureIsolation::BeyondHarshaPoPsPath
+        when DataSets::CloudfrontTargets
+            return FailureIsolation::CloudfrontTargetsPath
+        when DataSets::SpooferTargets
+            return FailureIsolation::SpooferTargetsPath
+        when DataSets::Unknown
+            return "/dev/null"
+        else
+            return "/dev/null"
+        end
+    end
+end
+
+# Harsha's Ip2PoP mappings
+module PoP
+    PoP::Unknown = :"Unknown"
+end
+
 module FailureIsolation
     FailureIsolation::DefaultPeriodSeconds = 360
 
@@ -13,7 +44,8 @@ module FailureIsolation
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
-    FailureIsolation::TargetSet = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
+    FailureIsolation::TargetSetPath = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
+    FailureIsolation::TargetSet = Set.new
     
     FailureIsolation::TestPing = "128.208.4.49" # crash.cs.washington.edu
 
@@ -76,7 +108,7 @@ module FailureIsolation
 
     def FailureIsolation::get_dataset(dst)
         if FailureIsolation::HarshaPoPs.include? dst
-            return DataSets::HarshaPops
+            return DataSets::HarshaPoPs
         elsif FailureIsolation::BeyondHarshaPoPs.include? dst
             return DataSets::BeyondHarshaPoPs 
         elsif FailureIsolation::CloudfrontTargets.include? dst
@@ -108,6 +140,9 @@ module FailureIsolation
 
         FailureIsolation::TargetBlacklist.clear
         FailureIsolation::TargetBlacklist.merge(IO.read(FailureIsolation::TargetBlacklistPath).split("\n"))
+        
+        FailureIsolation::TargetSet.clear
+        FailureIsolation::TargetSet.merge(IO.read(FailureIsolation::TargetSetPath).split("\n"))
     end
 
     FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
@@ -140,37 +175,6 @@ module FailureIsolation
 
     FailureIsolation::CoreRtrsPerPoP = 1
     FailureIsolation::EdgeRtrsPerPoP = 2
-end
-
-# constants for names of datasets (not targets themselves)
-module DataSets
-    DataSets::HarshaPoPs = :"Harsha's most well-connected PoPs"
-    DataSets::BeyondHarshaPoPs = :"Routers on paths beyond Harsha's PoPs"
-    DataSets::CloudfrontTargets = :"CloudFront"
-    DataSets::SpooferTargets = :"PL/mlab nodes"
-    DataSets::Unknown = :"Unknown"
-
-    def self.ToPath(dataset)
-        case dataset
-        when DataSets::HarshaPoPs
-            return FailureIsolation::HarshaPoPsPath
-        when DataSets::BeyondHarshaPoPs
-            return FailureIsolation::BeyondHarshaPoPsPath
-        when DataSets::CloudfrontTargets
-            return FailureIsolation::CloudfrontTargetsPath
-        when DataSets::SpooferTargets
-            return FailureIsolation::SpooferTargetsPath
-        when DataSets::Unknown
-            return "/dev/null"
-        else
-            return "/dev/null"
-        end
-    end
-end
-
-# Harsha's Ip2PoP mappings
-module PoP
-    PoP::Unknown = :"Unknown"
 end
 
 FailureIsolation::ReadInDataSets()
