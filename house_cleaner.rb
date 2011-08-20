@@ -135,7 +135,8 @@ class HouseCleaner
         sorted_replacement_pops, pop2corertrs, pop2edgertrs = self::generate_top_pops
 
         # (see utilities.rb for .categorize())
-        core_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::HarshaPoPs].categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
+        core_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::HarshaPoPs]\
+                                        .categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
         dataset2substitute_targets[DataSets::HarshaPoPs] = self::refill_pops(core_pop2unresponsive_targets,
                                                                              FailureIsolation::CoreRtrsPerPoP,
                                                                              pop2corertrs, sorted_replacement_pops)
@@ -176,7 +177,7 @@ class HouseCleaner
     def swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
-        self::update_target_blacklist(bad_targets | FailureIsolation::Blacklist)
+        self.update_target_blacklist(bad_targets | FailureIsolation::TargetBlacklist)
         @logger.debug "blacklist updated"
 
         dataset2substitute_targets.each do |dataset, substitute_targets|
@@ -187,13 +188,13 @@ class HouseCleaner
             File.open(path, "w") { |f| f.puts new_targets.join "\n" }
         end
 
-        @logger.debug "target lists updated"
-
         FailureIsolation::ReadInDataSets()
+
+        @logger.debug "target lists updated"
     end
 
     def find_substitute_vps()
-        already_blacklisted = Set.new(IO.read(FailureIsolation::BlackListPath).split("\n"))
+        already_blacklisted = FailureIsolation::NodeBlacklist
 
         to_swap_out = Set.new
 
@@ -225,9 +226,9 @@ class HouseCleaner
     def swap_out_faulty_nodes(faulty_nodes)
         @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
 
-        all_nodes = Set.new(IO.read(FailureIsolation::AllNodesPath).split("\n"))
-        blacklist = Set.new(IO.read(FailureIsolation::BlackListPath).split("\n"))
-        current_nodes = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n"))
+        all_nodes = FailureIsolation::AllNodes
+        blacklist = FailureIsolation::NodeBlackList
+        current_nodes = FailureIsolation::CurrentNodes
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
         # XXX
@@ -252,6 +253,8 @@ class HouseCleaner
 
         update_current_nodes(current_nodes)
         update_blacklist(blacklist)
+        FailureIsolation::ReadInNodeSets()
+
         system "rm #{FailureIsolation::PingStatePath}/*"
     end
 

@@ -40,8 +40,7 @@ class FailureMonitor
 
         @all_targets = FailureIsolation::TargetSet
 
-        @all_nodes = Set.new
-        File.foreach(FailureIsolation::MonitoringNodes){ |line| @all_nodes.add line.chomp }
+        @all_nodes = FailureIsolation::CurrentNodes
 
         @@never_seen_yml = "./targets_never_seen.yml"
         begin
@@ -51,7 +50,7 @@ class FailureMonitor
             @vps_2_targets_never_seen = {}
 
             # unresponsive until proven otherwise
-            File.foreach(FailureIsolation::MonitoringNodes) { |node| @vps_2_targets_never_seen[node.chomp] = @all_targets }
+            @all_nodes.each { |node| @vps_2_targets_never_seen[node.chomp] = @all_targets }
         end
         
         @@last_outage_yml = "./last_outages.yml"
@@ -69,7 +68,8 @@ class FailureMonitor
 
         # so that we don't probe the hell out of failed routers
         # target -> time
-        @target2lastisolationattempt = {}
+        @node_target2lastisolationattempt = {}
+
         # minimum time in between successive isolation measurements sent from
         # a source to a destination
         @@isolation_interval = 30 # we isolate at most every 6*10.33 =~ 60 minutes
@@ -92,7 +92,7 @@ class FailureMonitor
             start = Time.new
 
             # TODO: cat directly from ssh rather than scp'ing
-            system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::MonitoringNodes} 100 100 \
+            system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
 
             node2targetstate = read_in_results()
@@ -178,8 +178,8 @@ class FailureMonitor
 
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
-        if File.size(FailureIsolation::AllNodesPath) == File.size(FailureIsolation::BlackListPath)
-            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: ~revtr/spoofed_traceroute/blacklisted_isolation_nodes.txt")
+        if (FailureIsolation::AllNodes - FailureIsolation::NodeBlacklist).empty?
+            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}")
             return
         end
         
@@ -228,7 +228,7 @@ class FailureMonitor
             end
         end
     end
-
+e
     def remove_node(node)
         @nodetarget2lastoutage.delete_if { |n,t| n[0] == node }
         @vps_2_targets_never_seen.delete node
@@ -302,14 +302,21 @@ class FailureMonitor
 
               # don't issue isolation measurements for targets which have
               # already been probed recently
-              next if @target2lastisolationattempt.include? target and (@current_round - @target2lastisolationattempt[target] <= @@isolation_interval)
+              observingnode2rounds.each do |node, rounds|
+                if @node_target2lastisolationattempt.include? [node,target] and 
+                            (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
+                    observingnode2rounds.delete node 
+                else
+                    @node_target2lastisolationattempt[[node,target]] = @current_round
+                end
+              end
 
-              @target2lastisolationattempt[target] = @current_round
+              next if observingnode2rounds.empty?
 
               dst2outage_correlation[target] = OutageCorrelation.new(target, observingnode2rounds.keys, target2stillconnected[target])
 
               observingnode2rounds.keys.each do |src|
-                 # XXX Multiplex on Symmetry here?
+                 # TODO: Multiplex on Symmetry here?
                  srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
                                                           formatted_connected, formatted_unconnected, formatted_never_seen)
               end
