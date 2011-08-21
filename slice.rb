@@ -49,7 +49,6 @@ class Slice
             File.delete(file) if File.exists?(file)
 
         end
-        
     end
     
     # Return a hash pointing each vp to a boolean value (true if any output

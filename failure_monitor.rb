@@ -184,7 +184,7 @@ class FailureMonitor
         end
         
         to_swap_out,outdated,source_problems,not_sshable,failed_measurements,
-            not_controllable,bad_srcs,possibly_bad_srcs,outdated = @house_cleaner.identify_faulty_nodes
+            not_controllable,bad_srcs,possibly_bad_srcs,outdated = identify_faulty_nodes
 
         @logger.debug "finished finding substitites for vps"
 
@@ -211,6 +211,43 @@ class FailureMonitor
         @house_cleaner.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
     end
 
+    def identify_faulty_nodes()
+        already_blacklisted = FailureIsolation::NodeBlacklist
+
+        to_swap_out = Set.new
+
+        outdated = @outdated_nodes
+        @outdated_nodes = {}
+        to_swap_out |= outdated.map { |k,v| k }
+        
+        source_problems = @problems_at_the_source
+        @problems_at_the_source = {}
+        to_swap_out |= source_problems.keys
+
+        not_sshable = @not_sshable
+        @not_sshable = Set.new
+        to_swap_out |= not_sshable
+        
+        not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
+        # remove from target list
+        # substitutes implemented separately
+        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ips.values, {})
+        to_swap_out |= not_controllable_hostname2ip.keys
+
+        # XXX clear node_2_failed_measurements state
+        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
+        to_swap_out |= failed_measurements.map { |k,v| k }
+
+        bad_srcs, possibly_bad_srcs = @db.check_source_probing_status()
+        to_swap_out += bad_srcs
+
+        to_swap_out -= already_blacklisted
+
+        return [to_swap_out,outdated,source_problems,not_sshable,
+            failed_measurements,not_controllable,bad_srcs,possibly_bad_srcs,outdated]
+    end
+
+
     def update_auxiliary_state(node2targetstate)
         current_time = Time.now
 
@@ -229,7 +266,7 @@ class FailureMonitor
             end
         end
     end
-e
+
     def remove_node(node)
         @nodetarget2lastoutage.delete_if { |n,t| n[0] == node }
         @vps_2_targets_never_seen.delete node

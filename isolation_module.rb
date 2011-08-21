@@ -6,42 +6,6 @@ require 'set'
 $config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require $config
 
-# constants for names of datasets (not targets themselves)
-module DataSets
-    DataSets::HarshaPoPs = :"Harsha's most well-connected PoPs"
-    DataSets::BeyondHarshaPoPs = :"Routers on paths beyond Harsha's PoPs"
-    DataSets::CloudfrontTargets = :"CloudFront"
-    DataSets::SpooferTargets = :"PL/mlab nodes"
-    DataSets::Unknown = :"Unknown"
-
-    # !!!!!!!!!!!!!!!
-    #  to add a dataset, add an element to this array, and edit
-    #  the path in FailureIsolation
-    DataSets::AllDataSets = [DataSets::HarshaPoPs, DataSets::BeyondHarshaPoPs,
-        DataSets::CloudfrontTargets, DataSets::SpooferTargets]
-
-    def self.ToPath(dataset)
-        case dataset
-        when DataSets::HarshaPoPs
-            return FailureIsolation::HarshaPoPsPath
-        when DataSets::BeyondHarshaPoPs
-            return FailureIsolation::BeyondHarshaPoPsPath
-        when DataSets::CloudfrontTargets
-            return FailureIsolation::CloudfrontTargetsPath
-        when DataSets::SpooferTargets
-            return FailureIsolation::SpooferTargetsPath
-        when DataSets::Unknown
-            return "/dev/null"
-        else
-            return "/dev/null"
-        end
-    end
-end
-
-# Harsha's Ip2PoP mappings
-module PoP
-    PoP::Unknown = :"Unknown"
-end
 
 # Constants for the entire isolation system
 module FailureIsolation
@@ -166,7 +130,7 @@ module FailureIsolation
 
     def FailureIsolation::UpdateTargetSet()
         FailureIsolation::TargetSet.clear
-        union = DataSets::AllDataSets.reduce([]) { |union,dataset| union | dataset }
+        union = DataSets::AllDataSets.reduce(Set.new) { |union,dataset| union | dataset }
         FailureIsolation::TargetSet.merge(union)
         File.open(FailureIsolation::TargetSetPath, "w") { |f| f.puts FailureIsolation::TargetSet.to_a.join "\n" }
     end
@@ -223,6 +187,44 @@ module FailureIsolation
     FailureIsolation::SelectedPaths = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/selected_paths.txt"
     # PL sources and targets for top 500 PoPs. Format: <pop #> <PL node> <target>
     FailureIsolation::SourceDests = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
+end
+
+# constants for names of datasets (not targets themselves)
+module DataSets
+    DataSets::HarshaPoPs = :"Harsha's most well-connected PoPs"
+    DataSets::BeyondHarshaPoPs = :"Routers on paths beyond Harsha's PoPs"
+    DataSets::CloudfrontTargets = :"CloudFront"
+    DataSets::SpooferTargets = :"PL/mlab nodes"
+    DataSets::Unknown = :"Unknown"
+
+    # !!!!!!!!!!!!!!!
+    #  to add a dataset, add an element to this array, and edit
+    #  the path in FailureIsolation. Note that these are the Sets! not the
+    #  symbols
+    DataSets::AllDataSets = [FailureIsolation::HarshaPoPs, FailureIsolation::BeyondHarshaPoPs,
+        FailureIsolation::CloudfrontTargets, FailureIsolation::SpooferTargets]
+
+    def self.ToPath(dataset)
+        case dataset
+        when DataSets::HarshaPoPs
+            return FailureIsolation::HarshaPoPsPath
+        when DataSets::BeyondHarshaPoPs
+            return FailureIsolation::BeyondHarshaPoPsPath
+        when DataSets::CloudfrontTargets
+            return FailureIsolation::CloudfrontTargetsPath
+        when DataSets::SpooferTargets
+            return FailureIsolation::SpooferTargetsPath
+        when DataSets::Unknown
+            return "/dev/null"
+        else
+            return "/dev/null"
+        end
+    end
+end
+
+# Harsha's Ip2PoP mappings
+module PoP
+    PoP::Unknown = :"Unknown"
 end
 
 FailureIsolation::ReadInDataSets()

@@ -6,6 +6,7 @@ require 'mysql'
 require 'mail'
 require 'socket'
 require 'utilities'
+require 'db_interface'
 
 # TODO: merge with faulty VP report
 class Emailer < ActionMailer::Base
@@ -189,47 +190,13 @@ class HouseCleaner
         @logger.debug "target lists updated"
     end
 
-    def identify_faulty_nodes()
-        already_blacklisted = FailureIsolation::NodeBlacklist
-
-        to_swap_out = Set.new
-
-        outdated = @outdated_nodes
-        @outdated_nodes = {}
-        to_swap_out |= outdated.map { |k,v| k }
-        
-        source_problems = @problems_at_the_source
-        @problems_at_the_source = {}
-        to_swap_out |= source_problems.keys
-
-        not_sshable = @not_sshable
-        @not_sshable = Set.new
-        to_swap_out |= not_sshable
-        
-        not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
-        # remove from target list
-        # substitutes implemented separately
-        swap_out_unresponsive_targets(not_controllable_hostname2ips.values, {})
-        to_swap_out |= not_controllable_hostname2ip.keys
-
-        # XXX clear node_2_failed_measurements state
-        failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }
-        to_swap_out |= failed_measurements.map { |k,v| k }
-
-        bad_srcs, possibly_bad_srcs = @db.check_source_probing_status()
-        to_swap_out += bad_srcs
-
-        to_swap_out -= already_blacklisted
-
-        return [to_swap_out,outdated,source_problems,not_sshable,
-            failed_measurements,not_controllable,bad_srcs,possibly_bad_srcs,outdated]
-    end
-
+    # TODO: grab subtitute nodes from the database, not the static file
+    # TODO: make the blacklist site-specific, not host-specific
     def swap_out_faulty_nodes(faulty_nodes)
         @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
 
-        all_nodes = FailureIsolation::AllNodes
-        blacklist = FailureIsolation::NodeBlackList
+        all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
+        blacklist = FailureIsolation::NodeBlacklist
         current_nodes = FailureIsolation::CurrentNodes
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
@@ -248,6 +215,7 @@ class HouseCleaner
         end
         
         while current_nodes.size < FailureIsolation::NumActiveNodes
+            raise "No more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
             @logger.debug "choosing: #{new_vp}"
             current_nodes.add new_vp
@@ -273,11 +241,11 @@ class HouseCleaner
     end
 
     def update_blacklist(blacklist)
-        File.open(FailureIsolation::BlackListPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation::NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 
     def update_target_blacklist(blacklist)
-        File.open(FailureIsolation::TargetBlackListPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation::TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 end
 

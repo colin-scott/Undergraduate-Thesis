@@ -80,7 +80,7 @@ begin
         if !up then
             $vps[vp].save!
             puts "#{$vps.delete(vp).vantage_point} not sshable..."
-            $vps.delete vp
+            $vps.delete vp #  Can't do jack shit
         end
     }
 
@@ -102,6 +102,7 @@ begin
             $vps[vp].controllable = up
         end
     
+        # if ! up .... shouldn't we save too?!
         if up then
             $vps[vp].save!
             puts "#{$vps.delete(vp).vantage_point} works just fine..."
@@ -301,7 +302,10 @@ begin
     }
     File.delete(file) if File.exists?(file)
     
-    $vps.keys.each { |vp| puts "No idea what's going on with #{vp}..." }
+    $vps.each { |vp,obj|
+        puts "No idea what's going on with #{vp}..."
+        obj.save!
+    }
     
     # Email us in a batch 
     #Emailer.deliver_check_up_vps_issue(badSudo, "sudo") if badSudo.length > 0
