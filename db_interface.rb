@@ -31,6 +31,7 @@ class DatabaseInterface
 
     # return hash from ip -> last_responsive
     def fetch_pingability(ips)
+        raise "ips can't be nil!" if ips.nil?
         #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
         addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton($pl_host2ip[ip]) : ip }
         #@logger.puts "fetch_pingability(), addrs=#{ips.inspect}"
@@ -58,7 +59,7 @@ class DatabaseInterface
     def fetch_reverse_hops()
         sql = "select distinct inet_ntoa(hop) from cache_hops where date < (current_timestamp()-24*60*60)"
         
-        results = Set.new(query(sql))
+        results = Set.new(query(sql)).to_a
 
         # convert (singleton) arrays into the the strings they contain
         results.map { |hop| hop[0] }

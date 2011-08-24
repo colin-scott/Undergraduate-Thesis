@@ -8,18 +8,6 @@ require 'socket'
 require 'utilities'
 require 'db_interface'
 
-# TODO: merge with faulty VP report
-class Emailer < ActionMailer::Base
-  def isolation_status(email,bad_srcs,p_bad_srcs,bad_dsts,p_bad_dsts,bad_dsts_ep,p_bad_dsts_ep)
-    subject     "Isolation status: reverse path probing"
-    from        "revtr@cs.washington.edu"
-    recipients  email
-    body        :bad_srcs => bad_srcs.join("<br />"), :bad_dsts => bad_dsts.join("<br />"),
-    :possibly_bad_srcs => p_bad_srcs.join("<br />"), :possibly_bad_dsts => p_bad_dsts.join("<br />"),
-    :possibly_bad_dsts_ep => p_bad_dsts_ep.join("<br />"), :bad_dsts_ep => bad_dsts_ep.join("<br />")
-  end
-end
-
 class HouseCleaner
     def initialize(logger=LoggerLog.new($stderr), db = DatabaseInterface.new)
         @logger = logger
@@ -35,9 +23,8 @@ class HouseCleaner
     def generate_top_pops(regenerate=true)
         # Why the broken pipe?? XXX
         # possibly there is an EOF in there?
-        system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
-
         @logger.debug "generating top pops..."
+        system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
 
         sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym } 
         pops_set = Set.new(sorted_pops)
@@ -113,7 +100,7 @@ class HouseCleaner
         @logger.debug "bad_hops: #{bad_hops}"
         @logger.debug "bad_targets: #{bad_targets}"
         
-        dataset2unresponsivetargets = Hash.new { |h,k| h[k] = [] }
+        dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
 
         bad_targets.each do |target|
             @logger.debug ". #{target} identifying"
@@ -124,10 +111,10 @@ class HouseCleaner
                 next
             end
 
-            dataset2unresponsivetargets[dataset] << target
+            dataset2unresponsive_targets[dataset] << target
         end
 
-        @logger.debug "dataset2unresponsivetargets: #{dataset2unresponsivetargets.inspect}"
+        @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
 
         # =======================
         #   Harsha's PoPs       #
@@ -136,16 +123,16 @@ class HouseCleaner
         sorted_replacement_pops, pop2corertrs, pop2edgertrs = generate_top_pops
 
         # (see utilities.rb for .categorize())
-        core_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::HarshaPoPs]\
+        core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
                                         .categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
-        dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsive_targets,
+        dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
                                                                              FailureIsolation::CoreRtrsPerPoP,
                                                                              pop2corertrs, sorted_replacement_pops)
         @logger.debug "Harsha PoPs substituted"
         
         # (see utilities.rb for .categorize())
-        edge_pop2unresponsivetargets = dataset2unresponsivetargets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
-        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsive_targets,
+        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
+        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
                                                                                    FailureIsolation::EdgeRtrsPerPoP,
                                                                                    pop2edgertrs, sorted_replacement_pops)
 
@@ -161,7 +148,7 @@ class HouseCleaner
         #  Spoofers             #
         # =======================
         
-        unresponsive_spoofers = dataset2unresponsivetargets[DataSets::SpooferTargets] 
+        unresponsive_spoofers = dataset2unresponsive_targets[DataSets::SpooferTargets] 
         dataset2substitute_targets[DataSets::SpooferTargets] = @db.controllable_isolation_vantage_points.values
         #  Only filter out faulty /isolation nodes/ not faulty vps
          
@@ -171,10 +158,11 @@ class HouseCleaner
 
     # TODO: separate this into two methods: remove, and substitute
     # precondition: bad_targets are a subset of the current datasets
-    def swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
+    def swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets)
+        bad_targets = dataset2unresponsive_targets.values.reduce([]) { |sum,array| sum | array }
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
-        update_target_blacklist(bad_targets | FailureIsolation::TargetBlacklist)
+        update_target_blacklist(bad_targets.to_set | FailureIsolation::TargetBlacklist)
         @logger.debug "blacklist updated"
 
         dataset2substitute_targets.each do |dataset, substitute_targets|

@@ -1,7 +1,6 @@
 require 'failure_dispatcher'
 require 'house_cleaner'
 require 'isolation_module'
-require 'isolation_probe_status'
 require 'set'
 require 'yaml'
 require 'outage'
@@ -207,10 +206,10 @@ class FailureMonitor
         @logger.debug "finished finding substitutes for targets"
 
         Emailer.deliver_isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
-        
-        @house_cleaner.swap_out_unresponsive_targets(bad_targets, dataset2substitute_targets)
+         
+        @house_cleaner.swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets) 
     end
-
+     
     def identify_faulty_nodes()
         already_blacklisted = FailureIsolation::NodeBlacklist
 
@@ -231,7 +230,7 @@ class FailureMonitor
         not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
         # remove from target list
         # substitutes implemented separately
-        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ips.values, {})
+        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.values, {})
         to_swap_out |= not_controllable_hostname2ip.keys
 
         # XXX clear node_2_failed_measurements state

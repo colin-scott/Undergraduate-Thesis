@@ -6,7 +6,6 @@ require 'set'
 $config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require $config
 
-
 # Constants for the entire isolation system
 module FailureIsolation
     # ====================================

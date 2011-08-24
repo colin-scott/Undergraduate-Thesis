@@ -137,7 +137,8 @@ class Emailer < ActionMailer::Base
       subject     "Isolation target status"
       from        "failures@cs.washington.edu"
       recipients  "failures@cs.washington.edu"
-      body        :bad_targets => bad_targets, :possibly_bad_targets => possibly_bad_targets,
+      body        :dataset2unresponsive_targets => dataset2unresponsive_targets, 
+                    :possibly_bad_targets => possibly_bad_targets,
                    :bad_hops => bad_hops, :possibly_bad_hops => possibly_bad_hops
     end
 end
