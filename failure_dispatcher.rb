@@ -84,19 +84,20 @@ class FailureDispatcher
 
         # first filter out any outages where no nodes are actually registered
         # with the controller
-        @logger.puts "before filtering, srcdst2outage: #{srcdst2outage.inspect}"
+        @logger.puts "before filtering, srcdst2outage: #{srcdst2outage.keys.inspect}"
         registered_vps = @controller.hosts.clone
-        srcdst2outage.delete_if do |srcdst, outage|
+        srcdst2outage.each do |srcdst, outage|
             if !registered_vps.include?(srcdst[0])
                @logger.puts "source #{srcdst[0]} not registered."
-               return true
+               srcdst2outage.delete srcdst
+               next
             elsif (registered_vps & outage.receivers).empty?
                @logger.puts "registered_vps & outage.receivers #{outage.receivers} empty"
-               return true
+               srcdst2outage.delete srcdst
+               next
             end
-            return false
         end
-        @logger.puts "after filtering, srcdst2outage: #{srcdst2outage.inspect}"
+        @logger.puts "after filtering, srcdst2outage: #{srcdst2outage.keys.inspect}"
 
         return if srcdst2outage.empty? # optimization
 
@@ -141,7 +142,7 @@ class FailureDispatcher
             src, dst = srcdst
             if FailureIsolation::SpooferTargets.include? dst
                 dst_hostname = FailureIsolation::SpooferIP2Hostname[dst]
-                @logger.puts "check4targetswecontrol: dst ip is: #{dst}, dst_hostname is: #{dst_hostname}. ip mismap?"
+                @logger.puts "check4targetswecontrol: dst ip is: #{dst}, dst_hostname is: #{dst_hostname}. ip mismap?" if dst_hostname.nil?
 
                 if registered_hosts.include? dst_hostname
                     outage.symmetric = true
@@ -258,7 +259,7 @@ class FailureDispatcher
             3.times do 
                 sleep 30
                 outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
-                issue_spoofed_traceroutes({[src,dst] => outage})
+                issue_spoofed_traceroutes({[outage.src,outage.dst] => outage})
 
                 break if !outage.paths_diverge?
                 measurements_reissued += 1
