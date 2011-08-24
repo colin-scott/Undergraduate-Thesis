@@ -232,7 +232,7 @@ class FailureMonitor
 
         # remove from target list
         # substitutes implemented separately
-        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.value_set, {})
+        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.values, {})
         to_swap_out |= not_controllable
 
         # XXX clear node_2_failed_measurements state

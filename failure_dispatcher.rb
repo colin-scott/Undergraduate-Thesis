@@ -88,10 +88,10 @@ class FailureDispatcher
         registered_vps = @controller.hosts.clone
         srcdst2outage.delete_if do |srcdst, outage|
             if !registered_vps.include?(srcdst[0])
-               @logger.info "source #{srcdst[0]} not registered."
+               @logger.puts "source #{srcdst[0]} not registered."
                return true
             elsif (registered_vps & outage.receivers).empty?
-               @logger.info "registered_vps & outage.receivers #{outage.receivers} empty"
+               @logger.puts "registered_vps & outage.receivers #{outage.receivers} empty"
                return true
             end
             return false
