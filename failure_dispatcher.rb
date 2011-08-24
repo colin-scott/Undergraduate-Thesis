@@ -592,7 +592,7 @@ class FailureDispatcher
         targets = non_responsive_hops.map { |hop| hop.ip }
 
         src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
-        pingable_ips = src2reachable.values.reduce([]) { |sum,set| sum | set }
+        pingable_ips = src2reachable.value_set.to_a
 
         non_responsive_hops.each do |hop|
             hop.reachable_from_other_vps = pingable_ips.include? hop.ip

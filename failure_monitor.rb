@@ -228,10 +228,12 @@ class FailureMonitor
         to_swap_out |= not_sshable
         
         not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
+        not_controllable = not_controllable_hostname2ip.keys
+
         # remove from target list
         # substitutes implemented separately
-        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.values, {})
-        to_swap_out |= not_controllable_hostname2ip.keys
+        @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.value_set, {})
+        to_swap_out |= not_controllable
 
         # XXX clear node_2_failed_measurements state
         failed_measurements = @dispatcher.node_2_failed_measurements.find_all { |node,missed_count| missed_count > @@failed_measurement_threshold }

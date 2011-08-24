@@ -159,7 +159,10 @@ class HouseCleaner
     # TODO: separate this into two methods: remove, and substitute
     # precondition: bad_targets are a subset of the current datasets
     def swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets)
-        bad_targets = dataset2unresponsive_targets.values.reduce([]) { |sum,array| sum | array }
+        bad_targets = (dataset2unresponsive_targets.is_a?(Hash) ? \
+                       dataset2unresponsive_targets.value_set : \
+                       dataset2unresponsive_targets 
+
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
         update_target_blacklist(bad_targets.to_set | FailureIsolation::TargetBlacklist)

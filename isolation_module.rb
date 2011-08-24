@@ -129,7 +129,7 @@ module FailureIsolation
 
     def FailureIsolation::UpdateTargetSet()
         FailureIsolation::TargetSet.clear
-        union = DataSets::AllDataSets.reduce(Set.new) { |union,dataset| union | dataset }
+        union = DataSets::AllDataSets.value_set
         FailureIsolation::TargetSet.merge(union)
         File.open(FailureIsolation::TargetSetPath, "w") { |f| f.puts FailureIsolation::TargetSet.to_a.join "\n" }
     end
