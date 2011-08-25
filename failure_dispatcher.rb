@@ -43,7 +43,7 @@ class FailureDispatcher
 
         @ipInfo = IpInfo.new
 
-        @failure_analyzer = FailureAnalyzer.new(@ipInfo)
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger)
         
         @db = db
 
@@ -512,7 +512,7 @@ class FailureDispatcher
 
         @logger.debug "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
 
-        raise "issue_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" unless srcdst2revtr.is_a?(Hash) or srcdst2revtr.is_a?(DRb::DRbObject)
+        raise "issue_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" if !srcdst2revtr.is_a?(Hash) and !srcdst2revtr.is_a?(DRb::DRbObject)
 
         if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
             return SpoofedReversePath.new([:nil_return_value])

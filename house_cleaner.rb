@@ -171,8 +171,8 @@ class HouseCleaner
         dataset2substitute_targets.each do |dataset, substitute_targets|
             path = DataSets::ToPath(dataset)
 
-            old_targets = IO.read(path).split("\n")
-            new_targets = (old_targets - bad_targets + substitute_targets).uniq
+            old_targets = Set.new IO.read(path).split("\n")
+            new_targets = (old_targets - bad_targets.to_set + substitute_targets.to_set)
             File.open(path, "w") { |f| f.puts new_targets.join "\n" }
         end
 

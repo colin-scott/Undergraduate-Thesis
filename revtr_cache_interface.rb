@@ -18,9 +18,10 @@ class RevtrCache
     @@max_hops = 30
     @@do_remapping = false
 
-    def initialize(connection, ipInfo)
+    def initialize(connection, ipInfo, logger=LoggerLog.new($stderr))
         @connection = connection
         @ipInfo = ipInfo
+        @logger = logger
     end
 
     def get_cached_reverse_path(src, dst)
@@ -55,7 +56,7 @@ class RevtrCache
               old_dst = dst
               dst = row["last_hop"].to_i
             }
-            $LOG.puts "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}"
+            @logger.puts "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}"
           end
     
           sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
@@ -73,18 +74,18 @@ class RevtrCache
             reason = "not yet attempted"
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
             "#{src} and dst=#{dst}"
-            #          $LOG.puts sql
+            #          @logger.puts sql
             begin
               results = @connection.query sql
               results.each_hash{|row|
                 reason = row["state"] + " at " + row["lastUpdate"]
               }
             rescue Mysql::Error
-              $LOG.puts "Error with query: #{sql}"
-              $LOG.puts $!
+              @logger.puts "Error with query: #{sql}"
+              @logger.puts $!
             end
     
-            $LOG.puts "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
+            @logger.puts "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
     
             path.valid = false
             path.invalid_reason = reason
@@ -126,8 +127,8 @@ class RevtrCache
           break unless path.empty?
         end # results.each_hash
       rescue Mysql::Error
-        $LOG.puts "Error with query: #{sql}"
-        $LOG.puts $!
+        @logger.puts "Error with query: #{sql}"
+        @logger.puts $!
       end # begin
     
       path.pop while !path.empty? and path[-1].ip=="0.0.0.0"
