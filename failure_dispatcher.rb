@@ -84,7 +84,8 @@ class FailureDispatcher
 
         # first filter out any outages where no nodes are actually registered
         # with the controller
-        @logger.puts "before filtering, srcdst2outage: #{srcdst2outage.keys.inspect}"
+        srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
+        @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
         registered_vps = @controller.hosts.clone
         srcdst2outage.each do |srcdst, outage|
             if !registered_vps.include?(srcdst[0])
@@ -97,7 +98,8 @@ class FailureDispatcher
                next
             end
         end
-        @logger.puts "after filtering, srcdst2outage: #{srcdst2outage.keys.inspect}"
+        srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
+        @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
         return if srcdst2outage.empty? # optimization
 
@@ -341,7 +343,7 @@ class FailureDispatcher
                !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
             # TODO: should the key be the ip, or the Hop object?
            upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
-           outage.upstream_reverse_paths = {suspected_failure.next.ip => upstream_revtr}
+           outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
            @logger.debug("upstream revtr issued")
         end
 
