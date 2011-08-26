@@ -86,6 +86,10 @@ module FailureIsolation
     FailureIsolation::CloudfrontTargetsPath = "#{FailureIsolation::DataSetDir}/cloudfront_ips.txt"
     FailureIsolation::CloudfrontTargets = Set.new
 
+    # targets taken from AT&T ips, for potential ground truth
+    FailureIsolation::ATTTargetsPath = "/homes/network/revtr/dave/revtr-test/reverse_traceroute/data/att_responsive_just_ips.txt"
+    FailureIsolation::ATTTargets = Set.new
+
     # !!!!!!!!!!!!!!!!!!!
     #   to add a dataset, mimick the above lines
 
@@ -98,6 +102,8 @@ module FailureIsolation
             return DataSets::CloudfrontTargets
         elsif FailureIsolation::SpooferTargets.include? dst
             return DataSets::SpooferTargets
+        elsif FailureIsolation::ATTTargets.include? dst
+            return DataSets::ATTTargets
         else
             return DataSets::Unknown 
         end
@@ -124,6 +130,9 @@ module FailureIsolation
         FailureIsolation::TargetBlacklist.clear
         FailureIsolation::TargetBlacklist.merge(IO.read(FailureIsolation::TargetBlacklistPath).split("\n"))
 
+        FailureIsolation::ATTTargets.clear
+        FailureIsolation::ATTTargets.merge(IO.read(FailureIsolation::ATTTargetsPath).split("\n"))
+
         FailureIsolation::UpdateTargetSet()
     end
 
@@ -138,7 +147,7 @@ module FailureIsolation
     #         Vantage Points             #
     # ====================================
 
-    FailureIsolation::NumActiveNodes = 12
+    FailureIsolation::NumActiveNodes = 13
 
     FailureIsolation::AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
     FailureIsolation::AllNodes = Set.new
@@ -186,6 +195,7 @@ module FailureIsolation
     FailureIsolation::SelectedPaths = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/selected_paths.txt"
     # PL sources and targets for top 500 PoPs. Format: <pop #> <PL node> <target>
     FailureIsolation::SourceDests = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
+    
 end
 
 # constants for names of datasets (not targets themselves)
@@ -195,13 +205,14 @@ module DataSets
     DataSets::CloudfrontTargets = :"CloudFront"
     DataSets::SpooferTargets = :"PL/mlab nodes"
     DataSets::Unknown = :"Unknown"
+    DataSets::ATTTargets = :"ATT"
 
     # !!!!!!!!!!!!!!!
     #  to add a dataset, add an element to this array, and edit
     #  the path in FailureIsolation. Note that these are the Sets! not the
     #  symbols
     DataSets::AllDataSets = [FailureIsolation::HarshaPoPs, FailureIsolation::BeyondHarshaPoPs,
-        FailureIsolation::CloudfrontTargets, FailureIsolation::SpooferTargets]
+        FailureIsolation::CloudfrontTargets, FailureIsolation::SpooferTargets,FailureIsolation::ATTTargets]
 
     def self.ToPath(dataset)
         case dataset
@@ -213,6 +224,8 @@ module DataSets
             return FailureIsolation::CloudfrontTargetsPath
         when DataSets::SpooferTargets
             return FailureIsolation::SpooferTargetsPath
+        when DataSets::ATTTargets
+            return FailureIsolation::ATTTargetsPath
         when DataSets::Unknown
             return "/dev/null"
         else

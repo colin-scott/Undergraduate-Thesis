@@ -3,16 +3,39 @@
 require 'hops'
 require 'isolation_module'
 
+# encapsulates mutiple (src,dst) pairs identified as being related to the same
+# failure
+class MergedOutage
+   extend Forwardable
+   def_delegators :@outages,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
+       :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
+       :empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,
+       :initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,
+       :reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,
+       :slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,
+       :|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,
+       :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
+       :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+
+    def initialize(*outages)
+        outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
+        @outages = outages
+    end
+end
+
 # TODO: builder pattern?
 # TODO: convert all old SymmetricOutage objects to Outage.symmetric = true
 class Outage
+  # !! suspected_failure is for backwards compatibility...
+  #    suspected_failures is now a hash { :direction => [suspected_failure1, suspected_failure2...] }
+  #              hash to account for bidirectional outages
   attr_accessor :file, :src, :dst, :dataset, :direction, :connected, :formatted_connected,
                                           :formatted_unconnected, :formatted_never_seen, :pings_towards_src,
                                           :tr, :spoofed_tr,
                                           :dst_tr, :dst_spoofed_tr, :src_ip, :dst_hostname,
                                           :historical_tr, :historical_trace_timestamp,
                                           :spoofed_revtr, :historical_revtr,
-                                          :suspected_failure, :as_hops_from_dst, :as_hops_from_src, 
+                                          :suspected_failure, :suspected_failures, :as_hops_from_dst, :as_hops_from_src, 
                                           :alternate_paths, :measured_working_direction, :path_changed,
                                           :measurement_times, :passed_filters, 
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
@@ -118,6 +141,7 @@ class Outage
        ping_responsive
    end
 
+   # XXX do I want functionality within the class???
    def paths_diverge?
         spoofed_tr_loop = @spoofed_tr.contains_loop?()
         tr_loop = @tr.contains_loop?()
@@ -135,15 +159,32 @@ class Outage
         return spoofed_tr_loop || tr_loop || divergence
    end
 
-    # given an array of the form:
-    #   [[measurement_type, time], ...]
-    # Transform it into:
-    #   [[measurement_type, time, duration], ... ]
-    def insert_measurement_durations
-        0.upto(@measurement_times.size - 2) do |i|
-            duration = @measurement_times[i+1][1] - @measurement_times[i][1] 
-            @measurement_times[i] << "(#{duration} seconds)"
-        end
+   # XXX do I want functionality within the class???
+   def anyone_on_as_boundary?()
+       return false if @suspected_failure.nil?
+
+       [@tr, @spoofed_tr, @historical_tr, @spoofed_revtr].each do |path|
+           same_hop = path.find { |hop| !hop.is_a?(MockHop) && hop.cluster == @suspected_failure.cluster }
+           if !same_hop.nil? && same_hop.on_as_boundary?
+               #puts same_hop.asn
+               #puts same_hop.previous.asn
+               #puts same_hop.next.asn
+               return same_hop.on_as_boundary?
+           end
+       end
+
+       return false
+   end
+
+   # given an array of the form:
+   #   [[measurement_type, time], ...]
+   # Transform it into:
+   #   [[measurement_type, time, duration], ... ]
+   def insert_measurement_durations
+       0.upto(@measurement_times.size - 2) do |i|
+           duration = @measurement_times[i+1][1] - @measurement_times[i][1] 
+           @measurement_times[i] << "(#{duration} seconds)"
+       end
    end
 
    # Our fake builder pattern
@@ -160,22 +201,6 @@ class Outage
        @historical_tr.link_listify!
        @historical_revtr.link_listify!
        @spoofed_revtr.link_listify!
-   end
-
-   def anyone_on_as_boundary?()
-       return false if @suspected_failure.nil?
-
-       [@tr, @spoofed_tr, @historical_tr, @spoofed_revtr].each do |path|
-           same_hop = path.find { |hop| !hop.is_a?(MockHop) && hop.cluster == @suspected_failure.cluster }
-           if !same_hop.nil? && same_hop.on_as_boundary?
-               #puts same_hop.asn
-               #puts same_hop.previous.asn
-               #puts same_hop.next.asn
-               return same_hop.on_as_boundary?
-           end
-       end
-
-       return false
    end
 
    def to_s()

@@ -78,7 +78,7 @@ class FailureDispatcher
         end
     end
 
-    # precondition: stillconnected are able to reach dst
+    # precondition: sdtillconnected are able to reach dst
     def isolate_outages(srcdst2outage, dst2outage_correlation, testing=false) # this testing flag is terrrrible
         @have_retried_connection = false
 
@@ -293,7 +293,7 @@ class FailureDispatcher
 
         @logger.debug "pings to non-responsive hops issued"
 
-        if outage.direction != Direction::REVERSE and outage.direction != Direction::BOTH and !testing
+        if outage.direction != Direction.REVERSE and outage.direction != Direction.BOTH and !testing
             outage.measurement_times << ["revtr", Time.new]
             outage.spoofed_revtr = issue_revtr(outage.src, outage.dst, outage.historical_tr.map { |hop| hop.ip })
         else
@@ -316,9 +316,8 @@ class FailureDispatcher
 
         @logger.debug "historical pingability fetched"
 
-        outage.suspected_failure = @failure_analyzer.identify_fault(outage.src, outage.dst, outage.direction, outage.tr, 
-                                                             outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
-                                                             outage.historical_revtr)
+        #TODO: move all of these the (outage) pattern
+        @failure_analyzer.identify_faults(outage)
 
         outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
         outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
@@ -339,7 +338,7 @@ class FailureDispatcher
         # TODO: an upstream router in a reverse traceroute at the reachability
         # horizon: was there a path change? Issue spoofed reverse traceroute,
         # and compare to historical reverse traceroute.
-        if(outage.direction == Direction::REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
+        if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
                !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
             # TODO: should the key be the ip, or the Hop object?
            upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
@@ -635,7 +634,7 @@ class FailureDispatcher
     def splice_alternate_paths(outage)
        raise "not a symmetric outage!" unless outage.symmetric
 
-       if outage.direction == Direction::FORWARD
+       if outage.direction == Direction.FORWARD
           # TODO: use other data for finding ingresses
           return if outage.tr.empty? # spooftr
           return if outage.historical_tr.empty?

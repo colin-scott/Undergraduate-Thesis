@@ -2,10 +2,47 @@ require 'isolation_module'
 require 'ip_info'
 
 class Direction
-    FORWARD = "forward path"
-    REVERSE = "reverse path"
-    BOTH = "bi-directional"
-    FALSE_POSITIVE = "both paths seem to be working...?"
+    # make initializer public during class loading (to deal with load ' ' calls)
+    public_class_method :new
+
+    def initialize(symbol)
+        @symbol = symbol
+    end
+
+    @@forward = Direction.new(:"forward path")
+    @@reverse = Direction.new(:"reverse path")
+    @@both = Direction.new(:"bi-directional")
+    @@false_positive = Direction.new(:"both paths seem to be working...?")
+
+    def self.FORWARD
+        return @@forward
+    end
+
+    def self.REVERSE
+        return @@reverse
+    end
+
+    def self.BOTH
+        return @@both
+    end
+
+    def self.FALSE_POSITIVE
+        return @@false_positive
+    end
+
+    def to_s()
+        @symbol.to_s
+    end
+
+    def is_forward?()
+        return (self == Direction.FORWARD or self == Direction.BOTH)
+    end
+
+    def self.is_reverse?()
+        return (self == Direction.REVERSE or self == Direction.BOTH)
+    end
+
+    private_class_method :new # singletons
 end
 
 class AlternatePath
@@ -21,20 +58,39 @@ class FailureAnalyzer
     def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr))
         @ipInfo = ipInfo
         @logger = logger
+
+        @suspect_set_initializers = []
+        @suspect_set_pruners = []
+    end
+
+    # initializer contract:
+    #   - takes a MergedOutage object as param
+    #   - returns a set of suspects
+    def register_suspect_set_initializer(&initializer)
+        @suspect_set_initializers << initializer
+    end
+
+    # pruner contract:
+    #   - takes a set of suspects, and a MergedOutage object
+    #   - prunes the set of suspects, and returns nil
+    def register_suspect_set_pruner(&pruner)
+        @suspect_set_pruners << pruner
     end
 
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
-    def identify_fault(src, dst, direction, tr, spoofed_tr, historical_tr,
-                                      spoofed_revtr, historical_revtr)
-        case direction
-        when Direction::REVERSE
-            if !historical_revtr.valid?
+    # TODO: create plug-in architecture for:
+    #       - initializing suspect set
+    #       - pruning the suspect set
+    def identify_faults(outage)
+        case outage.direction
+        when Direction.REVERSE
+            if !outage.historical_revtr.valid?
                 # let m be the first forward hop that does not yield a revtr to s
-                tr_suspect = tr.last_responsive_hop
-                spooftr_suspect = spoofed_tr.last_responsive_hop
+                tr_suspect = outage.tr.last_responsive_hop
+                spooftr_suspect = outage.spoofed_tr.last_responsive_hop
                 suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-                return suspected_hop
+                outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
 
                 # baaaaah. This is confusing and not all that helpful.
                 #
@@ -46,23 +102,25 @@ class FailureAnalyzer
                 #
                 # Will only have a historical_revtr if the suspected hop is a
                 # historical hop, or the hops of the measured path overlap.
-                # historical_revtr = fetch_historical_revtr(src, suspected_hop)
+                # historical_revtr = fetch_historical_revtr(outage.src, suspected_hop)
                 # XXX 
                 # return suspected_hop
             else
                 # TODO: more stuff with
-                return historical_revtr.unresponsive_hop_farthest_from_dst()
+                return outage.historical_revtr.unresponsive_hop_farthest_from_dst()
             end # what if the spoofed revtr went through?
-        when Direction::FORWARD, Direction::BOTH
+        when Direction.FORWARD
             # the failure is most likely adjacent to the last responsive forward hop
-            last_tr_hop = tr.last_non_zero_hop
-            last_spooftr_hop = spoofed_tr.last_non_zero_hop
+            last_tr_hop = outage.tr.last_non_zero_hop
+            last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
             return suspected_hop
-        when Direction::FALSE_POSITIVE
+        when Direction.BOTH
+            return [1,2]
+        when Direction.FALSE_POSITIVE
             return "problem resolved itself"
         else 
-            raise ArgumentError.new("unknown direction #{direction}!")
+            raise ArgumentError.new("unknown direction #{outage.direction}!")
         end
     end
 
@@ -139,11 +197,11 @@ class FailureAnalyzer
             alternate_paths << :"historical forward path"
         end
     
-        if(direction == Direction::FORWARD && measured_working_direction?(direction, spoofed_revtr))
+        if(direction == Direction.FORWARD && measured_working_direction?(direction, spoofed_revtr))
             alternate_paths << :"reverse path"
         end
     
-        if(direction == Direction::REVERSE && measured_working_direction?(direction, spoofed_tr))
+        if(direction == Direction.REVERSE && measured_working_direction?(direction, spoofed_tr))
             alternate_paths << :"forward path"
         end
 
@@ -152,9 +210,9 @@ class FailureAnalyzer
 
     def measured_working_direction?(direction, spoofed_revtr)
         case direction
-        when Direction::FORWARD
+        when Direction.FORWARD
             return (spoofed_revtr.valid?) ? spoofed_revtr.num_sym_assumptions : false
-        when Direction::REVERSE
+        when Direction.REVERSE
             return true # spoofed forward tr must have gone through
         else
             return false
@@ -163,10 +221,10 @@ class FailureAnalyzer
 
     def path_changed?(historical_tr, tr, spoofed_tr, direction)
        case direction
-       when Direction::REVERSE
-       when Direction::FORWARD
-       when Direction::BOTH
-       when Direction::FALSE_POSITIVE
+       when Direction.REVERSE
+       when Direction.FORWARD
+       when Direction.BOTH
+       when Direction.FALSE_POSITIVE
        else
        end
 
@@ -181,16 +239,16 @@ class FailureAnalyzer
     def infer_direction(reverse_problem, forward_problem)
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
-            direction = Direction::REVERSE
+            direction = Direction.REVERSE
         elsif(reverse_problem and forward_problem)
             # failure is bidirectional
-            direction = Direction::BOTH
+            direction = Direction.BOTH
         elsif(!reverse_problem and forward_problem)
             # failure is only on the forward path
-            direction = Direction::FORWARD
+            direction = Direction.FORWARD
         else
             # just a lossy link?
-            direction = Direction::FALSE_POSITIVE
+            direction = Direction.FALSE_POSITIVE
         end
 
         direction
@@ -217,13 +275,13 @@ class FailureAnalyzer
 
         last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
 
-        reverse_path_helpless = (direction == Direction::REVERSE && !historical_revtr.valid?)
+        reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
 
-        if(!(testing || (!destination_pingable && direction != Direction::FALSE_POSITIVE &&
+        if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
                 !historical_trace_didnt_reach && !reverse_path_helpless)))
 
-            bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction::FALSE_POSITIVE, 
+            bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction.FALSE_POSITIVE, 
                 :forward_meas_essss => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
                 :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
 
@@ -236,7 +294,7 @@ class FailureAnalyzer
 
     # TODO: get rid of Mock Hops!!!
     def categorize_failure(outage)
-        if outage.direction == Direction::BOTH or outage.direction == Direction::FORWARD
+        if outage.direction == Direction.BOTH or outage.direction == Direction.FORWARD
             # Do the measured forward paths stop at the same hop? They should...
             last_tr_hop = outage.tr.last_responsive_hop
             last_spoofed_tr_hop = outage.spoofed_tr.last_responsive_hop
@@ -269,7 +327,7 @@ class FailureAnalyzer
                 # BROKEN? do we arrive here if suspecteD_failure is nil?
                 return :unclear_forward_path
             end
-        else # Direction::REVERSE
+        else # Direction.REVERSE
             # is there a crystal clear "reachability horizon"?
             # This is easy to do visually. Several historical reverse paths,
             # all converging to one point, which is then pingable afterwards
@@ -320,7 +378,7 @@ class FailureAnalyzer
     def pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
         pingable_targets = []
 
-        if (direction == Direction::FORWARD or direction == Direction::BOTH) and !suspected_failure.nil? and !suspected_failure.ttl.nil?
+        if (direction == Direction.FORWARD or direction == Direction.BOTH) and !suspected_failure.nil? and !suspected_failure.ttl.nil?
             pingable_targets += historical_tr.find_all { |hop| !hop.nil? && !hop.ttl.nil? && hop.ttl > suspected_failure.ttl && hop.ping_responsive }
         end
 
