@@ -20,7 +20,7 @@ receivers = hosts[0..5]
 if ARGV.empty?
     target = "132.252.152.193"
     srcdst = [src, target]
-    outage = Outage.new(src, target, receivers, [], [])
+    outage = Outage.new(src, target, receivers, [], [], [])
     outage_correlation = OutageCorrelation.new(target, [src], receivers)
     dispatcher.isolate_outages({srcdst => outage},{target => outage_correlation}, true)
 else

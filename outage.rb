@@ -61,6 +61,7 @@ class Outage
         @additional_traces = {}
         @upstream_reverse_paths = {}
         @spliced_paths = []
+        @suspected_failures = {}
 
         case args.size
         when 6

@@ -38,7 +38,7 @@ class Direction
         return (self == Direction.FORWARD or self == Direction.BOTH)
     end
 
-    def self.is_reverse?()
+    def is_reverse?()
         return (self == Direction.REVERSE or self == Direction.BOTH)
     end
 

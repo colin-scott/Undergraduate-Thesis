@@ -216,7 +216,7 @@ class FailureDispatcher
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
         outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
-        @logger.debug("direction: " + outage.direction)
+        @logger.debug("direction: #{outage.direction}")
 
         # HistoricalForwardHop objects
         outage.historical_tr, outage.historical_trace_timestamp = retrieve_historical_tr(outage.src, outage.dst)
