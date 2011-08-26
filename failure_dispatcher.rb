@@ -319,9 +319,9 @@ class FailureDispatcher
         #TODO: move all of these the (outage) pattern
         @failure_analyzer.identify_faults(outage)
 
-        outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
-        outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
-                                                outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
+        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
+        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
+        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
 
         outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
                                                     outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)

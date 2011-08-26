@@ -54,6 +54,8 @@ end
 
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
+#
+# essentially, acts on Outage objects which already have data fields filled in
 class FailureAnalyzer
     def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr))
         @ipInfo = ipInfo
@@ -83,8 +85,19 @@ class FailureAnalyzer
     #       - initializing suspect set
     #       - pruning the suspect set
     def identify_faults(outage)
-        case outage.direction
-        when Direction.REVERSE
+        if outage.direction.is_reverse?
+            # TODO: 
+            # suspect_set = Set.new
+            # @suspect_set_initializers.each do |init| 
+            #   suspect_set |= init.call outage 
+            # end
+            #
+            # @suspect_set_pruners.each do |pruner|
+            #   pruner.call suspect_set, outage
+            # end
+            #
+            # outage.suspected_failures[Direction::REVERSE] = suspect_set
+
             if !outage.historical_revtr.valid?
                 # let m be the first forward hop that does not yield a revtr to s
                 tr_suspect = outage.tr.last_responsive_hop
@@ -107,29 +120,31 @@ class FailureAnalyzer
                 # return suspected_hop
             else
                 # TODO: more stuff with
-                return outage.historical_revtr.unresponsive_hop_farthest_from_dst()
+                outage.suspected_failures[Direction.REVERSE] = [outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
             end # what if the spoofed revtr went through?
-        when Direction.FORWARD
+        end
+
+        if outage.direction.is_forward?
             # the failure is most likely adjacent to the last responsive forward hop
             last_tr_hop = outage.tr.last_non_zero_hop
             last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-            return suspected_hop
-        when Direction.BOTH
-            return [1,2]
-        when Direction.FALSE_POSITIVE
-            return "problem resolved itself"
-        else 
-            raise ArgumentError.new("unknown direction #{outage.direction}!")
+            outage.suspected_failures[Direction.FORWARD] = [suspected_hop]
+        end
+
+        if outage.direction == Direction.FALSE_POSITIVE
+            outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
         end
     end
 
+    # TODO: add as_hops_from_src to Hop objects
     def as_hops_from_src(suspected_hop, tr, spoofed_tr, historical_tr)
         as_hops_from_src = [count_AS_hops(tr, suspected_hop),
                 count_AS_hops(spoofed_tr, suspected_hop),
                 count_AS_hops(historical_tr, suspected_hop)].max
     end
 
+    # TODO: add as_hops_from_dst to Hop objects
     def as_hops_from_dst(suspected_hop, historical_revtr, spoofed_revtr, spoofed_tr, tr, as_hops_from_src)
         metrics = [count_AS_hops(historical_revtr, suspected_hop),
                 count_AS_hops(spoofed_revtr, suspected_hop)]
