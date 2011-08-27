@@ -9,9 +9,8 @@ require 'outage_correlation'
 
 require 'utilities'
 Thread.abort_on_exception = true
-$LOG = LoggerLog.new($stderr)
 
-dispatcher = FailureDispatcher.new
+dispatcher = FailureDispatcher.new()
 
 hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.sort_by { rand }.clone
 src = hosts.shift

@@ -98,14 +98,13 @@ class Emailer < ActionMailer::Base
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
 
-    def isolation_results(outage, testing=false)
-        subject     (outage.symmetric) ? "Ground Truth Isolation Results #{outage.src} #{outage.dst}" \
-                                       : "Isolation Results #{outage.src} #{outage.dst}"
+    def isolation_results(merged_outage, testing=false)
+        subject "Isolation Results #{merged_outage.file}"
         
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
 
-        body        :outage => outage
+        body        :merged_outage => merged_outage
     end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
         subject     "Isolation Module Exception"

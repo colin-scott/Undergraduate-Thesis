@@ -26,6 +26,8 @@ module FailureIsolation
 
     FailureIsolation::CachedRevtrTool = "~/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
 
+    FailureIsolation::SuspectSetProcessors = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/suspect_set_processing.rb"
+
     def FailureIsolation::read_in_spoofer_hostnames()
        ip2hostname = {}
        File.foreach("#{$DATADIR}/up_spoofers_w_ips.txt") do |line|
@@ -42,6 +44,7 @@ module FailureIsolation
     #         Data Directories           #
     # ====================================
     FailureIsolation::IsolationResults = "#{$DATADIR}/isolation_results_final"
+    FailureIsolation::MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     FailureIsolation::Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
     FailureIsolation::OutageCorrelation = "#{$DATADIR}/outage_correlation" 

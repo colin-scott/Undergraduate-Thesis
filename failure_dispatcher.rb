@@ -44,10 +44,12 @@ class FailureDispatcher
         @ipInfo = IpInfo.new
 
         @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger)
+        FailureAnalyzer.load_initializers_and_pruners_from_file(@failure_analyzer,
+                                                                FailureIsolation::SuspectSetProcessors)
         
         @db = db
 
-        @revtr_cache = RevtrCache.new(@db, @ipInfo)
+        @revtr_cache = RevtrCache.new(@db, @ipInfo, @logger)
 
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)
@@ -125,17 +127,56 @@ class FailureDispatcher
         issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage)
         @logger.debug("spoofed traceroute issued")
 
-        # thread out on each src, dst
-        srcdst2outage.each do |srcdst, outage|
-            Thread.new do
-                src,dst = srcdst
-                outage.measurement_times = deep_copy(measurement_times)
-                analyze_results(outage, dst2outage_correlation[dst], testing)
+        # One thread for joining on each src,dst pair thread
+        Thread.new do
+            # thread out on each src, dst
+            outage_threads = []
+            srcdst2outage.each do |srcdst, outage|
+                outage_threads << Thread.new do
+                    src,dst = srcdst
+                    outage.measurement_times = deep_copy(measurement_times)
+                    process_srcdst_outage(outage, dst2outage_correlation[dst], testing)
+                end
+            end
+
+            # XXX Should I really be joining here if there are going to be
+            # more measurements issued for MergedOutage?
+            outage_threads.each { |thread| thread.join }
+
+            dst2outage_correlation.values.each do |outage_correlation|
+                log_outage_correlation(outage_correlation) 
+            end
+
+            merged_outages = merge_outages(srcdst2outage.values)
+            merged_outage2id = assign_ids(merged_outages)
+
+            merged_outage2id.each do |merged_outage, id|
+                process_merged_outage(merged_outage, id, testing)
             end
         end
     end
 
     # private
+
+    # !!! Edit me for merging heuristics
+    def merge_outages(outages)
+       # example: no merging at all:
+       merged_outages = outages.map { |outage| MergedOutage.new([outage]) }
+       return merged_outages
+    end
+
+    # return a hash
+    # merged outage -> id
+    def assign_ids(merged_outages)
+       merged_outage2id = {}
+       id = 0
+       merged_outages.each do |merged_outage|
+           merged_outage2id[merged_outage] = id
+           id += 1 
+       end
+
+       merged_outage2id
+    end
 
     def check4targetswecontrol(srcdst2outage, registered_hosts)
        dstsrc2outage = {}
@@ -159,10 +200,10 @@ class FailureDispatcher
        dstsrc2outage
     end
 
-    def analyze_results(outage, outage_correlation, testing=false)
-        @logger.debug "analyze_results: #{outage.src}, #{outage.dst}"
+    def process_srcdst_outage(outage, outage_correlation, testing=false)
+        @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}"
 
-        gather_additional_data(outage, testing)
+        gather_measurements(outage, testing)
 
         outage.file = get_uniq_filename(outage.src, outage.dst)
 
@@ -170,48 +211,50 @@ class FailureDispatcher
                                                              outage.ping_responsive, outage.historical_tr, outage.historical_revtr, 
                                                              outage.direction, testing)
 
-        @logger.debug "analyze_results: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
+        @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
 
         outage.build
 
         if(!testing)
-            log_isolation_results(outage)
+            log_srcdst_outage(outage)
         end
 
         if(outage.passed_filters)
             outage_correlation.final_passed << outage.src
-        else
-            outage_correlation.final_failed2reasons[outage.src] = reasons
-        end
 
-        # XXX thread safe? I doubt it...
-        if outage_correlation.complete?
-           log_outage_correlation(outage_correlation) 
-           @logger.debug("logged outage correlation")
-        end
-
-        if(outage.passed_filters)
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
                              outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
 
             outage.graph_url = generate_web_symlink(outage.jpg_output)
-
-            # TODO: make deliver_isolation_results polymorphic for
-            #       symmetric outages
-            Emailer.deliver_isolation_results(outage, testing)
-
-            @logger.puts "Attempted to send isolation_results email for #{outage.src} #{outage.dst} testing #{testing}..."
         else
+            outage_correlation.final_failed2reasons[outage.src] = reasons
+
             @logger.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
 
         return outage.passed_filters
     end
 
+    # id goes from 0 to n, where n is the number of merged_outages this round
+    def process_merged_outage(merged_outage, id, testing=false)
+        analyze_measurements(merged_outage)    
+
+        merged_outage.file = get_uniq_filename(id, id)
+
+        if(!testing)
+            log_merged_outage(merged_outage)
+        end
+
+        # at least one of the inside outages passed filters
+        if(merged_outage.is_interesting?)
+            Emailer.deliver_isolation_results(merged_outage, testing)
+        end
+    end
+
     # TODO: I should figure out a better way to gather data, rather
     # than this longgg method
-    def gather_additional_data(outage, testing)
+    def gather_measurements(outage, testing)
         reverse_problem = outage.pings_towards_src.empty?
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
@@ -316,42 +359,49 @@ class FailureDispatcher
 
         @logger.debug "historical pingability fetched"
 
-        #TODO: move all of these the (outage) pattern
-        @failure_analyzer.identify_faults(outage)
-
-        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
-        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
-        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
-
-        outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
-                                                    outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
-
-        outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
-
-        outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
-
-        # now... if we found any pingable hops beyond the failure... send
-        # traceroutes to them... their paths must differ somehow
-        outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
-                                                                   outage.spoofed_revtr, outage.historical_revtr)
-
-        # TODO: an upstream router in a reverse traceroute at the reachability
-        # horizon: was there a path change? Issue spoofed reverse traceroute,
-        # and compare to historical reverse traceroute.
-        if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
-               !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
-            # TODO: should the key be the ip, or the Hop object?
-           upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
-           outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
-           @logger.debug("upstream revtr issued")
-        end
-
         if outage.symmetric
             outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
             @logger.debug("destination's tr issued. valid?:#{outage.dst_tr.valid?}")
 
             splice_alternate_paths(outage)
             @logger.debug("alternate path splicing complete")
+        end
+    end
+
+    def analyze_measurements(merged_outage)
+        #TODO: move all of these the (outage) pattern
+        @failure_analyzer.identify_faults(merged_outage)
+
+        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
+        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
+        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
+
+        merged_outage.each do |outage|
+            outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
+                                                        outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
+
+            outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
+
+            outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
+
+            # now... if we found any pingable hops beyond the failure... send
+            # traceroutes to them... their paths must differ somehow
+            # TODO: put me back in?:
+            #
+            #
+            #outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
+            #                                                           outage.spoofed_revtr, outage.historical_revtr)
+            #
+            # TODO: an upstream router in a reverse traceroute at the reachability
+            # horizon: was there a path change? Issue spoofed reverse traceroute,
+            # and compare to historical reverse traceroute.
+            #if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
+            #       !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
+            #    # TODO: should the key be the ip, or the Hop object?
+            #   upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
+            #   outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
+            #   @logger.debug("upstream revtr issued")
+            #end
         end
     end
 
@@ -493,10 +543,12 @@ class FailureDispatcher
         targ2paths 
     end
 
+    # TODO: generalize to multiple srcs, dsts, 
     def issue_revtr(src, dst, historical_hops=[], spoofed=true)
-        srcdst2revtr = {}
+        # symbol is one of :failed_attempts
+        symbol2srcdst2revtr = {}
         begin
-                srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
+                symbol2srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
                                                           @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
@@ -509,28 +561,40 @@ class FailureDispatcher
             return SpoofedReversePath.new([:self_induced_timeout])
         end
 
-        @logger.debug "isolate_outage(#{src}, #{dst}), srcdst2revtr: #{srcdst2revtr.inspect}"
+        @logger.debug "isolate_outage(#{src}, #{dst}), symbol2srcdst2revtr: #{symbol2srcdst2revtr.inspect}"
 
-        raise "issue_revtr returned an #{srcdst2revtr.class}: #{srcdst2revtr.inspect}!" if !srcdst2revtr.is_a?(Hash) and !srcdst2revtr.is_a?(DRb::DRbObject)
+        raise "issue_revtr returned an #{symbol2srcdst2revtr.class}: #{symbol2srcdst2revtr.inspect}!" if !symbol2srcdst2revtr.is_a?(Hash) and !symbol2srcdst2revtr.is_a?(DRb::DRbObject)
 
-        if srcdst2revtr.nil? || srcdst2revtr[[src,dst]].nil?
+        if symbol2srcdst2revtr.nil? || symbol2srcdst2revtr.values.find { |hash| hash.include? [src,dst] }.nil?
             return SpoofedReversePath.new([:nil_return_value])
         end
-                
-        revtr = srcdst2revtr[[src,dst]]
-        revtr = revtr.to_sym if revtr.is_a?(String) # dave switched on me...
-        
-        if revtr.is_a?(Symbol)
-            # The request failed -- the symbol tells us the cause of the failure
-            spoofed_revtr = [revtr]
-        else
-            # XXX string -> array -> string. meh.
-            spoofed_revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
+
+        revtr = [:daves_new_api_is_broken?]
+
+        symbol2srcdst2revtr.each do |symbol,srcdst2revtr|
+            case symbol
+            when :failed_measurements
+                reason = srcdst2revtr[[src,dst]]
+                next if reason.nil?
+                reason = reason.to_sym if reason.is_a?(String) # dave switched on me...
+                revtr = [reason] # TODO: don't encode failure reasons as hops...
+            when :results
+                revtr = srcdst2revtr[[src,dst]]
+                next if revtr.nil?
+                # XXX string -> array -> string. meh.
+                revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
+            # The following are for partial results
+            # TODO: request partial results for long-lived spoofed revtrs
+            when :unreachable
+            when :token
+            else 
+                raise "unknown spoofed_revtr key: #{symbol}"
+            end
+
+            @logger.debug "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{revtr.inspect}"
         end
 
-        @logger.debug "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{spoofed_revtr.inspect}"
-        
-        SpoofedReversePath.new(spoofed_revtr)
+        return SpoofedReversePath.new(revtr)
     end
 
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
@@ -704,9 +768,14 @@ class FailureDispatcher
     end
 
     # see outage.rb
-    def log_isolation_results(outage)
+    def log_srcdst_outage(outage)
         filename = outage.file
         File.open(FailureIsolation::IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+    end
+
+    def log_merged_outage(outage)
+        filename = outage.file
+        File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     def log_outage_correlation(outage_correlation)

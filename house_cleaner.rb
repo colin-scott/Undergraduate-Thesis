@@ -191,9 +191,6 @@ class HouseCleaner
         current_nodes = FailureIsolation::CurrentNodes
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
-        # XXX
-        available_nodes.delete_if { |node| node =~ /mlab/ || node =~ /measurement-lab/ }
-        
         faulty_nodes.each do |broken_vp|
             if !current_nodes.include? broken_vp
                 @logger.warn "#{broken_vp} not in current node set..."

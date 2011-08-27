@@ -84,6 +84,7 @@ class Path
    def contains_loop?()
        no_zeros = @hops.map { |hop| hop.ip }.find_all { |ip| ip != "0.0.0.0" }
        adjacents_removed = Path.new
+
        (0..(no_zeros.size-2)).each do |i|
           adjacents_removed << no_zeros[i] if no_zeros[i] != no_zeros[i+1]
        end

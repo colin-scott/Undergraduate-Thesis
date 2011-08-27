@@ -6,6 +6,10 @@ require 'isolation_module'
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
 class MergedOutage
+   attr_accessor :outages, :suspected_failures, :file
+
+   alias :log_name :file
+
    extend Forwardable
    def_delegators :@outages,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
        :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
@@ -17,15 +21,22 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-    def initialize(*outages)
+    def initialize(outages)
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages
+        @suspected_failures = {}
+    end
+
+    def is_interesting?()
+        return !@outages.find { |outage| outage.passed_filters }.nil?
     end
 end
 
 # TODO: builder pattern?
 # TODO: convert all old SymmetricOutage objects to Outage.symmetric = true
 class Outage
+  # !! suspected_failures is now not even a part of Outage objects -- part of
+    # MergedOutage objects...
   # !! suspected_failure is for backwards compatibility...
   #    suspected_failures is now a hash { :direction => [suspected_failure1, suspected_failure2...] }
   #              hash to account for bidirectional outages
@@ -64,6 +75,13 @@ class Outage
         @suspected_failures = {}
 
         case args.size
+        when 0
+            @src = "test.pl.edu"
+            @dst = "1.2.3.4"
+            @connected = []
+            @formatted_connected = []
+            @formatted_unconnected = []
+            @formatted_never_seen = []
         when 6
             @src, @dst, @connected, @formatted_connected, @formatted_unconnected, @formatted_never_seen = args
 
@@ -111,7 +129,7 @@ class Outage
         #@alternate_paths ||= $analyzer.find_alternate_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
         #                              spoofed_revtr, historical_revtr)
 
-        link_listify!
+        #link_listify!
    end
 
    def dst_as()

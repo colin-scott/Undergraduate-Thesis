@@ -79,61 +79,77 @@ class FailureAnalyzer
         @suspect_set_pruners << pruner
     end
 
+    # Huzzah, meta-programming
+    def self.load_initializers_and_pruners_from_file(analyzer, file)
+        require file
+
+        Initializer.singleton_methods.each do |method_str|
+            initializer = Initializer.method(method_str)
+            analyzer.register_suspect_set_initializer(&initializer)
+        end
+
+        Pruner.singleton_methods.each do |method_str|
+            pruner = Pruner.method(method_str)
+            analyzer.register_suspect_set_pruner(&pruner)
+        end
+    end
+
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
-    # TODO: create plug-in architecture for:
-    #       - initializing suspect set
-    #       - pruning the suspect set
-    def identify_faults(outage)
-        if outage.direction.is_reverse?
-            # TODO: 
-            # suspect_set = Set.new
-            # @suspect_set_initializers.each do |init| 
-            #   suspect_set |= init.call outage 
-            # end
-            #
-            # @suspect_set_pruners.each do |pruner|
-            #   pruner.call suspect_set, outage
-            # end
-            #
-            # outage.suspected_failures[Direction::REVERSE] = suspect_set
-
-            if !outage.historical_revtr.valid?
-                # let m be the first forward hop that does not yield a revtr to s
-                tr_suspect = outage.tr.last_responsive_hop
-                spooftr_suspect = outage.spoofed_tr.last_responsive_hop
-                suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-                outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
-
-                # baaaaah. This is confusing and not all that helpful.
-                #
-                # do some comparison of m's historical reverse path to infer the router which is either
-                # failed or changed its path
-                #
-                # doesn't make sense when running over logs... fine when run in
-                # real-time though
-                #
-                # Will only have a historical_revtr if the suspected hop is a
-                # historical hop, or the hops of the measured path overlap.
-                # historical_revtr = fetch_historical_revtr(outage.src, suspected_hop)
-                # XXX 
-                # return suspected_hop
-            else
-                # TODO: more stuff with
-                outage.suspected_failures[Direction.REVERSE] = [outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
-            end # what if the spoofed revtr went through?
+    def identify_faults(merged_outage)
+        # OK, for now, always call initializers for both reverse and forward
+        # path outages. They'll have to figure it out
+        suspect_set = Set.new
+        @suspect_set_initializers.each do |init| 
+          suspect_set |= init.call merged_outage 
         end
-
-        if outage.direction.is_forward?
-            # the failure is most likely adjacent to the last responsive forward hop
-            last_tr_hop = outage.tr.last_non_zero_hop
-            last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
-            suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-            outage.suspected_failures[Direction.FORWARD] = [suspected_hop]
+        
+        @suspect_set_pruners.each do |pruner|
+          pruner.call suspect_set, merged_outage
         end
+        
+        merged_outage.suspected_failures[Direction.REVERSE] = suspect_set
+        
+        #if merged_outage.direction.is_reverse?
+            #if !merged_outage.historical_revtr.valid?
+            #    # let m be the first forward hop that does not yield a revtr to s
+            #    tr_suspect = merged_outage.tr.last_responsive_hop
+            #    spooftr_suspect = merged_outage.spoofed_tr.last_responsive_hop
+            #    suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
+            #    merged_outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
 
-        if outage.direction == Direction.FALSE_POSITIVE
-            outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
+            #    # baaaaah. This is confusing and not all that helpful.
+            #    #
+            #    # do some comparison of m's historical reverse path to infer the router which is either
+            #    # failed or changed its path
+            #    #
+            #    # doesn't make sense when running over logs... fine when run in
+            #    # real-time though
+            #    #
+            #    # Will only have a historical_revtr if the suspected hop is a
+            #    # historical hop, or the hops of the measured path overlap.
+            #    # historical_revtr = fetch_historical_revtr(merged_outage.src, suspected_hop)
+            #    # XXX 
+            #    # return suspected_hop
+            #else
+            #    # TODO: more stuff with
+            #    merged_outage.suspected_failures[Direction.REVERSE] = [merged_outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
+            #end # what if the spoofed revtr went through?
+        #end
+
+        # OK, for now, only call this on individual outages
+        merged_outage.each do |outage|
+            if outage.direction.is_forward?
+                # the failure is most likely adjacent to the last responsive forward hop
+                last_tr_hop = outage.tr.last_non_zero_hop
+                last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
+                suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
+                outage.suspected_failures[Direction.FORWARD] = [suspected_hop]
+            end
+
+            if outage.direction == Direction.FALSE_POSITIVE
+                outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
+            end
         end
     end
 
