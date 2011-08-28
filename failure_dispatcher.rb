@@ -545,7 +545,7 @@ class FailureDispatcher
 
     # TODO: generalize to multiple srcs, dsts, 
     def issue_revtr(src, dst, historical_hops=[], spoofed=true)
-        # symbol is one of :failed_attempts
+        # symbol is one of :failed_attempts, :results, :unreachable, or :token
         symbol2srcdst2revtr = {}
         begin
                 symbol2srcdst2revtr = (historical_hops.empty?) ? @rtrSvc.get_reverse_paths([[src, dst]]) :
@@ -579,10 +579,11 @@ class FailureDispatcher
                 reason = reason.to_sym if reason.is_a?(String) # dave switched on me...
                 revtr = [reason] # TODO: don't encode failure reasons as hops...
             when :results
-                revtr = srcdst2revtr[[src,dst]]
-                next if revtr.nil?
+                string = srcdst2revtr[[src,dst]]
+                next if string.nil?
                 # XXX string -> array -> string. meh.
-                revtr = revtr.get_revtr_string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
+                string= string.get_revtr_string if !string.is_a?(String) 
+                revtr = string.split("\n").map { |formatted| ReverseHop.new(formatted, @ipInfo) }
             # The following are for partial results
             # TODO: request partial results for long-lived spoofed revtrs
             when :unreachable

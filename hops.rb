@@ -17,8 +17,18 @@ class Path
    attr_accessor :hops
 
    def initialize(init_hops=[])
-      @hops = Array.new(init_hops)
-      link_listify!
+      begin 
+        if init_hops.is_a?(Path)
+            init_hops = init_hops.hops
+        elsif !init_hops.is_a?(Array)
+          raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" if !init_hops.is_a?(Array)
+        end
+
+        @hops = Array.new(init_hops)
+        link_listify!
+      rescue Exception => e
+          raise "Caught #{e}, init_hops was #{init_hops.inspect}"
+      end
    end
 
    # delegate methods to @hops!!!
