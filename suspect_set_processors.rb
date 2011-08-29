@@ -15,7 +15,7 @@
 # definition of the measurement data types.
 #
 # TODO: we want accounting for where each target was initialized from and
-# which pruner eliminated
+# which pruner eliminated. Perhaps make a new object Suspect
 #
 # TODO: We want to prioritze the suspected failures in the case that more than
 # one target remains in the suspect set. For example, the unresponsive router
@@ -92,8 +92,7 @@ class Pruner
 
     def pings_from_source(suspect_set, merged_outage)
         # we have some set of preexisting pings.
-        # XXX issue more! -> need access to vp object...
-         
+        # issue more! 
     end
 
     # empty for now... revtr is far too slow...
