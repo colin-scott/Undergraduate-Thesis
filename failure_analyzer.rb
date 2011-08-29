@@ -1,5 +1,7 @@
 require 'isolation_module'
 require 'ip_info'
+require 'suspect_set_processors.rb'
+require 'db_interface'
 
 class Direction
     # make initializer public during class loading (to deal with load ' ' calls)
@@ -57,41 +59,15 @@ end
 #
 # essentially, acts on Outage objects which already have data fields filled in
 class FailureAnalyzer
-    def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr))
+    def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr), registrar=nil, db=DatabaseInterface.new)
         @ipInfo = ipInfo
         @logger = logger
 
-        @suspect_set_initializers = []
-        @suspect_set_pruners = []
-    end
+        @initializer = Initializer.new(registrar, db, logger)
+        @suspect_set_initializers = @intitializer.public_methods(false).map { |str| @initializer.method str }
 
-    # initializer contract:
-    #   - takes a MergedOutage object as param
-    #   - returns a set of suspects
-    def register_suspect_set_initializer(&initializer)
-        @suspect_set_initializers << initializer
-    end
-
-    # pruner contract:
-    #   - takes a set of suspects, and a MergedOutage object
-    #   - prunes the set of suspects, and returns nil
-    def register_suspect_set_pruner(&pruner)
-        @suspect_set_pruners << pruner
-    end
-
-    # Huzzah, meta-programming
-    def self.load_initializers_and_pruners_from_file(analyzer, file)
-        require file
-
-        Initializer.singleton_methods.each do |method_str|
-            initializer = Initializer.method(method_str)
-            analyzer.register_suspect_set_initializer(&initializer)
-        end
-
-        Pruner.singleton_methods.each do |method_str|
-            pruner = Pruner.method(method_str)
-            analyzer.register_suspect_set_pruner(&pruner)
-        end
+        @pruner = Pruner.new(registrar, db, logger)
+        @suspect_set_pruners = @pruner.public_methods(false).map { |str| @pruner.method str }
     end
 
     # returns the hop suspected to be close to the failure

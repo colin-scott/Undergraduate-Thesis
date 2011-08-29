@@ -43,11 +43,9 @@ class FailureDispatcher
 
         @ipInfo = IpInfo.new
 
-        @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger)
-        FailureAnalyzer.load_initializers_and_pruners_from_file(@failure_analyzer,
-                                                                FailureIsolation::SuspectSetProcessors)
-        
         @db = db
+
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @registrar, @db)
 
         @revtr_cache = RevtrCache.new(@db, @ipInfo, @logger)
 
