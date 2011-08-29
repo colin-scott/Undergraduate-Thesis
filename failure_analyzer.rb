@@ -64,7 +64,7 @@ class FailureAnalyzer
         @logger = logger
 
         @initializer = Initializer.new(registrar, db, logger)
-        @suspect_set_initializers = @intitializer.public_methods(false).map { |str| @initializer.method str }
+        @suspect_set_initializers = @initializer.public_methods(false).map { |str| @initializer.method str }
 
         @pruner = Pruner.new(registrar, db, logger)
         @suspect_set_pruners = @pruner.public_methods(false).map { |str| @pruner.method str }

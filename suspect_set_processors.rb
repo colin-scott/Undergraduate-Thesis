@@ -56,11 +56,13 @@ class Initializer
 
         # contained in Ethan's trs
         # may have to map from hostname->site
-        symmetric_outage.each do |o|
+        symmetric_outages.each do |o|
             # select all historical hops on traceroutes where source is o.src
             # may have to map from hostname->site
             # can be liberal, since it's for initializing, not pruning
         end
+
+        return []
     end
 
     # All VPs -> source (ethan's PL traceroutes + isolation VPs -> source)
@@ -108,7 +110,7 @@ class Pruner
         symmetric_outages = merged_outage.symmetric_outages
         return if symmetric_outages.empty?
 
-        symmetric_outage.each do |o|
+        symmetric_outages.each do |o|
             # select all hops on current traceroutes where source is o.src
             # may have to map from hostname->site
              
