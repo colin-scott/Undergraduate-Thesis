@@ -108,7 +108,7 @@ class FailureAnalyzer
           pruner.call suspect_set, merged_outage
         end
         
-        merged_outage.suspected_failures[Direction.REVERSE] = suspect_set
+        merged_outage.suspected_failures[Direction.REVERSE] = suspect_set.to_a
         
         #if merged_outage.direction.is_reverse?
             #if !merged_outage.historical_revtr.valid?
@@ -151,6 +151,9 @@ class FailureAnalyzer
                 outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
             end
         end
+
+        merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
+            .map { |o| o.suspected_failures[Direction.FORWARD] }.flatten.uniq.delete(nil)
     end
 
     # TODO: add as_hops_from_src to Hop objects

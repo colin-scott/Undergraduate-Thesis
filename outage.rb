@@ -30,6 +30,10 @@ class MergedOutage
     def is_interesting?()
         return !@outages.find { |outage| outage.passed_filters }.nil?
     end
+
+    def symmetric_outages()
+        @outages.find_all { |outage| outage.symmetric }
+    end
 end
 
 # TODO: builder pattern?
