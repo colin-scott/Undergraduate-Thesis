@@ -173,7 +173,7 @@ class HouseCleaner
 
             old_targets = Set.new IO.read(path).split("\n")
             new_targets = (old_targets - bad_targets.to_set + substitute_targets.to_set)
-            File.open(path, "w") { |f| f.puts new_targets.join "\n" }
+            File.open(path, "w") { |f| f.puts new_targets.to_a.join "\n" }
         end
 
         FailureIsolation::ReadInDataSets()

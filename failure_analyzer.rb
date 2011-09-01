@@ -64,10 +64,13 @@ class FailureAnalyzer
         @logger = logger
 
         @initializer = Initializer.new(registrar, db, logger)
-        @suspect_set_initializers = @initializer.public_methods(false).map { |str| @initializer.method str }
+        public_methods = @initializer.public_methods(false)
+        @suspect_set_initializers = public_methods.uniq.map { |m| @initializer.method m }
 
         @pruner = Pruner.new(registrar, db, logger)
-        @suspect_set_pruners = @pruner.public_methods(false).map { |str| @pruner.method str }
+        public_methods = @pruner.public_methods(false)
+        Pruner::OrderedMethods.each { |method| public_methods.unshift method  }
+        @suspect_set_pruners = public_methods.uniq.map { |m| @pruner.method m }
     end
 
     # returns the hop suspected to be close to the failure

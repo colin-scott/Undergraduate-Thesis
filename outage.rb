@@ -34,6 +34,20 @@ class MergedOutage
     def symmetric_outages()
         @outages.find_all { |outage| outage.symmetric }
     end
+
+    def direction()
+         return Direction.REVERSE unless @outages.find { |o| o.direction == Direction.REVERSE }.nil?
+         return Direction.FORWARD unless @outages.find { |o| o.direction == Direction.FORWARD }.nil?
+         return Direction.BOTH
+    end
+
+    def dataset()
+        return @outages.map { |o| o.dataset }.uniq
+    end
+
+    def sources()
+        return @outages.map { |o| o.src }
+    end
 end
 
 # TODO: builder pattern?

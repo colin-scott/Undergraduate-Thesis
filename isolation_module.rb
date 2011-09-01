@@ -3,6 +3,11 @@
 # CONSTANTS!!!
 
 require 'set'
+require 'utilities'
+require 'yaml'
+
+# TODO: don't load this here... make loaders do it explicity for performance
+# reasons
 $config = "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
 require $config
 
@@ -24,7 +29,26 @@ module FailureIsolation
     FailureIsolation::ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     FailureIsolation::RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
-    FailureIsolation::CachedRevtrTool = "~/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
+    FailureIsolation::CachedRevtrTool = "~revtr/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
+
+    FailureIsolation::ReadTraces = "~revtr/colin/Scripts/readouttraces"
+    FailureIsolation::HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipX_input_filesY..."
+
+    FailureIsolation::HistoricalPLPLHopsPath = "/homes/network/revtr/spoofed_traceroute/data/historical_pl_pl_hops.yml"
+
+    FailureIsolation::CurrentPLPLTracesPath = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/currentlogdir/probes"
+
+    def self.current_hops_on_pl_pl_traces_to_src_ip(src_ip)
+        Set.new(`#{FailureIsolation::HopsTowardsSrc} #{src_ip} #{FailureIsolation::CurrentPLPLTracesPath}/*`.split("\n"))
+    end
+
+    # returns direction2host2hops
+    # where direction is one of :source or :destination
+    # :source is hops seen sent from the source
+    # and :destination is hops seen sent towards the destination
+    def self.historical_pl_pl_hops
+        YAML.load_file(FailureIsolation::HistoricalPLPLHopsPath)
+    end
 
     def FailureIsolation::read_in_spoofer_hostnames()
        ip2hostname = {}
@@ -242,3 +266,7 @@ end
 
 FailureIsolation::ReadInDataSets()
 FailureIsolation::ReadInNodeSets()
+
+if $0 == __FILE__
+    FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip("1.2.3.4")
+end

@@ -13,6 +13,7 @@ require 'utilities'
 require 'set'
 require 'isolation_module'
 
+# TODO: make all static sql queries class variables
 class DatabaseInterface
     def initialize(logger=$stderr, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
         @logger = logger
@@ -27,6 +28,51 @@ class DatabaseInterface
     # wrapper for arbitrary sql queries
     def query(sql)
         results = @connection.query sql
+    end
+
+    def node_hostname(ip)
+        hostname = nil
+        ip_int = Inet::aton(ip)
+        sql = "select vantage_point from isolation_vantage_points where IP=#{ip_int};"
+        
+        results = query(sql)
+
+        results.each_hash do |row|
+            hostname = row["vantage_point"]
+        end
+
+        return hostname
+    end
+
+    def node_ip(node)
+        ip = nil
+        sql = "select inet_ntoa(IP) as ip from isolation_vantage_points where vantage_point='#{node}';" 
+        
+        results = query(sql)
+
+        results.each_hash do |row|
+            ip = row["ip"]
+        end
+
+        return ip 
+    end
+
+    def hostname2ip()
+        ip2hostname.invert
+    end
+
+    def ip2hostname()
+        sql = "select vantage_point, inet_ntoa(IP) as ip from isolation_vantage_points;"
+        
+        ip2hostname = Hash.new { |h,k| k }
+
+        results = query(sql)
+
+        results.each_hash do |row|
+            ip2hostname[row["ip"]] = row["vantage_point"]
+        end
+
+        return ip2hostname
     end
 
     # return hash from ip -> last_responsive
@@ -152,5 +198,6 @@ end
 
 if $0 == __FILE__
     db = DatabaseInterface.new
-    puts db.fetch_pingability(ARGV).inspect
+    # puts db.fetch_pingability(ARGV).inspect
+    puts db.node_hostname("38.98.51.15")
 end

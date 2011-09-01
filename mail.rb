@@ -70,7 +70,6 @@ class Emailer < ActionMailer::Base
         bcc         "revtr@cs.washington.edu"
         body        :source => source, :dest => destination
     end
-
     def blocked(email, source, destination)
         subject     "Reverse traceroute from #{destination} back to #{source}"
         from        "revtr@cs.washington.edu"
@@ -78,14 +77,12 @@ class Emailer < ActionMailer::Base
         bcc         "revtr@cs.washington.edu"
         body        :dest => destination
     end
-    
     def check_up_vps_issue(vps, issue)
         subject     "VPs having trouble with #{issue}"
         from        "revtr@cs.washington.edu"
         recipients  "revtr@cs.washington.edu"
         body        :vps => vps.join("<br />"), :issue => issue
     end
-
     def outage_detected(target, dataset, disconnected, connected, never_seen,
                         problems_at_the_source, outdated_nodes,
                         not_sshable, testing=false)
@@ -97,9 +94,8 @@ class Emailer < ActionMailer::Base
                     :problems_at_the_source => problems_at_the_source,
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
-
     def isolation_results(merged_outage, testing=false)
-        subject "Isolation Results #{merged_outage.file}"
+        subject "Isolation: #{merged_outage.direction} #{merged_outage.dataset} #{merged_outage.sources.join ' '}"
         
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
