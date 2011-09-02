@@ -78,17 +78,38 @@ class FailureAnalyzer
     def identify_faults(merged_outage)
         # OK, for now, always call initializers for both reverse and forward
         # path outages. They'll have to figure it out
-        suspect_set = Set.new
+        initializer2suspectset = {}
         @suspect_set_initializers.each do |init| 
-          suspect_set |= init.call merged_outage 
+          initializer2suspectset[init.to_s] = init.call merged_outage 
         end
+
+        all_suspects = initializer2suspectset.value_set
         
+        pruner2removed = {}
         @suspect_set_pruners.each do |pruner|
-          pruner.call suspect_set, merged_outage
+            removed = pruner.call all_suspects, merged_outage
+            pruner2removed[pruner.to_s] = removed & all_suspects
+            all_suspects -= removed
         end
+
+        removed_suspects = pruner2removed.value_set 
         
-        merged_outage.suspected_failures[Direction.REVERSE] = suspect_set.to_a
-        
+        merged_outage.initializer2suspectset = initializer2suspectset
+        merged_outage.pruner2removed = pruner2removed
+
+        remaining_w_inits = (all_suspects - removed_suspects).map do |hop|
+            with_inits = "#{hop.clone} ("
+            initializer2suspectset.each do |init, suspect_set|
+               if suspect_set.include? hop
+                  with_inits << "#{init.to_s},"
+               end 
+            end
+            with_inits << ")"
+            with_inits
+        end
+
+        merged_outage.suspected_failures[Direction.REVERSE] = remaining_w_inits
+
         #if merged_outage.direction.is_reverse?
             #if !merged_outage.historical_revtr.valid?
             #    # let m be the first forward hop that does not yield a revtr to s
@@ -132,7 +153,9 @@ class FailureAnalyzer
         end
 
         merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
-            .map { |o| o.suspected_failures[Direction.FORWARD] }.flatten.uniq.delete(nil)
+            .map { |o| o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE] }.flatten.uniq.delete(nil)
+
+        merged_outage.suspected_failures[Direction.FORWARD] |= []
     end
 
     # TODO: add as_hops_from_src to Hop objects

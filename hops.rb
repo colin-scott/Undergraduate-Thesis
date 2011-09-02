@@ -433,10 +433,6 @@ class Hop
        return false
     end
 
-    def inspect
-        "#{self.class} asn=#{@asn} dns=#{@dns} formatted=#{@formatted} ip=#{@ip} last_responsive=#{@last_responsive} ping_responsive=#{@ping_responsive} ttl=#{@ttl} previous=#{@previous.nil? ? nil : @previous.asn} next=#{@next.nil? ? nil : @next.asn}"
-    end
-
     def to_s
         @formatted or @ip
     end

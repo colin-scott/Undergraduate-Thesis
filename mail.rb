@@ -95,7 +95,7 @@ class Emailer < ActionMailer::Base
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
     def isolation_results(merged_outage, testing=false)
-        subject "Isolation: #{merged_outage.direction} #{merged_outage.dataset} #{merged_outage.sources.join ' '}"
+        subject "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}"
         
         from        "failures@cs.washington.edu"
         recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"

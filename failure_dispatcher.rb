@@ -345,7 +345,7 @@ class FailureDispatcher
 
         if outage.spoofed_revtr.valid?
            outage.measurement_times << ["revtr pings", Time.new]
-           revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(outage.src, outage.spoofed_revtr)
+           revtr_ping_responsive, revtr_non_responsive_hops = issue_pings_for_revtr(outage)
            ping_responsive |= revtr_ping_responsive
 
            @logger.debug "revtr pings issued"
@@ -606,7 +606,7 @@ class FailureDispatcher
             all_hop_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
         end
 
-        request_pings(outage.src, all_hop_sets)
+        request_pings(outage, all_hop_sets)
     end
 
     # all pairs
@@ -616,22 +616,25 @@ class FailureDispatcher
 
     # we issue the pings separately for the revtr, since the revtr can take an
     # excrutiatingly long time to execute sometimes
-    def issue_pings_for_revtr(source, revtr)
-        if revtr.valid?
-           return request_pings(source, [revtr]) 
+    def issue_pings_for_revtr(outage)
+        if outage.revtr.valid?
+           return request_pings(outage, [outage.revtr]) 
         else
            return [[], []]
         end
     end
 
     # private
-    def request_pings(source, all_hop_sets)
+    def request_pings(outage, all_hop_sets)
+        source = outage.src
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
         responsive = @registrar.ping(source, all_targets.to_a, true)
         responsive ||= []
         @logger.debug "Responsive to ping: #{responsive.inspect}"
+
+        outage.responsive_targets |= responsive
 
         # update reachability
         all_hop_sets.each do |hop_set|

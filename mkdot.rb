@@ -140,10 +140,8 @@ class DotGenerator
 
         assign_colors!(node2asn, node_attributes)
 
-        if $DEBUG
-            $stderr.puts "node2pingable: #{node2pingable.inspect}"
-            $stderr.puts "node2historicallypingable: #{node2historicallypingable.inspect}"
-        end
+        @logger.debug "node2pingable: #{node2pingable.inspect}"
+        @logger.debug "node2historicallypingable: #{node2historicallypingable.inspect}"
 
         output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes,
                         symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)
@@ -188,8 +186,8 @@ class DotGenerator
           node2asn[current] = hop.asn
           node2pingable[current] ||= hop.ping_responsive
 
-          @logger.puts "add_path(), hop doesn't have reachable_from_other_vps: #{hop}, #{path}" unless hop.methods.include? "reachable_from_other_vps"
           node2othervpscanreach[current] ||= hop.reachable_from_other_vps
+          
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability
           # DB (hop.last_responsive == "N/A")

@@ -1,12 +1,14 @@
 #!/homes/network/revtr/ruby/bin/ruby
 #
 require 'hops'
+require 'set'
 require 'isolation_module'
 
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
 class MergedOutage
-   attr_accessor :outages, :suspected_failures, :file
+   attr_accessor :outages, :suspected_failures, :file, :initializer2suspectset,
+       :pruner2removed
 
    alias :log_name :file
 
@@ -41,7 +43,7 @@ class MergedOutage
          return Direction.BOTH
     end
 
-    def dataset()
+    def datasets()
         return @outages.map { |o| o.dataset }.uniq
     end
 
@@ -54,7 +56,7 @@ end
 # TODO: convert all old SymmetricOutage objects to Outage.symmetric = true
 class Outage
   # !! suspected_failures is now not even a part of Outage objects -- part of
-    # MergedOutage objects...
+  # MergedOutage objects...
   # !! suspected_failure is for backwards compatibility...
   #    suspected_failures is now a hash { :direction => [suspected_failure1, suspected_failure2...] }
   #              hash to account for bidirectional outages
@@ -68,12 +70,13 @@ class Outage
                                           :alternate_paths, :measured_working_direction, :path_changed,
                                           :measurement_times, :passed_filters, 
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
-                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url
+                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url, :responsive_targets
 
   # re: symmetric
   #   tried to implement symmetry through polymorphism... but no behavior is
   #   changed... only whether additional fields are nil or not
   
+  alias :revtr :spoofed_revtr
   alias :spoofers :connected 
   alias :spoofers_w_connectivity :connected 
   alias :receivers :connected 
@@ -91,6 +94,7 @@ class Outage
         @upstream_reverse_paths = {}
         @spliced_paths = []
         @suspected_failures = {}
+        @responsive_targets = Set.new
 
         case args.size
         when 0

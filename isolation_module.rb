@@ -268,5 +268,5 @@ FailureIsolation::ReadInDataSets()
 FailureIsolation::ReadInNodeSets()
 
 if $0 == __FILE__
-    FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip("1.2.3.4")
+    FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip()
 end

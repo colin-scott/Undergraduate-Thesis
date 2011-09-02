@@ -16,4 +16,4 @@ Emailer.deliver_dot_graph("../data/dots/planetlab-node3.it-sudparis.eu132.252.15
 #
 
 $stderr.puts "sent..."
-sleep
+Threads.list.each { |t| t.join }

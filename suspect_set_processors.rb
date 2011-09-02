@@ -16,9 +16,6 @@
 # See outage.rb for the MergedOutage class definition. See hops.rb for a
 # definition of the measurement data types.
 #
-# TODO: we want accounting for where each target was initialized from and
-# which pruner eliminated. Perhaps make a new object Suspect
-#
 # TODO: We want to prioritze the suspected failures in the case that more than
 # one target remains in the suspect set. For example, the unresponsive router
 # on the border of the "reachability horizon" is more interesting than
@@ -96,9 +93,8 @@ class Initializer
 end
 
 # pruner contract:
-#   - takes a set of suspects, and a MergedOutage object
-#   - prunes the set of suspects
-#   - return value is ignored
+#   - takes an immutable set of suspects, and a MergedOutage object
+#   - returns a list of suspects to remove from the suspect set
 class Pruner
     def initialize(registrar, db, logger)
         @registrar = registrar
@@ -111,6 +107,7 @@ class Pruner
 
     # empty for now... revtr is far too slow...
     def intersecting_revtrs_to_src(suspected_set, merged_outage)
+        return []
     end
 
     # first half of path splices
@@ -118,37 +115,57 @@ class Pruner
     #
     # XXX This technique is a little more sketch... routing table entries
     # other destinations, but not necessarily the soure...
-    def revtrs_dst2vps(suspected_set, merged_outage)
+    #def revtrs_dst2vps(suspected_set, merged_outage)
 
-        #symmetric_outages = merged_outage.symmetric_outages
-        #return if symmetric_outages.empty?
+    #    symmetric_outages = merged_outage.symmetric_outages
+    #    return if symmetric_outages.empty?
 
-        #symmetric_outages.each do |o|
-        #    # select all hops on current traceroutes where source is o.src
-        #    # may have to map from hostname->site
-        #     
-        #end
-    end
+    #    symmetric_outages.each do |o|
+    #        # select all hops on current traceroutes where source is o.src
+    #        # may have to map from hostname->site
+    #         
+    #    end
+    #end
 
     # second half of path splices
     #  TODO: ensure that traces are sufficiently recent (issued after outage
     #  began...)
     def intersecting_traces_to_src(suspect_set, merged_outage)
+        to_remove = []
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
             src_ip = @db.node_ip(o.src)
             next if src_ip.nil?
-            suspect_set -= FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip(src_ip)
+            to_remove += FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip(src_ip)
         end
+
+        return to_remove
     end
 
     # we want this method to be executed last...
     def pings_from_source(suspect_set, merged_outage)
-        # we have some set of preexisting pings.
-        # issue more! 
-        merged_outage.each do |o|
+        to_remove = Set.new
 
-        end
+        # we have some set of preexisting pings.
+        trace_hops = merged_outage.map { |o| o.tr }.find_all { |trace| trace.valid? }\
+            .map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set
+
+        to_remove += trace_hops
+
+        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets }.flatten.to_set
+
+        to_remove += ping_responsive_hops
+        
+        remaining = suspect_set - trace_hops - ping_responsive_hops
+
+        # now issue more pings! 
+        srcs = merged_outage.map { |o| o.src }
+
+        # XXX WHY ARENT YOU ISSUING??
+        src2pingable_dsts = @registrar.all_pairs_ping(srcs, remaining.to_a)
+        to_remove += src2pingable_dsts.value_set
+
+        return to_remove.to_a
     end
 end
 
