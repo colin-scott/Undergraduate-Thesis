@@ -36,8 +36,8 @@ class Initializer
         @db = db
         @logger = logger
         direction2hash = FailureIsolation.historical_pl_pl_hops
-        @node2outgoing_hops = direction2hash[:outgoing]
-        @node2incoming_hops = direction2hash[:incoming]
+        @site2outgoing_hops = direction2hash[:outgoing]
+        @site2incoming_hops = direction2hash[:incoming]
     end
 
     # (no correlation involved)
@@ -46,7 +46,7 @@ class Initializer
         merged_outage.each { |outage| historical_revtrs << outage.historical_revtr }
 
         historical_revtr_hops = historical_revtrs.find_all { |revtr| !revtr.nil? && revtr.valid? }\
-                                                 .map { |revtr| revtr.hops }\
+                                                 .map { |revtr| revtr.hops.map { |h| h.ip } }\
                                                  .flatten
         return historical_revtr_hops
     end
@@ -63,13 +63,11 @@ class Initializer
 
         historical_path_hops = []
 
-        # contained in Ethan's trs
-        # may have to map from hostname->site
         symmetric_outages.each do |o|
             # select all historical hops on traceroutes where source is o.src
-            # XXX may have to map from hostname->site
             # can be liberal, since it's for initializing, not pruning
-            historical_path_hops |= @node2outgoing_hops[o.dst_hostname]
+            site = FailureIsolation::Host2Site[o.dst_hostname]
+            historical_path_hops |= @site2outgoing_hops[site] unless site.nil?
         end
 
         return historical_path_hops
@@ -81,7 +79,8 @@ class Initializer
         merged_outage.each do |o|
             # select all hops on historical traceroutes where destination is o.src
             # can be liberal, since it's for initializing, not pruning
-            all_hops |= @node2incoming_hops[o.src]
+            site = FailureIsolation::Host2Site[o.src]
+            all_hops |= @site2incoming_hops[site] unless site.nil?
         end 
         return all_hops
     end
@@ -110,23 +109,6 @@ class Pruner
         return []
     end
 
-    # first half of path splices
-    #       actually trs, since we control the destination
-    #
-    # XXX This technique is a little more sketch... routing table entries
-    # other destinations, but not necessarily the soure...
-    #def revtrs_dst2vps(suspected_set, merged_outage)
-
-    #    symmetric_outages = merged_outage.symmetric_outages
-    #    return if symmetric_outages.empty?
-
-    #    symmetric_outages.each do |o|
-    #        # select all hops on current traceroutes where source is o.src
-    #        # may have to map from hostname->site
-    #         
-    #    end
-    #end
-
     # second half of path splices
     #  TODO: ensure that traces are sufficiently recent (issued after outage
     #  began...)
@@ -134,9 +116,8 @@ class Pruner
         to_remove = []
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
-            src_ip = @db.node_ip(o.src)
-            next if src_ip.nil?
-            to_remove += FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip(src_ip)
+            site = FailureIsolation::Host2Site(o.src)
+            to_remove += FailureIsolation::current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
         end
 
         return to_remove
@@ -158,12 +139,15 @@ class Pruner
         
         remaining = suspect_set - trace_hops - ping_responsive_hops
 
-        # now issue more pings! 
+        @logger.debug "remaining to ping: #{remaining.inspect}"
+
+        # now issue more pings!
         srcs = merged_outage.map { |o| o.src }
 
-        # XXX WHY ARENT YOU ISSUING??
+        # XXX WHY AREN'T YOU ISSUING?
         src2pingable_dsts = @registrar.all_pairs_ping(srcs, remaining.to_a)
         to_remove += src2pingable_dsts.value_set
+        @logger.warn "#{src2pingable_dsts.inspect} was empty?!" if !remaining.empty? and src2pingable_dsts.value_set.empty?
 
         return to_remove.to_a
     end

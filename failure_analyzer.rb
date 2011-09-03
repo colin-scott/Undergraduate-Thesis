@@ -84,6 +84,7 @@ class FailureAnalyzer
         end
 
         all_suspects = initializer2suspectset.value_set
+        all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ }
         
         pruner2removed = {}
         @suspect_set_pruners.each do |pruner|
@@ -153,9 +154,13 @@ class FailureAnalyzer
         end
 
         merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
-            .map { |o| o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE] }.flatten.uniq.delete(nil)
+            .map { |o| o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE] }.flatten.uniq
 
         merged_outage.suspected_failures[Direction.FORWARD] |= []
+
+        # XXX Wht won't the html in the email display the class... only the
+        # '#' ...........
+        merged_outage.suspected_failures[Direction.FORWARD].delete(nil)
     end
 
     # TODO: add as_hops_from_src to Hop objects

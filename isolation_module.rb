@@ -32,35 +32,51 @@ module FailureIsolation
     FailureIsolation::CachedRevtrTool = "~revtr/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
 
     FailureIsolation::ReadTraces = "~revtr/colin/Scripts/readouttraces"
-    FailureIsolation::HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipX_input_filesY..."
+    FailureIsolation::HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipsX_input_filesY\*"
 
     FailureIsolation::HistoricalPLPLHopsPath = "/homes/network/revtr/spoofed_traceroute/data/historical_pl_pl_hops.yml"
 
     FailureIsolation::CurrentPLPLTracesPath = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/currentlogdir/probes"
 
-    def self.current_hops_on_pl_pl_traces_to_src_ip(src_ip)
-        Set.new(`#{FailureIsolation::HopsTowardsSrc} #{src_ip} #{FailureIsolation::CurrentPLPLTracesPath}/*`.split("\n"))
+    def self.current_hops_on_pl_pl_traces_to_site(site)
+        return nil unless FailureIsolation::Site2Hosts.include? site
+        all_src_ips = FailureIsolation::Site2Hosts[site].map { |host| FailureIsolation::Host2IP[host] }
+        File.open("/tmp/site_hosts.txt", "w") { |f| f.puts all_src_ips.join "\n" }
+        Set.new(`#{FailureIsolation::HopsTowardsSrc} /tmp/site_hosts.txt #{FailureIsolation::CurrentPLPLTracesPath}/*`.split("\n"))
     end
 
-    # returns direction2host2hops
+    # returns direction2site2hops
     # where direction is one of :source or :destination
     # :source is hops seen sent from the source
     # and :destination is hops seen sent towards the destination
+    #
+    # pre: FailureIsolation::Host2Site is initialized
     def self.historical_pl_pl_hops
-        YAML.load_file(FailureIsolation::HistoricalPLPLHopsPath)
+        direction2host2hops = YAML.load_file(FailureIsolation::HistoricalPLPLHopsPath)
+        direction2site2hops = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = [] } }
+        direction2host2hops.each do |direction, host2hops|
+            host2hops.each do |host, hops|
+                direction2site2hops[direction][FailureIsolation::Host2Site[host]] |= hops 
+            end
+        end
+        direction2site2hops
     end
 
-    def FailureIsolation::read_in_spoofer_hostnames()
+    def FailureIsolation::read_in_ip2hostname()
+       # TODO BETTER: read in from the database
        ip2hostname = {}
-       File.foreach("#{$DATADIR}/up_spoofers_w_ips.txt") do |line|
+       File.foreach("#{$DATADIR}/pl_hostnames_w_ips.txt") do |line|
           hostname, ip = line.chomp.split  
           ip2hostname[ip] = hostname
        end
        ip2hostname
     end
 
-    # XXX Better: read directly from the database
-    FailureIsolation::SpooferIP2Hostname = FailureIsolation::read_in_spoofer_hostnames
+    FailureIsolation::IP2Hostname = Hash.new { |h,k| k }
+    FailureIsolation::Host2IP = Hash.new { |h,k| k }
+    FailureIsolation::Host2Site = Hash.new { |h,k| k }
+    FailureIsolation::Site2Hosts = {}
+    FailureIsolation::SiteMapper = "/homes/network/ethan/scripts/list_sites_for_pl_hosts_in_fileX.pl"
 
     # ====================================
     #         Data Directories           #
@@ -101,9 +117,9 @@ module FailureIsolation
     FailureIsolation::BeyondHarshaPoPsPath = "#{FailureIsolation::DataSetDir}/responsive_edgerouters.txt"
     FailureIsolation::BeyondHarshaPoPs = Set.new
 
-    # targets taken from spoofers.hosts
-    #  XXX Take in from isolation_vantage_points table instaed of this static
-    #  list.
+    # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
+    FailureIsolation::SpooferTargetsMetaDataPath = "#{FailureIsolation::DataSetDir}/up_spoofers_w_sites.txt"
+    #  XXX Take in from isolation_vantage_points table instaed of this static list.
     FailureIsolation::SpooferTargetsPath = "#{FailureIsolation::DataSetDir}/up_spoofers.ips"
     FailureIsolation::SpooferTargets = Set.new
 
@@ -135,6 +151,19 @@ module FailureIsolation
     end
 
     def FailureIsolation::ReadInDataSets()
+        FailureIsolation::Host2Site.clear
+        FailureIsolation::Host2Site.merge!(`#{FailureIsolation::SiteMapper} #{$DATADIR}/pl_hostnames_w_ips.txt | cut -d ' ' -f1,3`\
+                                          .split("\n").map { |line| line.split }.to_hash)
+
+        FailureIsolation::Site2Hosts.clear
+        FailureIsolation::Site2Hosts.merge!(FailureIsolation::Host2Site.value2keys)
+
+        FailureIsolation::IP2Hostname.clear
+        FailureIsolation::IP2Hostname.merge!(FailureIsolation::read_in_ip2hostname)
+
+        FailureIsolation::Host2IP.clear
+        FailureIsolation::Host2IP.merge!(FailureIsolation::IP2Hostname.invert)
+        
         FailureIsolation::HarshaPoPs.clear
         FailureIsolation::HarshaPoPs.merge(IO.read(FailureIsolation::HarshaPoPsPath).split("\n"))
 
@@ -220,7 +249,6 @@ module FailureIsolation
     FailureIsolation::SelectedPaths = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/selected_paths.txt"
     # PL sources and targets for top 500 PoPs. Format: <pop #> <PL node> <target>
     FailureIsolation::SourceDests = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
-    
 end
 
 # constants for names of datasets (not targets themselves)
@@ -268,5 +296,7 @@ FailureIsolation::ReadInDataSets()
 FailureIsolation::ReadInNodeSets()
 
 if $0 == __FILE__
-    FailureIsolation::current_hops_on_pl_pl_traces_to_src_ip()
+    #puts FailureIsolation::Site2Hosts.inspect
+    #puts FailureIsolation::Host2Site.inspect
+    puts FailureIsolation.current_hops_on_pl_pl_traces_to_site("arizona-gigapop.net").to_a.inspect
 end
