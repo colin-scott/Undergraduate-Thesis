@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'set'
 require 'mysql'
 require 'mail'
@@ -153,7 +153,7 @@ class HouseCleaner
     def find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
         # should only be probing one per site
         unresponsive_spoofers = dataset2unresponsive_targets[DataSets::SpooferTargets] 
-        site2chosen_node = choose_one_spoofer_per_site(unresponsive_spoofers)
+        site2chosen_node = choose_one_spoofer_target_per_site(unresponsive_spoofers)
         update_pl_pl_meta_data(site2chosen_node)
 
         dataset2substitute_targets[DataSets::SpooferTargets] = site2chosen_node.values
@@ -178,7 +178,7 @@ class HouseCleaner
         output.close
     end
      
-    def choose_one_spoofer_per_site(bad_targets_ips)
+    def choose_one_spoofer_target_per_site(bad_targets_ips)
         # prefer spoofers that are already chosen
         # for all sites that don't have a spoofer target or a monitor, add one that hasn't been
         # blacklisted
@@ -264,6 +264,7 @@ class HouseCleaner
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
         blacklist = FailureIsolation::NodeBlacklist
         current_nodes = FailureIsolation::CurrentNodes
+        current_sites = Set.new(current_nodes.map { |node| FailureIsolation::Node2Site[node] })
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
         faulty_nodes.each do |broken_vp|
@@ -276,12 +277,17 @@ class HouseCleaner
             blacklist.add broken_vp
             system "echo #{broken_vp} > #{FailureIsolation::NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
         end
+
+        
         
         while current_nodes.size < FailureIsolation::NumActiveNodes
             raise "No more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
+            new_vp_site = FailureIsolation::Node2Site[new_vp]
+            next if current_sites.include? new_vp_site
             @logger.debug "choosing: #{new_vp}"
             current_nodes.add new_vp
+            current_sites.add new_vp_site
         end
 
         update_current_nodes(current_nodes)

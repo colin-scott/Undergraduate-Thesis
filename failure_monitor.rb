@@ -1,6 +1,6 @@
 require 'failure_dispatcher'
 require 'house_cleaner'
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'set'
 require 'yaml'
 require 'outage'

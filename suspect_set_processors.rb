@@ -1,5 +1,4 @@
 #!/homes/network/revtr/ruby/bin/ruby
-#
 # These modules encapsulate the code for outage correlation.
 #
 # Initializers populate the suspect set.
@@ -26,6 +25,7 @@
 
 require 'utilities'
 require 'db_interface'
+require 'failure_isolation_consts'
 
 # initializer contract:
 #   - takes a MergedOutage object as param
@@ -35,6 +35,8 @@ class Initializer
         @registrar = registrar
         @db = db
         @logger = logger
+
+        # TODO: reload when data changes (every 5 min.)
         direction2hash = FailureIsolation.historical_pl_pl_hops
         @site2outgoing_hops = direction2hash[:outgoing]
         @site2incoming_hops = direction2hash[:incoming]
@@ -48,6 +50,8 @@ class Initializer
         historical_revtr_hops = historical_revtrs.find_all { |revtr| !revtr.nil? && revtr.valid? }\
                                                  .map { |revtr| revtr.hops.map { |h| h.ip } }\
                                                  .flatten
+
+        @logger.warn "historical_revtr_hops empty!" if historical_revtr_hops.empty?
         return historical_revtr_hops
     end
 
@@ -57,6 +61,8 @@ class Initializer
     # traceroutes are obviously working.
     #
     # So we do need a date field in the DB...
+    #
+    # XXX Basically redundant code with next method..
     def historical_revtrs_dst2vps(merged_outage)
         symmetric_outages = merged_outage.symmetric_outages
         return [] if symmetric_outages.empty?
@@ -67,7 +73,11 @@ class Initializer
             # select all historical hops on traceroutes where source is o.src
             # can be liberal, since it's for initializing, not pruning
             site = FailureIsolation::Host2Site[o.dst_hostname]
-            historical_path_hops |= @site2outgoing_hops[site] unless site.nil?
+            if site.nil?
+                @logger.warn "site for #{o.dst_hostname} not specified!" if site.nil?
+            else
+                historical_path_hops |= @site2outgoing_hops[site]
+            end
         end
 
         return historical_path_hops
@@ -80,7 +90,11 @@ class Initializer
             # select all hops on historical traceroutes where destination is o.src
             # can be liberal, since it's for initializing, not pruning
             site = FailureIsolation::Host2Site[o.src]
-            all_hops |= @site2incoming_hops[site] unless site.nil?
+            if site.nil?
+                @logger.warn "site for #{o.src} not specified!" if site.nil?
+            else
+                all_hops |= @site2incoming_hops[site] unless site.nil?
+            end
         end 
         return all_hops
     end
@@ -116,8 +130,10 @@ class Pruner
         to_remove = []
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
-            site = FailureIsolation::Host2Site(o.src)
-            to_remove += FailureIsolation::current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
+            site = FailureIsolation::Host2Site[o.src]
+            hops_on_traces = FailureIsolation::current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
+            @logger.warn "no hops on traces to site: #{site}" if hops_on_traces.empty?
+            to_remove += hops_on_traces
         end
 
         return to_remove
@@ -139,7 +155,7 @@ class Pruner
         
         remaining = suspect_set - trace_hops - ping_responsive_hops
 
-        @logger.debug "remaining to ping: #{remaining.inspect}"
+        @logger.debug "\# trace_hops: #{trace_hops.size} \# ping_hops: #{ping_responsive_hops.size} remaining to ping: #{remaining.inspect}"
 
         # now issue more pings!
         srcs = merged_outage.map { |o| o.src }

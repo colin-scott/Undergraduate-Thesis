@@ -1,4 +1,4 @@
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'drb'
 require 'drb/acl'
 require 'thread'
@@ -188,7 +188,7 @@ class FailureDispatcher
                 if registered_hosts.include? dst_hostname
                     outage.symmetric = true
                     # XXX Possible problem with ip2hostname mappings??
-                    outage.src_ip = $pl_host2ip[src]
+                    outage.src_ip = @db.hostname2ip[src]
                     outage.dst_hostname = dst_hostname
                     dstsrc2outage[[outage.dst_hostname, outage.src_ip]] = outage
                 end

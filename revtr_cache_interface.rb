@@ -1,25 +1,20 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'db_interface'
 require 'socket'
 require 'utilities'
 require 'ip_info'
 require 'hops'
 
-$DATADIR = "/homes/network/ethan/timestamp/reverse_traceroute/data";
-$PL_HOSTNAMES_W_IPS="#{$DATADIR}/pl_hostnames_w_ips.txt"
-$PL_HOSTNAMES_W_SITES="#{$DATADIR}/pl_hosts_w_sites.txt"
-loadPLSites
-loadPLHostnames
-
 class RevtrCache
     @@freshness = 24*60
     @@max_hops = 30
     @@do_remapping = false
 
-    def initialize(connection, ipInfo, logger=LoggerLog.new($stderr))
+    def initialize(connection, ipInfo, database=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @connection = connection
+        @db = database
         @ipInfo = ipInfo
         @logger = logger
     end
@@ -29,7 +24,7 @@ class RevtrCache
       path.src = src
       path.dst = dst
     
-      src = Inet::aton($pl_host2ip[src])
+      src = Inet::aton(@db.hostname2ip[src])
       dst = Inet::aton(dst)
       old_dst = dst
       ts = 0

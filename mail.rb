@@ -1,6 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'action_mailer'
 
 ActionMailer::Base.delivery_method = :sendmail

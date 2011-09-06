@@ -11,12 +11,15 @@ require 'mysql'
 require 'socket'
 require 'utilities'
 require 'set'
-require 'isolation_module'
+require 'failure_isolation_consts'
 
 # TODO: make all static sql queries class variables
 class DatabaseInterface
     def initialize(logger=$stderr, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
         @logger = logger
+        @hostname2ip = hostname2ip
+        @ip2hostname = ip2hostname
+
         begin
           @connection = Mysql.new(host, usr, pwd, database)
         rescue Mysql::Error => e
@@ -58,10 +61,13 @@ class DatabaseInterface
     end
 
     def hostname2ip()
+        return @hostname2ip unless @hostname2ip.nil?
         ip2hostname.invert
     end
 
     def ip2hostname()
+        return @ip2hostname unless @ip2hostname.nil?
+
         sql = "select vantage_point, inet_ntoa(IP) as ip from isolation_vantage_points;"
         
         ip2hostname = Hash.new { |h,k| k }
@@ -79,7 +85,7 @@ class DatabaseInterface
     def fetch_pingability(ips)
         raise "ips can't be nil!" if ips.nil?
         #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
-        addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton($pl_host2ip[ip]) : ip }
+        addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton(@hostname2ip[ip]) : ip }
         #@logger.puts "fetch_pingability(), addrs=#{ips.inspect}"
         responsive = Hash.new { |h,k| h[k] = "N/A" }
 
@@ -125,11 +131,11 @@ class DatabaseInterface
         possibly_bad_srcs = []
         src2states.each{|src,states2count|
           if states2count.length == 1 and states2count.include?("dst_not_reachable")
-            bad_srcs << $pl_ip2host[Inet::ntoa(src.to_i)] 
+            bad_srcs << @ip2hostname[Inet::ntoa(src.to_i)] 
           elsif states2count.length > 1 and states2count.include?("dst_not_reachable")
             sum = states2count.values.inject( nil ) { |sum,x| sum ? sum+x : x }
             if (states2count["reached"]+states2count["in_progress"])/(sum*1.0) < 0.5
-              possibly_bad_srcs << $pl_ip2host[Inet::ntoa(src.to_i)] 
+              possibly_bad_srcs << @ip2hostname[Inet::ntoa(src.to_i)] 
             end
           end
         }

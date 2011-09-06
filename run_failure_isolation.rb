@@ -32,9 +32,6 @@ require 'failure_analyzer'
 require 'failure_dispatcher'
 require 'failure_monitor'
 
-# XXX Don't hardcode!!!
-$pptasks = "~ethan/scripts/pptasks"
-$node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 Thread.abort_on_exception = true
 
 begin

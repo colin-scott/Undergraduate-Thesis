@@ -2,7 +2,7 @@
 #
 require 'hops'
 require 'set'
-require 'isolation_module'
+require 'failure_isolation_consts'
 
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
@@ -57,8 +57,7 @@ end
 class Outage
   # !! suspected_failures is now not even a part of Outage objects -- part of
   # MergedOutage objects...
-  # !! suspected_failure is for backwards compatibility...
-  #    suspected_failures is now a hash { :direction => [suspected_failure1, suspected_failure2...] }
+  #    suspected_failures was a hash { :direction => [suspected_failure1, suspected_failure2...] }
   #              hash to account for bidirectional outages
   attr_accessor :file, :src, :dst, :dataset, :direction, :connected, :formatted_connected,
                                           :formatted_unconnected, :formatted_never_seen, :pings_towards_src,
@@ -253,6 +252,7 @@ class Outage
    end
 end
 
+# DEPRECATED
 # Special case of Outage, so subclass
 class SymmetricOutage < Outage
     def initialize(*args)

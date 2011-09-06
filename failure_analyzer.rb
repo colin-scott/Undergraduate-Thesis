@@ -1,4 +1,4 @@
-require 'isolation_module'
+require 'failure_isolation_consts'
 require 'ip_info'
 require 'suspect_set_processors.rb'
 require 'db_interface'
@@ -63,6 +63,11 @@ class FailureAnalyzer
         @ipInfo = ipInfo
         @logger = logger
 
+        load_suspect_set_processors
+    end
+
+    # TODO: reload me whenever the data is read in again
+    def load_suspect_set_processors
         @initializer = Initializer.new(registrar, db, logger)
         public_methods = @initializer.public_methods(false)
         @suspect_set_initializers = public_methods.uniq.map { |m| @initializer.method m }
