@@ -26,26 +26,26 @@ class HouseCleaner
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
         @logger.debug "generating top pops..."
-        system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
+        system "#{FailureIsolation.TopPoPsScripts} #{FailureIsolation.NumTopPoPs}" if regenerate
 
-        sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym } 
+        sorted_pops = IO.read(FailureIsolation.TopN).split("\n").map { |line| line.split[0].to_sym } 
         pops_set = Set.new(sorted_pops)
 
         # generate pop, core mappings
         pop2corertrs = Hash.new { |h,k| h[k] = [] }
-        FailureIsolation::IPToPoPMapping.each do |ip, pop|
-            pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation::TargetBlacklist.include? ip
+        FailureIsolation.IPToPoPMapping.each do |ip, pop|
+            pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation.TargetBlacklist.include? ip
         end
 
         @logger.debug "core routers generated"
 
         # generate pop, edge mappings
-        popsrcdsts = IO.read(FailureIsolation::SourceDests).split("\n")\
+        popsrcdsts = IO.read(FailureIsolation.SourceDests).split("\n")\
                         .map { |line| line.split }.map { |triple| [triple[0].to_sym, triple[1,2]] }
         # TODO: filter out core routers?
                         
         # only grab edge routers seen from at least one of our VPs
-        current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\
+        current_vps = Set.new(IO.read(FailureIsolation.CurrentNodesPath).split("\n")\
                               .map { |node| $pl_host2ip[node] })
 
         pop2edgertrs = Hash.new { |h,k| h[k] = [] }
@@ -54,12 +54,12 @@ class HouseCleaner
             next unless pops_set.include? pop # should be included...
             src, dst = srcdst
             next unless current_vps.include? src
-            pop2edgertrs[pop] << dst unless FailureIsolation::TargetBlacklist.include? dst
+            pop2edgertrs[pop] << dst unless FailureIsolation.TargetBlacklist.include? dst
         end
 
         @logger.debug "edge routers generated"
 
-        currently_used_pops = Set.new(FailureIsolation::HarshaPoPs.map { |ip| FailureIsolation::IPToPoPMapping[ip] })
+        currently_used_pops = Set.new(FailureIsolation.HarshaPoPs.map { |ip| FailureIsolation.IPToPoPMapping[ip] })
 
         sorted_replacement_pops = sorted_pops.find_all { |pop| !currently_used_pops.include? pop }
 
@@ -97,7 +97,7 @@ class HouseCleaner
     def find_substitutes_for_unresponsive_targets()
         dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
 
-        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation::TargetSet)
+        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops
         @logger.debug "bad_hops: #{bad_hops}"
@@ -108,7 +108,7 @@ class HouseCleaner
         bad_targets.each do |target|
             @logger.debug ". #{target} identifying"
             # identify which dataset it came from
-            dataset = FailureIsolation::get_dataset(target) 
+            dataset = FailureIsolation.get_dataset(target) 
             if dataset == DataSets::Unknown
                 @logger.warn "unknown target #{target}" 
                 next
@@ -133,18 +133,18 @@ class HouseCleaner
 
         # (see utilities.rb for .categorize())
         core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
-                                        .categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
+                                        .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
-                                                                             FailureIsolation::CoreRtrsPerPoP,
+                                                                             FailureIsolation.CoreRtrsPerPoP,
                                                                              pop2corertrs, sorted_replacement_pops)
         @logger.debug "Harsha PoPs substituted"
         
         # (see utilities.rb for .categorize())
-        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation::IPToPoPMapping, DataSets::Unknown)
+        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
-                                                                                   FailureIsolation::EdgeRtrsPerPoP,
+                                                                                   FailureIsolation.EdgeRtrsPerPoP,
                                                                                    pop2edgertrs, sorted_replacement_pops)
 
         @logger.debug "Edge PoPs substituted"
@@ -163,15 +163,15 @@ class HouseCleaner
     def update_pl_pl_meta_data(site2chosen_node)
         # We include both monitoring nodes and spoofer targets
         site2node_ip_tuple = {}
-        FailureIsolation::CurrentNodes.each do |spoofer|
-            site2node_ip_tuple[FailureIsolation::Host2Site[spoofer]] = [spoofer, FailureIsolation::Host2IP[spoofer]]
+        FailureIsolation.CurrentNodes.each do |spoofer|
+            site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, FailureIsolation.Host2IP[spoofer]]
         end
 
         site2chosen_node.each do |site, chosen_node|
-            site2node_ip_tuple[site] = [chosen_node, FailureIsolation::Host2IP[chosen_node]]
+            site2node_ip_tuple[site] = [chosen_node, FailureIsolation.Host2IP[chosen_node]]
         end
 
-        output = File.open(FailureIsolation::SpooferTargetsMetaDataPath, "w")
+        output = File.open(FailureIsolation.SpooferTargetsMetaDataPath, "w")
         site2node_ip_tuple.each do |site, node_ip|
             output.puts "#{node_ip.join ' '} #{site}"
         end
@@ -184,26 +184,26 @@ class HouseCleaner
         # blacklisted
         site2chosen_node = {}
 
-        all_sites = FailureIsolation::Site2Hosts.keys
+        all_sites = FailureIsolation.Site2Hosts.keys
 
         # all controllable
         all_controllable = @db.controllable_isolation_vantage_points.values
         site2controllable_nodes = Hash.new { |h,k| h[k] = [] }
         all_controllable.each do |host|
-            site2controllable_nodes[FailureIsolation::Host2Site[host]] << host
+            site2controllable_nodes[FailureIsolation.Host2Site[host]] << host
         end
 
         # currently probed
         site2current_spoofer = {}
-        FailureIsolation::SpooferTargets.each do |spoofer_ip|
-            spoofer = FailureIsolation::IP2Hostname[spoofer_ip]
-            site2current_spoofer[FailureIsolation::Host2Site[spoofer]] = spoofer
+        FailureIsolation.SpooferTargets.each do |spoofer_ip|
+            spoofer = FailureIsolation.IP2Hostname[spoofer_ip]
+            site2current_spoofer[FailureIsolation.Host2Site[spoofer]] = spoofer
         end
 
         # already have a monitoring node
         site2monitoring_node = {}
-        FailureIsolation::CurrentNodes.each do |spoofer|
-            site2monitoring_node[FailureIsolation::Host2Site[spoofer]] = spoofer
+        FailureIsolation.CurrentNodes.each do |spoofer|
+            site2monitoring_node[FailureIsolation.Host2Site[spoofer]] = spoofer
         end
 
         all_sites.each do |site|
@@ -211,14 +211,14 @@ class HouseCleaner
                 next
             end
 
-            if site2current_spoofer.include? site and !FailureIsolation::TargetBlacklist.include? site2current_spoofer[site] and 
-                         !bad_targets_ips.include? FailureIsolation::Host2IP[site2current_spoofer[site]]
+            if site2current_spoofer.include? site and !FailureIsolation.TargetBlacklist.include? site2current_spoofer[site] and 
+                         !bad_targets_ips.include? FailureIsolation.Host2IP[site2current_spoofer[site]]
                 site2chosen_node[site] = site2current_spoofer[site]
                 next
             end
 
-            site2controllable_nodes[site].delete_if { |hop| FailureIsolation::TargetBlacklist.include? host or \
-                                                         bad_targets_ips.include? FailureIsolation::Host2IP[host] }
+            site2controllable_nodes[site].delete_if { |hop| FailureIsolation.TargetBlacklist.include? host or \
+                                                         bad_targets_ips.include? FailureIsolation.Host2IP[host] }
             if !site2controllable_nodes[site].empty?
                 site2chosen_node[site] = site2controllable_nodes[site].shift
             end
@@ -244,14 +244,14 @@ class HouseCleaner
 
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
-        update_target_blacklist(bad_targets.to_set | FailureIsolation::TargetBlacklist)
+        update_target_blacklist(bad_targets.to_set | FailureIsolation.TargetBlacklist)
         @logger.debug "blacklist updated"
 
         dataset2substitute_targets.each do |dataset, substitute_targets|
             update_data_set(dataset, substitute_targets, bad_targets)
         end
 
-        FailureIsolation::ReadInDataSets()
+        FailureIsolation.ReadInDataSets()
 
         @logger.debug "target lists updated"
     end
@@ -262,9 +262,9 @@ class HouseCleaner
         @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
-        blacklist = FailureIsolation::NodeBlacklist
-        current_nodes = FailureIsolation::CurrentNodes
-        current_sites = Set.new(current_nodes.map { |node| FailureIsolation::Node2Site[node] })
+        blacklist = FailureIsolation.NodeBlacklist
+        current_nodes = FailureIsolation.CurrentNodes
+        current_sites = Set.new(current_nodes.map { |node| FailureIsolation.Node2Site[node] })
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
         faulty_nodes.each do |broken_vp|
@@ -275,15 +275,15 @@ class HouseCleaner
         
             current_nodes.delete broken_vp
             blacklist.add broken_vp
-            system "echo #{broken_vp} > #{FailureIsolation::NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
+            system "echo #{broken_vp} > #{FailureIsolation.NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
         end
 
         
         
-        while current_nodes.size < FailureIsolation::NumActiveNodes
+        while current_nodes.size < FailureIsolation.NumActiveNodes
             raise "No more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
-            new_vp_site = FailureIsolation::Node2Site[new_vp]
+            new_vp_site = FailureIsolation.Node2Site[new_vp]
             next if current_sites.include? new_vp_site
             @logger.debug "choosing: #{new_vp}"
             current_nodes.add new_vp
@@ -292,29 +292,29 @@ class HouseCleaner
 
         update_current_nodes(current_nodes)
         update_blacklist(blacklist)
-        FailureIsolation::ReadInNodeSets()
+        FailureIsolation.ReadInNodeSets()
 
-        system "rm #{FailureIsolation::PingStatePath}/*"
+        system "rm #{FailureIsolation.PingStatePath}/*"
     end
 
     def add_nodes(nodes)
-        current_nodes = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n"))
+        current_nodes = Set.new(IO.read(FailureIsolation.CurrentNodesPath).split("\n"))
         current_nodes |= nodes
         
         update_current_nodes(current_nodes)
     end
 
     def update_current_nodes(current_nodes)
-        File.open(FailureIsolation::CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
-        system "scp #{FailureIsolation::CurrentNodesPath} cs@toil:#{FailureIsolation::ToilNodesPath}"
+        File.open(FailureIsolation.CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
+        system "scp #{FailureIsolation.CurrentNodesPath} cs@toil:#{FailureIsolation.ToilNodesPath}"
     end
 
     def update_blacklist(blacklist)
-        File.open(FailureIsolation::NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation.NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 
     def update_target_blacklist(blacklist)
-        File.open(FailureIsolation::TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation.TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 end
 

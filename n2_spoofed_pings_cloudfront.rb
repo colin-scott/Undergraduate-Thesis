@@ -4,8 +4,8 @@ require 'isolation_module'
 require '../spooftr_config.rb'
 require 'yaml'
 
-controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
+controller = DRb::DRbObject.new_with_uri(FailureIsolation.ControllerUri)
+registrar = DRb::DRbObject.new_with_uri(FailureIsolation.RegistrarUri)
 
 i = 0
 
@@ -17,7 +17,7 @@ loop do
         curr_vp = vps[i]
         
         #                                                       Terrrrrrible
-        target2receiver2succesfulsenders = registrar.receive_all_spoofed_pings(curr_vp, FailureIsolation::CloudfrontTargets, true) 
+        target2receiver2succesfulsenders = registrar.receive_all_spoofed_pings(curr_vp, FailureIsolation.CloudfrontTargets, true) 
 
         # results is [[probes, receiver], [probes, receiver], ..] 
         t = Time.new

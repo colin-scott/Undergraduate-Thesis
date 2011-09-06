@@ -26,8 +26,8 @@ class FailureDispatcher
 
     def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @logger = logger
-        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-        @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
+        @controller = DRb::DRbObject.new_with_uri(FailureIsolation.ControllerUri)
+        @registrar = DRb::DRbObject.new_with_uri(FailureIsolation.RegistrarUri)
 
         acl=ACL.new(%w[deny all
 					allow *.cs.washington.edu
@@ -56,7 +56,7 @@ class FailureDispatcher
 
         Thread.new do
             loop do
-                @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+                @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation.HistoricalTraces
                 sleep 60 * 60 * 24
             end
         end
@@ -181,8 +181,8 @@ class FailureDispatcher
 
        srcdst2outage.each do |srcdst, outage|
             src, dst = srcdst
-            if FailureIsolation::SpooferTargets.include? dst
-                dst_hostname = FailureIsolation::IP2Hostname[dst]
+            if FailureIsolation.SpooferTargets.include? dst
+                dst_hostname = FailureIsolation.IP2Hostname[dst]
                 @logger.puts "check4targetswecontrol: dst ip is: #{dst}, dst_hostname is: #{dst_hostname}. ip mismap?" if dst_hostname.nil?
 
                 if registered_hosts.include? dst_hostname
@@ -411,7 +411,7 @@ class FailureDispatcher
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
                              historical_revtr, additional_traceroutes, upstream_reverse_paths)
         # TODO: put this into its own function
-        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
+        jpg_output = "#{FailureIsolation.DotFiles}/#{log_name}.jpg"
 
         @dot_generator.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
                              historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
@@ -422,7 +422,7 @@ class FailureDispatcher
     def generate_web_symlink(jpg_output)
         t = Time.new
         subdir = "#{t.year}.#{t.month}.#{t.day}"
-        abs_path = FailureIsolation::WebDirectory+"/"+subdir
+        abs_path = FailureIsolation.WebDirectory+"/"+subdir
         FileUtils.mkdir_p(abs_path)
         basename = File.basename(jpg_output)
         File.symlink(jpg_output, abs_path+"/#{basename}")
@@ -600,7 +600,7 @@ class FailureDispatcher
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
     def check_reachability(outage)
-        all_hop_sets = [[Hop.new(outage.dst), Hop.new(FailureIsolation::TestPing)], outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
+        all_hop_sets = [[Hop.new(outage.dst), Hop.new(FailureIsolation.TestPing)], outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
 
         for hop in outage.historical_tr
             all_hop_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
@@ -772,18 +772,18 @@ class FailureDispatcher
     # see outage.rb
     def log_srcdst_outage(outage)
         filename = outage.file
-        File.open(FailureIsolation::IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+        File.open(FailureIsolation.IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     def log_merged_outage(outage)
         filename = outage.file
-        File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+        File.open(FailureIsolation.MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     def log_outage_correlation(outage_correlation)
         t = Time.new
         t_str = t.strftime("%Y%m%d%H%M%S")
         filename = "#{outage_correlation.target}_#{t_str}.yml"
-        File.open(FailureIsolation::OutageCorrelation+"/"+filename, "w") { |f| YAML.dump(outage_correlation, f) }
+        File.open(FailureIsolation.OutageCorrelation+"/"+filename, "w") { |f| YAML.dump(outage_correlation, f) }
     end
 end

@@ -106,7 +106,7 @@ class Outage
         when 6
             @src, @dst, @connected, @formatted_connected, @formatted_unconnected, @formatted_never_seen = args
 
-            @dataset = FailureIsolation::get_dataset(@dst)
+            @dataset = FailureIsolation.get_dataset(@dst)
 
             return
         when 22

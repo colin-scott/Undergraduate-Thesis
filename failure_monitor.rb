@@ -31,15 +31,15 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
         # how often we send out faulty_node_audit reports
-        @@node_audit_period = 60*60*24 / FailureIsolation::DefaultPeriodSeconds / 3
+        @@node_audit_period = 60*60*24 / FailureIsolation.DefaultPeriodSeconds / 3
 
         @@outdated_node_threshold = 20
 
-        @target_set_size = FailureIsolation::TargetSet.size
+        @target_set_size = FailureIsolation.TargetSet.size
 
-        @all_targets = FailureIsolation::TargetSet
+        @all_targets = FailureIsolation.TargetSet
 
-        @all_nodes = FailureIsolation::CurrentNodes
+        @all_nodes = FailureIsolation.CurrentNodes
 
         @@never_seen_yml = "./targets_never_seen.yml"
         begin
@@ -85,14 +85,14 @@ class FailureMonitor
 
     # infinitely loop, periodically pulling state from ping monitors
     def start_pull_cycle(period)
-        FileUtils.mkdir_p(FailureIsolation::PingMonitorRepo) 
+        FileUtils.mkdir_p(FailureIsolation.PingMonitorRepo) 
 
         loop do
             start = Time.new
 
             # TODO: cat directly from ssh rather than scp'ing
-            system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                     @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
+            system "#{$pptasks} scp #{FailureIsolation.MonitorSlice} #{FailureIsolation.CurrentNodesPath} 100 100 \
+                     @:#{FailureIsolation.PingMonitorState} :#{FailureIsolation.PingMonitorRepo}state"
 
             node2targetstate = read_in_results()
 
@@ -121,7 +121,7 @@ class FailureMonitor
 
         @not_sshable = @all_nodes.clone
 
-        Dir.glob("#{FailureIsolation::PingMonitorRepo}state*").each do |yaml|
+        Dir.glob("#{FailureIsolation.PingMonitorRepo}state*").each do |yaml|
             # is there a cleaner way to get the mtime of a file?
             input = File.open(yaml)
             mtime = input.mtime
@@ -177,8 +177,8 @@ class FailureMonitor
 
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
-        if (FailureIsolation::AllNodes - FailureIsolation::NodeBlacklist).empty?
-            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}")
+        if (FailureIsolation.AllNodes - FailureIsolation.NodeBlacklist).empty?
+            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation.NodeBlacklistPath}")
             return
         end
         
@@ -211,7 +211,7 @@ class FailureMonitor
     end
      
     def identify_faulty_nodes()
-        already_blacklisted = FailureIsolation::NodeBlacklist
+        already_blacklisted = FailureIsolation.NodeBlacklist
 
         to_swap_out = Set.new
 
@@ -290,7 +290,7 @@ class FailureMonitor
      
         node2targetstate.each do |node, target_state|
             target_state.each do |target, rounds|
-               next if FailureIsolation::TargetBlacklist.include? target
+               next if FailureIsolation.TargetBlacklist.include? target
                # XXX For backwards compatibility...
                rounds = rounds[0] if rounds.is_a?(Array)
 
@@ -367,7 +367,7 @@ class FailureMonitor
 
     def log_outage_detected(*args)
         t = Time.new
-        File.open(FailureIsolation::OutageNotifications+"/#{args[0]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
+        File.open(FailureIsolation.OutageNotifications+"/#{args[0]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
     end
 end
 

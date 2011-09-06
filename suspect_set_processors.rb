@@ -72,7 +72,7 @@ class Initializer
         symmetric_outages.each do |o|
             # select all historical hops on traceroutes where source is o.src
             # can be liberal, since it's for initializing, not pruning
-            site = FailureIsolation::Host2Site[o.dst_hostname]
+            site = FailureIsolation.Host2Site[o.dst_hostname]
             if site.nil?
                 @logger.warn "site for #{o.dst_hostname} not specified!" if site.nil?
             else
@@ -89,7 +89,7 @@ class Initializer
         merged_outage.each do |o|
             # select all hops on historical traceroutes where destination is o.src
             # can be liberal, since it's for initializing, not pruning
-            site = FailureIsolation::Host2Site[o.src]
+            site = FailureIsolation.Host2Site[o.src]
             if site.nil?
                 @logger.warn "site for #{o.src} not specified!" if site.nil?
             else
@@ -130,8 +130,8 @@ class Pruner
         to_remove = []
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
-            site = FailureIsolation::Host2Site[o.src]
-            hops_on_traces = FailureIsolation::current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
+            site = FailureIsolation.Host2Site[o.src]
+            hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
             @logger.warn "no hops on traces to site: #{site}" if hops_on_traces.empty?
             to_remove += hops_on_traces
         end
