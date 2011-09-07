@@ -99,10 +99,10 @@ class Initializer
         return all_hops
     end
 
-    # all IPs in nearby prefixes
-    def all_ips_in_vicinity(merged_outage)
-        return []
-    end
+    ## all IPs in nearby prefixes
+    #def all_ips_in_vicinity(merged_outage)
+    #    return []
+    #end
 end
 
 # pruner contract:
@@ -116,12 +116,12 @@ class Pruner
     end
 
     # To specify an order for your methods to be executed in, add method names here, first to last
-    Pruner::OrderedMethods = ["intersecting_traces_to_src", "pings_from_source"]
+    Pruner::OrderedMethods = ["intersecting_traces_to_src", "pings_issued_before_suspect_set_processing", "trace_hops_src_to_dst",  "pings_from_source"]
 
-    # empty for now... revtr is far too slow...
-    def intersecting_revtrs_to_src(suspected_set, merged_outage)
-        return []
-    end
+    ## empty for now... revtr is far too slow...
+    #def intersecting_revtrs_to_src(suspected_set, merged_outage)
+    #    return []
+    #end
 
     # second half of path splices
     #  TODO: ensure that traces are sufficiently recent (issued after outage
@@ -131,6 +131,7 @@ class Pruner
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
             site = FailureIsolation.Host2Site[o.src]
+            @logger.warn "site nil! #{o.src}" if site.nil?
             hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(@db, site) unless site.nil?
             @logger.warn "no hops on traces to site: #{site}" if hops_on_traces.empty?
             to_remove += hops_on_traces
@@ -139,33 +140,31 @@ class Pruner
         return to_remove
     end
 
-    # we want this method to be executed last...
-    def pings_from_source(suspect_set, merged_outage)
-        to_remove = Set.new
-
+    def trace_hops_src_to_dst(suspect_set, merged_outage)
         # we have some set of preexisting pings.
         trace_hops = merged_outage.map { |o| o.tr }.find_all { |trace| trace.valid? }\
-            .map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set
+            .map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set.to_a
+    end
 
-        to_remove += trace_hops
+    def pings_issued_before_suspect_set_processing(suspect_set, merged_outage)
+          # TODO: is responsive_targets ip addresses?
+        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets }.flatten.to_set.to_a
+    end
 
-        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets }.flatten.to_set
-
-        to_remove += ping_responsive_hops
-        
-        remaining = suspect_set - trace_hops - ping_responsive_hops
-
-        @logger.debug "\# trace_hops: #{trace_hops.size} \# ping_hops: #{ping_responsive_hops.size} remaining to ping: #{remaining.inspect}"
-
+    # we want this method to be executed last...
+    def pings_from_source(suspect_set, merged_outage)
         # now issue more pings!
         srcs = merged_outage.map { |o| o.src }
 
         # XXX WHY AREN'T YOU ISSUING?
-        src2pingable_dsts = @registrar.all_pairs_ping(srcs, remaining.to_a)
-        to_remove += src2pingable_dsts.value_set
-        @logger.warn "#{src2pingable_dsts.inspect} was empty?!" if !remaining.empty? and src2pingable_dsts.value_set.empty?
+        src2pingable_dsts = @registrar.all_pairs_ping(srcs, suspect_set.to_a)
 
-        return to_remove.to_a
+        if !suspect_set.empty? and src2pingable_dsts.value_set.empty?
+            @logger.warn "#{src2pingable_dsts.inspect} was empty?!" 
+            @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
+        end
+
+        return src2pingable_dsts.value_set
     end
 end
 

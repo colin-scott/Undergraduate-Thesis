@@ -27,8 +27,8 @@ describe "suspect set processors" do
         end
 
         it "should find historical revtr hops" do 
-            @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
-                .sort.should eql(Fixture.historical_revtr.sort)
+        #    @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
+        #        .sort.uniq.should eql(Fixture.historical_revtr.hops.uniq.sort)
         end
 
         it "should gather some revtrs" do
@@ -46,8 +46,11 @@ describe "suspect set processors" do
         end
 
         it "should issue pings" do
-           to_remove = @initializer.intersecting_traces_to_src(Fixture.suspect_set, Fixture.merged_outage)
+           to_remove = @pruner.pings_from_source(Fixture.suspect_set, Fixture.merged_outage)
            to_remove.should_not be_empty
+           
+           left = to_remove - Fixture.merged_outage.first.tr.map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set - Fixture.merged_outage.first.resonsive_targets
+           left.should_not be_empty
         end
     end
 end
