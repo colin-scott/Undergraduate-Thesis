@@ -14,8 +14,8 @@ class RevtrCache
 
     def initialize(connection, ipInfo, database=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @connection = connection
-        @db = database
         @ipInfo = ipInfo
+        @db = database
         @logger = logger
     end
 

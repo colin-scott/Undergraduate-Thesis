@@ -63,11 +63,11 @@ class FailureAnalyzer
         @ipInfo = ipInfo
         @logger = logger
 
-        load_suspect_set_processors
+        load_suspect_set_processors(ipInfo, logger, registrar, db)
     end
 
     # TODO: reload me whenever the data is read in again
-    def load_suspect_set_processors
+    def load_suspect_set_processors(ipInfo, logger, registrar, db)
         @initializer = Initializer.new(registrar, db, logger)
         public_methods = @initializer.public_methods(false)
         @suspect_set_initializers = public_methods.uniq.map { |m| @initializer.method m }
@@ -81,40 +81,41 @@ class FailureAnalyzer
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
     def identify_faults(merged_outage)
-        # OK, for now, always call initializers for both reverse and forward
-        # path outages. They'll have to figure it out
-        initializer2suspectset = {}
-        @suspect_set_initializers.each do |init| 
-          initializer2suspectset[init.to_s] = init.call merged_outage 
-        end
-
-        all_suspects = initializer2suspectset.value_set
-        all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ }
-        
-        pruner2removed = {}
-        @suspect_set_pruners.each do |pruner|
-            removed = pruner.call all_suspects, merged_outage
-            pruner2removed[pruner.to_s] = removed & all_suspects
-            all_suspects -= removed
-        end
-
-        removed_suspects = pruner2removed.value_set 
-        
-        merged_outage.initializer2suspectset = initializer2suspectset
-        merged_outage.pruner2removed = pruner2removed
-
-        remaining_w_inits = (all_suspects - removed_suspects).map do |hop|
-            with_inits = "#{hop.clone} ("
-            initializer2suspectset.each do |init, suspect_set|
-               if suspect_set.include? hop
-                  with_inits << "#{init.to_s},"
-               end 
+        if merged_outage.direction == Direction.FORWARD
+            initializer2suspectset = {}
+            @suspect_set_initializers.each do |init| 
+              initializer2suspectset[init.to_s] = init.call merged_outage 
             end
-            with_inits << ")"
-            with_inits
-        end
 
-        merged_outage.suspected_failures[Direction.REVERSE] = remaining_w_inits
+            all_suspects = initializer2suspectset.value_set
+            all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ }
+            
+            pruner2removed = {}
+            @suspect_set_pruners.each do |pruner|
+                removed = pruner.call all_suspects, merged_outage
+                pruner2removed[pruner.to_s] = removed & all_suspects
+                @logger.warn "removed & all_suspects empty #{pruner.to_s}, removed: #{removed}" if (removed & all_suspects).empty?
+                all_suspects -= removed
+            end
+
+            removed_suspects = pruner2removed.value_set 
+            
+            merged_outage.initializer2suspectset = initializer2suspectset
+            merged_outage.pruner2removed = pruner2removed
+
+            remaining_w_inits = (all_suspects - removed_suspects).map do |hop|
+                with_inits = "#{hop.clone} ("
+                initializer2suspectset.each do |init, suspect_set|
+                   if suspect_set.include? hop
+                      with_inits << "#{init.to_s},"
+                   end 
+                end
+                with_inits << ")"
+                with_inits
+            end
+
+            merged_outage.suspected_failures[Direction.REVERSE] = remaining_w_inits
+        end
 
         #if merged_outage.direction.is_reverse?
             #if !merged_outage.historical_revtr.valid?
@@ -159,11 +160,11 @@ class FailureAnalyzer
         end
 
         merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
-            .map { |o| o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE] }.flatten.uniq
+            .map { |o| (o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE]) }.flatten.uniq
 
         merged_outage.suspected_failures[Direction.FORWARD] |= []
 
-        # XXX Wht won't the html in the email display the class... only the
+        # XXX Why won't the html in the email display the class... only the
         # '#' ...........
         merged_outage.suspected_failures[Direction.FORWARD].delete(nil)
     end

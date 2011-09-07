@@ -154,15 +154,15 @@ module FailureIsolation
     # !!!!!!!!!!!!!!!!!!!
     #   to add a dataset, mimick the above lines
     def self.get_dataset(dst)
-        if HarshaPoPs.include? dst
+        if self.HarshaPoPs.include? dst
             return DataSets::HarshaPoPs
-        elsif BeyondHarshaPoPs.include? dst
+        elsif self.BeyondHarshaPoPs.include? dst
             return DataSets::BeyondHarshaPoPs 
-        elsif CloudfrontTargets.include? dst
+        elsif self.CloudfrontTargets.include? dst
             return DataSets::CloudfrontTargets
-        elsif SpooferTargets.include? dst
+        elsif self.SpooferTargets.include? dst
             return DataSets::SpooferTargets
-        elsif ATTTargets.include? dst
+        elsif self.ATTTargets.include? dst
             return DataSets::ATTTargets
         else
             return DataSets::Unknown 
