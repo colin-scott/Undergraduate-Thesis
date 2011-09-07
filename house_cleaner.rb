@@ -26,9 +26,9 @@ class HouseCleaner
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
         @logger.debug "generating top pops..."
-        system "#{FailureIsolation.TopPoPsScripts} #{FailureIsolation.NumTopPoPs}" if regenerate
+        system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
 
-        sorted_pops = IO.read(FailureIsolation.TopN).split("\n").map { |line| line.split[0].to_sym } 
+        sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym } 
         pops_set = Set.new(sorted_pops)
 
         # generate pop, core mappings
@@ -40,12 +40,12 @@ class HouseCleaner
         @logger.debug "core routers generated"
 
         # generate pop, edge mappings
-        popsrcdsts = IO.read(FailureIsolation.SourceDests).split("\n")\
+        popsrcdsts = IO.read(FailureIsolation::SourceDests).split("\n")\
                         .map { |line| line.split }.map { |triple| [triple[0].to_sym, triple[1,2]] }
         # TODO: filter out core routers?
                         
         # only grab edge routers seen from at least one of our VPs
-        current_vps = Set.new(IO.read(FailureIsolation.CurrentNodesPath).split("\n")\
+        current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\
                               .map { |node| @db.hostname2ip[node] })
 
         pop2edgertrs = Hash.new { |h,k| h[k] = [] }
@@ -136,7 +136,7 @@ class HouseCleaner
                                         .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
-                                                                             FailureIsolation.CoreRtrsPerPoP,
+                                                                             FailureIsolation::CoreRtrsPerPoP,
                                                                              pop2corertrs, sorted_replacement_pops)
         @logger.debug "Harsha PoPs substituted"
         
@@ -144,7 +144,7 @@ class HouseCleaner
         edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
-                                                                                   FailureIsolation.EdgeRtrsPerPoP,
+                                                                                   FailureIsolation::EdgeRtrsPerPoP,
                                                                                    pop2edgertrs, sorted_replacement_pops)
 
         @logger.debug "Edge PoPs substituted"
@@ -171,7 +171,7 @@ class HouseCleaner
             site2node_ip_tuple[site] = [chosen_node, @db.hostname2ip[chosen_node]]
         end
 
-        output = File.open(FailureIsolation.SpooferTargetsMetaDataPath, "w")
+        output = File.open(FailureIsolation::SpooferTargetsMetaDataPath, "w")
         site2node_ip_tuple.each do |site, node_ip|
             output.puts "#{node_ip.join ' '} #{site}"
         end
@@ -275,12 +275,12 @@ class HouseCleaner
         
             current_nodes.delete broken_vp
             blacklist.add broken_vp
-            system "echo #{broken_vp} > #{FailureIsolation.NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
+            system "echo #{broken_vp} > #{FailureIsolation::NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
         end
 
         
         
-        while current_nodes.size < FailureIsolation.NumActiveNodes
+        while current_nodes.size < FailureIsolation::NumActiveNodes
             raise "No more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
             new_vp_site = FailureIsolation.Node2Site[new_vp]
@@ -294,27 +294,27 @@ class HouseCleaner
         update_blacklist(blacklist)
         FailureIsolation.ReadInNodeSets()
 
-        system "rm #{FailureIsolation.PingStatePath}/*"
+        system "rm #{FailureIsolation::PingStatePath}/*"
     end
 
     def add_nodes(nodes)
-        current_nodes = Set.new(IO.read(FailureIsolation.CurrentNodesPath).split("\n"))
+        current_nodes = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n"))
         current_nodes |= nodes
         
         update_current_nodes(current_nodes)
     end
 
     def update_current_nodes(current_nodes)
-        File.open(FailureIsolation.CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
-        system "scp #{FailureIsolation.CurrentNodesPath} cs@toil:#{FailureIsolation.ToilNodesPath}"
+        File.open(FailureIsolation::CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
+        system "scp #{FailureIsolation::CurrentNodesPath} cs@toil:#{FailureIsolation::ToilNodesPath}"
     end
 
     def update_blacklist(blacklist)
-        File.open(FailureIsolation.NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation::NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 
     def update_target_blacklist(blacklist)
-        File.open(FailureIsolation.TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+        File.open(FailureIsolation::TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 end
 

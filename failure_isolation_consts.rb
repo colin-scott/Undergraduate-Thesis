@@ -292,15 +292,15 @@ module DataSets
     def self.ToPath(dataset)
         case dataset
         when HarshaPoPs
-            return FailureIsolation.HarshaPoPsPath
+            return FailureIsolation::HarshaPoPsPath
         when BeyondHarshaPoPs
-            return FailureIsolation.BeyondHarshaPoPsPath
+            return FailureIsolation::BeyondHarshaPoPsPath
         when CloudfrontTargets
-            return FailureIsolation.CloudfrontTargetsPath
+            return FailureIsolation::CloudfrontTargetsPath
         when SpooferTargets
-            return FailureIsolation.SpooferTargetsPath
+            return FailureIsolation::SpooferTargetsPath
         when ATTTargets
-            return FailureIsolation.ATTTargetsPath
+            return FailureIsolation::ATTTargetsPath
         when Unknown
             return "/dev/null"
         else

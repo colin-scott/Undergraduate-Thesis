@@ -21,7 +21,7 @@ module LogIterator
 #    IPINFO = IpInfo.new # hmmm
 
     def LogIterator::jpg2yml_rev4(jpg)
-       FailureIsolation.IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
+       FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
     end
 
     def LogIterator::jpg2yml_rev3(jpg)
@@ -37,11 +37,11 @@ module LogIterator
     end
 
     def LogIterator::yml2jpg(yml)
-        FailureIsolation.DotFiles+"/"+File.basename(yml).gsub(/yml$/, "jpg")
+        FailureIsolation::DotFiles+"/"+File.basename(yml).gsub(/yml$/, "jpg")
     end
 
     def LogIterator::all_filtered_outages_rev4(&block)
-        Dir.glob(FailureIsolation.DotFiles+"/*jpg").each do |jpg|
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
             yml = LogIterator::jpg2yml_rev4(jpg)
             begin 
                 self.read_log_rev4(yml, &block)
@@ -52,7 +52,7 @@ module LogIterator
     end
 
     def LogIterator::all_filtered_outages_rev3(&block)
-        Dir.glob(FailureIsolation.DotFiles+"/*jpg").each do |jpg|
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
             yml = LogIterator::jpg2yml_rev3(jpg)
             begin 
                 self.read_log_rev3(yml, &block)
@@ -63,7 +63,7 @@ module LogIterator
     end
 
     def LogIterator::all_filtered_outages_rev2(&block)
-        Dir.glob(FailureIsolation.DotFiles+"/*jpg").each do |jpg|
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
             yml = LogIterator::jpg2yml_rev2(jpg)
             begin 
                 self.read_log_rev2(yml, &block)
@@ -74,7 +74,7 @@ module LogIterator
     end
 
     def LogIterator::all_filtered_outages_rev1(&block)
-        Dir.glob(FailureIsolation.DotFiles+"/*jpg").each do |jpg|
+        Dir.glob(FailureIsolation::DotFiles+"/*jpg").each do |jpg|
             yml = LogIterator::jpg2yml_rev1(jpg)
             begin 
                 self.read_log_rev1(yml, &block)
@@ -95,7 +95,7 @@ module LogIterator
     end
 
     def LogIterator::convert_all()
-        Dir.chdir FailureIsolation.IsolationResults do
+        Dir.chdir FailureIsolation::IsolationResults do
             files = Dir.glob("*yml").sort
             total = files.size
             curr = 0
@@ -111,7 +111,7 @@ module LogIterator
     end
 
     def LogIterator::convert_and_migrate_symmetric(filename)
-        bin = FailureIsolation.Snapshot+"/"+filename.gsub(/yml$/, "bin")
+        bin = FailureIsolation::Snapshot+"/"+filename.gsub(/yml$/, "bin")
         return if File.exists? bin
         arr = YAML.load_file(filename)
         return if !arr || arr.empty? || arr.include?(nil)
@@ -139,7 +139,7 @@ module LogIterator
     # HACK! Don't iterate over the snapshot, iterate over all logs
     # STOP COPYING AND PASTING
     def LogIterator::iterate_all_logs(debugging=false, &block)
-        Dir.chdir FailureIsolation.IsolationResults do
+        Dir.chdir FailureIsolation::IsolationResults do
             files = Dir.glob("*bin").sort
             total = files.size
             curr = 0
@@ -157,9 +157,9 @@ module LogIterator
         end
     end
 
-    # TODO: Change me back to FailureIsolation.IsolationResults?
+    # TODO: Change me back to FailureIsolation::IsolationResults?
     def LogIterator::iterate(files=nil, debugging=false, &block)
-        Dir.chdir FailureIsolation.Snapshot do
+        Dir.chdir FailureIsolation::Snapshot do
             files ||= Dir.glob("*bin").sort
 
             total = files.size
@@ -179,7 +179,7 @@ module LogIterator
     end
 
     def LogIterator::replace_logs(dispatcher, &block)
-        Dir.chdir FailureIsolation.Snapshot do
+        Dir.chdir FailureIsolation::Snapshot do
             files = Dir.glob("*bin").sort
             total = files.size
             curr = 0
@@ -394,7 +394,7 @@ module LogIterator
         ##      month/day/ subdirectories...
         #jpg = filename.gsub(/yml$/, "jpg")
     
-        #if File.exists?(FailureIsolation.WebDirectory+"/"+"1")
+        #if File.exists?(FailureIsolation::WebDirectory+"/"+"1")
         #    return 
         #end
     

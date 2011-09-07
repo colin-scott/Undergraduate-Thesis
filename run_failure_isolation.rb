@@ -60,7 +60,7 @@ begin
        # will threads be garbage collected if objects are garbage collected?  
        dispatcher = FailureDispatcher.new(db, logger)
        monitor = FailureMonitor.new(dispatcher, db, logger)
-       monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation.DefaultPeriodSeconds : ARGV.shift.to_i)
+       monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
    end
 
    Signal.trap("USR2") do
@@ -76,7 +76,7 @@ begin
      #end
    end
 
-   monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation.DefaultPeriodSeconds : ARGV.shift.to_i)
+   monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
 rescue Exception => e
    Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
    monitor.persist_state

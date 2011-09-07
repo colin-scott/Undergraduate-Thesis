@@ -352,7 +352,7 @@ if $0 == __FILE__
 
     require 'log_iterator' 
     d = DotGenerator.new
-    LogIterator::read_log_rev4(FailureIsolation.IsolationResults+"/plgmu4.ite.gmu.edu_77.221.192.1_2011224142939.bin") do |outage|
+    LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/plgmu4.ite.gmu.edu_77.221.192.1_2011224142939.bin") do |outage|
        d.generate_jpg(outage.src, outage.dst, outage.direction, outage.dataset, outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr, "testing.jpg")
     end
 end
