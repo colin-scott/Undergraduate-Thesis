@@ -1,8 +1,6 @@
 #!/homes/network/revtr/ruby/bin/ruby
 $: << File.expand_path("../")
 
-$FAST_LOAD = true
-
 require 'rspec'
 require 'failure_isolation_consts'
 #require 'isolation_module'
@@ -15,7 +13,6 @@ require 'db_interface'
 require 'fixtures'
 require 'utilities'
 Thread.abort_on_exception = true
-
 
 describe "suspect set processors" do
     before(:each) do

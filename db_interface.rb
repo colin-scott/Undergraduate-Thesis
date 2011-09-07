@@ -17,8 +17,6 @@ require 'failure_isolation_consts'
 class DatabaseInterface
     def initialize(logger=$stderr, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
         @logger = logger
-        @hostname2ip = hostname2ip
-        @ip2hostname = ip2hostname
 
         begin
           @connection = Mysql.new(host, usr, pwd, database)
@@ -26,6 +24,9 @@ class DatabaseInterface
           @logger.puts "DB connection error " + host
           throw e
         end
+
+        @hostname2ip = hostname2ip
+        @ip2hostname = ip2hostname
     end
     
     # wrapper for arbitrary sql queries
