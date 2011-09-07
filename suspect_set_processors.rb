@@ -131,7 +131,7 @@ class Pruner
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
             site = FailureIsolation.Host2Site[o.src]
-            hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(site) unless site.nil?
+            hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(@db, site) unless site.nil?
             @logger.warn "no hops on traces to site: #{site}" if hops_on_traces.empty?
             to_remove += hops_on_traces
         end

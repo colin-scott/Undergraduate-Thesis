@@ -46,7 +46,7 @@ class HouseCleaner
                         
         # only grab edge routers seen from at least one of our VPs
         current_vps = Set.new(IO.read(FailureIsolation.CurrentNodesPath).split("\n")\
-                              .map { |node| $pl_host2ip[node] })
+                              .map { |node| @db.hostname2ip[node] })
 
         pop2edgertrs = Hash.new { |h,k| h[k] = [] }
         popsrcdsts.each do |popsrcdst| 
@@ -164,11 +164,11 @@ class HouseCleaner
         # We include both monitoring nodes and spoofer targets
         site2node_ip_tuple = {}
         FailureIsolation.CurrentNodes.each do |spoofer|
-            site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, FailureIsolation.Host2IP[spoofer]]
+            site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, @db.hostname2ip[spoofer]]
         end
 
         site2chosen_node.each do |site, chosen_node|
-            site2node_ip_tuple[site] = [chosen_node, FailureIsolation.Host2IP[chosen_node]]
+            site2node_ip_tuple[site] = [chosen_node, @db.hostname2ip[chosen_node]]
         end
 
         output = File.open(FailureIsolation.SpooferTargetsMetaDataPath, "w")
@@ -196,7 +196,7 @@ class HouseCleaner
         # currently probed
         site2current_spoofer = {}
         FailureIsolation.SpooferTargets.each do |spoofer_ip|
-            spoofer = FailureIsolation.IP2Hostname[spoofer_ip]
+            spoofer = @db.ip2hostame[spoofer_ip]
             site2current_spoofer[FailureIsolation.Host2Site[spoofer]] = spoofer
         end
 
@@ -212,13 +212,13 @@ class HouseCleaner
             end
 
             if site2current_spoofer.include? site and !FailureIsolation.TargetBlacklist.include? site2current_spoofer[site] and 
-                         !bad_targets_ips.include? FailureIsolation.Host2IP[site2current_spoofer[site]]
+                         !bad_targets_ips.include? @db.hostname2ip[site2current_spoofer[site]]
                 site2chosen_node[site] = site2current_spoofer[site]
                 next
             end
 
             site2controllable_nodes[site].delete_if { |hop| FailureIsolation.TargetBlacklist.include? host or \
-                                                         bad_targets_ips.include? FailureIsolation.Host2IP[host] }
+                                                         bad_targets_ips.include? @db.hostname2ip[host] }
             if !site2controllable_nodes[site].empty?
                 site2chosen_node[site] = site2controllable_nodes[site].shift
             end

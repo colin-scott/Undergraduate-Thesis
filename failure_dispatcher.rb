@@ -182,7 +182,7 @@ class FailureDispatcher
        srcdst2outage.each do |srcdst, outage|
             src, dst = srcdst
             if FailureIsolation.SpooferTargets.include? dst
-                dst_hostname = FailureIsolation.IP2Hostname[dst]
+                dst_hostname = @db.ip2hostname[dst]
                 @logger.puts "check4targetswecontrol: dst ip is: #{dst}, dst_hostname is: #{dst_hostname}. ip mismap?" if dst_hostname.nil?
 
                 if registered_hosts.include? dst_hostname

@@ -1,3 +1,8 @@
+TODO: 
+  - make a utilitiy object to pass around rather than a (db, logger, etc.)
+    pair
+
+
 There have been some bizzare cases where the source doesn't get any replies
 back from normal tr or non-revtr pings...
 To look into it, run:
@@ -11,6 +16,8 @@ thrashing, could be that the heuristics are too stringent. Look into it?
 
 How to tell if the problem was caused by a forward path change:
  (see: pl1.6test.edu.cn_211.160.161.1_20113301998.jpg)
+
+t.edu.cn_211.160.161.1_20113301998.jpg
    - if hops beyond the suspected problem are still pingable. Especially if
      there is a AS transition right after the suspected problem
 

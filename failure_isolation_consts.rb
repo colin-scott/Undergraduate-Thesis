@@ -40,9 +40,10 @@ module FailureIsolation
 
     CurrentPLPLTracesPath = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/currentlogdir/probes"
 
-    def self.current_hops_on_pl_pl_traces_to_site(site)
+    # MOVE ME
+    def self.current_hops_on_pl_pl_traces_to_site(db, site)
         return nil unless self.Site2Hosts.include? site
-        all_src_ips = self.Site2Hosts[site].map { |host| self.Host2IP[host] }
+        all_src_ips = self.Site2Hosts[site].map { |host| db.hostname2ip[host] }
         File.open("/tmp/site_hosts.txt", "w") { |f| f.puts all_src_ips.join "\n" }
         Set.new(`#{HopsTowardsSrc} /tmp/site_hosts.txt #{CurrentPLPLTracesPath}/*`.split("\n"))
     end
@@ -64,42 +65,19 @@ module FailureIsolation
         direction2site2hops
     end
 
-    def self.read_in_ip2hostname()
-       # TODO BETTER: read in from the database
-       ip2hostname = {}
-       File.foreach("#{$DATADIR}/pl_hostnames_w_ips.txt") do |line|
-          hostname, ip = line.chomp.split  
-          ip2hostname[ip] = hostname
-       end
-       ip2hostname
-    end
-
     SiteMapper = "/homes/network/ethan/scripts/list_sites_for_pl_hosts_in_fileX.pl"
-
-    # XXX TODO: use DB, not these files
-    def self.IP2Hostname()
-        return @@IP2Hostname unless @@IP2Hostname.nil?
-        @@IP2Hostname = Hash.new { |h,k| k }
-        @@IP2Hostname.merge!(self.read_in_ip2hostname)
-    end
-        
-    def self.Host2IP()
-        return @@Host2IP unless @@Host2IP.nil?
-        @@Host2IP = Hash.new { |h,k| k }
-        @@Host2IP.merge!(self.IP2Hostname.invert)
-    end
-    
+       
     def self.Host2Site()
-        return @@Host2Site unless @@Host2Site.nil?
-        @@Host2Site = Hash.new { |h,k| k }
-        @@Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hostnames_w_ips.txt | cut -d ' ' -f1,3`\
+        return @Host2Site unless @Host2Site.nil?
+        @Host2Site = Hash.new { |h,k| k }
+        @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hostnames_w_ips.txt | cut -d ' ' -f1,3`\
                                           .split("\n").map { |line| line.split }.to_hash)
     end
 
     def self.Site2Hosts()
-        return @@Site2Hosts unless @@Site2Hosts.nil?
-        @@Site2Hosts = Hash.new { |h,k| [] }
-        @@Site2Hosts.merge!(self.Host2Site.value2keys)
+        return @Site2Hosts unless @Site2Hosts.nil?
+        @Site2Hosts = Hash.new { |h,k| [] }
+        @Site2Hosts.merge!(self.Host2Site.value2keys)
     end
 
     # ====================================
@@ -129,29 +107,28 @@ module FailureIsolation
     # ====================================
     TargetSetPath = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
     def self.TargetSet
-        if @@TargetSet.nil?
-            @@TargetSet = Set.new
+        if @TargetSet.nil?
             self.ReadInDataSets()
         end
 
-        @@TargetSet
+        @TargetSet
     end
 
     TargetBlacklistPath = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
     def self.TargetBlacklist()
-        @@TargetBlacklist ||= Set.new(IO.read(TargetBlacklistPath).split("\n"))
+        @TargetBlacklist ||= Set.new(IO.read(TargetBlacklistPath).split("\n"))
     end
 
     # targets taken from Harsha's most well connected PoPs
     HarshaPoPsPath = "#{DataSetDir}/responsive_corerouters.txt"
     def self.HarshaPoPs()
-        @@HarshaPoPs ||= Set.new(IO.read(HarshaPoPsPath).split("\n"))
+        @HarshaPoPs ||= Set.new(IO.read(HarshaPoPsPath).split("\n"))
     end
 
     # targets taken from routers on paths beyond Harsha's most well connected PoPs
     BeyondHarshaPoPsPath = "#{DataSetDir}/responsive_edgerouters.txt"
     def self.BeyondHarshaPoPs()
-        @@BeyondHarshaPoPs ||= Set.new(IO.read(BeyondHarshaPoPsPath).split("\n"))
+        @BeyondHarshaPoPs ||= Set.new(IO.read(BeyondHarshaPoPsPath).split("\n"))
     end
 
     # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
@@ -159,19 +136,19 @@ module FailureIsolation
     #  XXX Take in from isolation_vantage_points table instaed of this static list.
     SpooferTargetsPath = "#{DataSetDir}/up_spoofers.ips"
     def self.SpooferTargets()
-        @@SpooferTargets ||= Set.new(IO.read(SpooferTargetsPath).split("\n"))
+        @SpooferTargets ||= Set.new(IO.read(SpooferTargetsPath).split("\n"))
     end
 
     # targets taken from cloudfront ips
     CloudfrontTargetsPath = "#{DataSetDir}/cloudfront_ips.txt"
     def self.CloudfrontTargets()
-        @@CloudfrontTargets ||= Set.new(IO.read(CloudfrontTargetsPath).split("\n"))
+        @CloudfrontTargets ||= Set.new(IO.read(CloudfrontTargetsPath).split("\n"))
     end
 
     # targets taken from AT&T ips, for potential ground truth
     ATTTargetsPath = "/homes/network/revtr/dave/revtr-test/reverse_traceroute/data/att_responsive_just_ips.txt"
     def self.ATTTargets()
-        @@ATTTargets ||= Set.new(IO.read(ATTTargetsPath).split("\n"))
+        @ATTTargets ||= Set.new(IO.read(ATTTargetsPath).split("\n"))
     end
 
     # !!!!!!!!!!!!!!!!!!!
@@ -193,37 +170,33 @@ module FailureIsolation
     end
 
     def self.ReadInDataSets()
-        @@Host2Site = nil
+        @Host2Site = nil
         self.Host2Site
-        @@Site2Hosts = nil
+        @Site2Hosts = nil
         self.Site2Hosts
-        @@IP2Hostname = nil
-        self.IP2Hostname
-        @@Host2IP = nil
-        self.Host2IP
-        @@HarshaPoPs = nil
+        @HarshaPoPs = nil
         self.HarshaPoPs
-        @@BeyondHarshaPoPs = nil
+        @BeyondHarshaPoPs = nil
         self.BeyondHarshaPoPs
-        @@SpooferTargets = nil
+        @SpooferTargets = nil
         self.SpooferTargets
-        @@CloudfrontTargets = nil
+        @CloudfrontTargets = nil
         self.CloudfrontTargets
         # pops are symbols!
-        @@IPToPoPMapping = nil
+        @IPToPoPMapping = nil
         self.IPToPoPMapping
-        @@TargetBlacklist = nil
+        @TargetBlacklist = nil
         self.TargetBlacklist
-        @@ATTTargets = nil
+        @ATTTargets = nil
         self.ATTTargets
         self.UpdateTargetSet()
     end
 
-    # precondition: @@TargetSet != nil
     def self.UpdateTargetSet()
+        @TargetSet = Set.new
         union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
-        @@TargetSet.merge(union)
-        File.open(TargetSetPath, "w") { |f| f.puts @@TargetSet.to_a.join "\n" }
+        @TargetSet.merge(union)
+        File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
     end
 
     # ====================================
@@ -234,17 +207,17 @@ module FailureIsolation
 
     AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
     def self.AllNodes()
-        @@AllNodes ||= Set.new(IO.read(AllNodesPath).split("\n"))
+        @AllNodes ||= Set.new(IO.read(AllNodesPath).split("\n"))
     end
 
     NodeBlacklistPath = "/homes/network/revtr/spoofed_traceroute/blacklisted_isolation_nodes.txt"
-    def self.NodeBloacklist()
-        @@NodeBlacklist ||= Set.new(IO.read(NodeBlacklistPath).split("\n"))
+    def self.NodeBlacklist()
+        @NodeBlacklist ||= Set.new(IO.read(NodeBlacklistPath).split("\n"))
     end
 
     CurrentNodesPath = "/homes/network/revtr/spoofed_traceroute/cloudfront_spoofing_monitoring_nodes.txt"
     def self.CurrentNodes()
-        @@CurrentNodes ||= Set.new(IO.read(CurrentNodesPath).split("\n"))
+        @CurrentNodes ||= Set.new(IO.read(CurrentNodesPath).split("\n"))
     end
 
     ToilNodesPath = "/home/cs/colin/ping_monitoring/cloudfront_monitoring/cloudfront_spoofing_monitoring_nodes.txt"
@@ -252,14 +225,14 @@ module FailureIsolation
     NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 
     def self.ReadInNodeSets()
-        @@AllNodes.clear
-        @@AllNodes.merge(IO.read(AllNodesPath).split("\n"))
+        @AllNodes = nil
+        self.AllNodes
 
-        @@NodeBlacklist.clear
-        @@NodeBlacklist.merge(IO.read(NodeBlacklistPath).split("\n"))
+        @NodeBlacklist = nil
+        self.NodeBlacklist
 
-        @@CurrentNodes.clear
-        @@CurrentNodes.merge(IO.read(CurrentNodesPath).split("\n"))
+        @CurrentNodes = nil
+        self.CurrentNodes
     end
 
     # =========================
@@ -276,9 +249,9 @@ module FailureIsolation
 
     # PoPs are symbols!
     def self.IPToPoPMapping()
-        return  @@IPToPoPMapping unless @@IPToPoPMapping.nil?
-        @@IPToPoPMapping = Hash.new { |h,k| PoP::Unknown }
-        @@IPToPoPMapping.merge!(IO.read(IPToPoPMappingPath)\
+        return  @IPToPoPMapping unless @IPToPoPMapping.nil?
+        @IPToPoPMapping = Hash.new { |h,k| PoP::Unknown }
+        @IPToPoPMapping.merge!(IO.read(IPToPoPMappingPath)\
                               .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.to_hash)
     end
 
@@ -295,9 +268,6 @@ module FailureIsolation
     #   aliases               #
     # =========================
     class << self 
-        alias :Node2IP :Host2IP
-        alias :IP2Host :IP2Hostname 
-        alias :IP2Node :IP2Hostname 
         alias :Node2Site :Host2Site
         alias :Site2Nodes :Site2Hosts
     end
