@@ -26,15 +26,28 @@ describe "suspect set processors" do
             @initializer = Initializer.new(@registrar, @database, @log)
         end
 
-        it "should respond to methods" do
-            @initializer.should respond_to(:inspect)
+        it "should find historical revtr hops" do 
+            @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
+                .sort.should eql(Fixture.historical_revtr.sort)
         end
 
+        it "should gather some revtrs" do
+            @initializer.historical_revtrs_dst2vps(Fixture.merged_outage)
+        end
+
+        it "should gather some trs" do
+            @initializer.historical_trs_to_src(Fixture.merged_outage)
+        end
     end
     
     describe Pruner do
         before(:each) do
             @pruner = Pruner.new(@registrar, @database, @log)
+        end
+
+        it "should issue pings" do
+           to_remove = @initializer.intersecting_traces_to_src(Fixture.suspect_set, Fixture.merged_outage)
+           to_remove.should_not be_empty
         end
     end
 end
