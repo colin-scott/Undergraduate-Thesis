@@ -27,16 +27,18 @@ describe "suspect set processors" do
         end
 
         it "should find historical revtr hops" do 
-        #    @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
-        #        .sort.uniq.should eql(Fixture.historical_revtr.hops.uniq.sort)
+            historical_revtr_hops = @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
+                .sort.uniq
+            #$stderr.puts "historical_revtr_hops #{historical_revtr_hops.inspect}"
+            #$stderr.puts "Fixture hops #{Fixture.historical_revtr.inspect}"
         end
 
         it "should gather some revtrs" do
-            @initializer.historical_revtrs_dst2vps(Fixture.merged_outage)
+            #$stderr.puts @initializer.historical_revtrs_dst2vps(Fixture.merged_outage)
         end
 
         it "should gather some trs" do
-            @initializer.historical_trs_to_src(Fixture.merged_outage)
+            #$stderr.puts @initializer.historical_trs_to_src(Fixture.merged_outage)
         end
     end
     
@@ -49,11 +51,19 @@ describe "suspect set processors" do
            to_remove = @pruner.pings_from_source(Fixture.suspect_set, Fixture.merged_outage)
            to_remove.should_not be_empty
            
-           left = to_remove - Fixture.merged_outage.first.tr.map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set - Fixture.merged_outage.first.resonsive_targets
+           tr_hops = Fixture.merged_outage.first.tr.map { |hop|  hop.ip }.flatten.to_set
+           tr_hops ||= []
+           responsive_targets =  Fixture.merged_outage.first.responsive_targets
+           responsive_targets ||= []
+
+           left = to_remove - tr_hops - responsive_targets
+          
            left.should_not be_empty
+           #$stderr.puts left.inspect
         end
     end
 end
+
 
 #initer = Initializer.new(registrar,database,log)
 #pruner = Pruner.new(registrar, database, log)

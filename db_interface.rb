@@ -63,7 +63,9 @@ class DatabaseInterface
 
     def hostname2ip()
         return @hostname2ip unless @hostname2ip.nil?
-        ip2hostname.invert
+        hostname2ip = Hash.new { |h,k| k }
+        hostname2ip.merge!(ip2hostname.invert)
+        hostname2ip
     end
 
     def ip2hostname()
@@ -85,8 +87,12 @@ class DatabaseInterface
     # return hash from ip -> last_responsive
     def fetch_pingability(ips)
         raise "ips can't be nil!" if ips.nil?
+
+        only_ips = ips.map { |ip| ip.is_a?(String) ? @hostname2ip[ip] : ip }
+        raise "ips not ips! #{ips.inspect}" if only_ips.find { |ip| ip !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ and !ip.is_a?(Integer) }
+
         #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
-        addrs = ips.map{ |ip| ip.is_a?(String) ? Inet::aton(@hostname2ip[ip]) : ip }
+        addrs = only_ips.map { |ip| ip.is_a?(String) ? Inet::aton(ip) : ip }
         #@logger.puts "fetch_pingability(), addrs=#{ips.inspect}"
         responsive = Hash.new { |h,k| h[k] = "N/A" }
 

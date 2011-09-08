@@ -1,6 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require '~/dave/revtr-test/reverse_traceroute/utilities.rb'
+# XXX why Dave's, and not mine?
+require 'utilities.rb'
 require 'rubygems'
 require 'rpatricia'
 

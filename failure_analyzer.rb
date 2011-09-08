@@ -81,7 +81,7 @@ class FailureAnalyzer
     # returns the hop suspected to be close to the failure
     # Assumes only one failure in the network...
     def identify_faults(merged_outage)
-        if merged_outage.direction == Direction.FORWARD
+        if merged_outage.direction != Direction.FORWARD
             initializer2suspectset = {}
             @suspect_set_initializers.each do |init| 
               initializer2suspectset[init.to_s] = init.call merged_outage 
@@ -94,7 +94,7 @@ class FailureAnalyzer
             @suspect_set_pruners.each do |pruner|
                 removed = pruner.call all_suspects, merged_outage
                 pruner2removed[pruner.to_s] = removed & all_suspects
-                @logger.warn "removed & all_suspects empty #{pruner.to_s}, removed: #{removed}" if (removed & all_suspects).empty?
+                @logger.warn "removed & all_suspects empty #{pruner.to_s}, removed: #{removed.to_a.inspect}" if (removed & all_suspects).empty?
                 all_suspects -= removed
             end
 
@@ -151,7 +151,7 @@ class FailureAnalyzer
                 last_tr_hop = outage.tr.last_non_zero_hop
                 last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
                 suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-                outage.suspected_failures[Direction.FORWARD] = [suspected_hop]
+                outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip]
             end
 
             if outage.direction == Direction.FALSE_POSITIVE

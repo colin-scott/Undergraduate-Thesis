@@ -32,6 +32,7 @@ require 'failure_analyzer'
 require 'failure_dispatcher'
 require 'failure_monitor'
 
+$node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 Thread.abort_on_exception = true
 
 begin
@@ -64,7 +65,11 @@ begin
    end
 
    Signal.trap("USR2") do
-      monitor.remove_node(IO.read($node_to_remove).chomp)
+      node = IO.read($node_to_remove)
+      if !node.nil?
+         node.chomp!
+         monitor.remove_node(node)
+      end
    end
 
    Signal.trap("ALRM") do

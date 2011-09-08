@@ -196,7 +196,7 @@ class HouseCleaner
         # currently probed
         site2current_spoofer = {}
         FailureIsolation.SpooferTargets.each do |spoofer_ip|
-            spoofer = @db.ip2hostame[spoofer_ip]
+            spoofer = @db.ip2hostname[spoofer_ip]
             site2current_spoofer[FailureIsolation.Host2Site[spoofer]] = spoofer
         end
 

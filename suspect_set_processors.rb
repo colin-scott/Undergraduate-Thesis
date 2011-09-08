@@ -50,8 +50,12 @@ class Initializer
         historical_revtr_hops = historical_revtrs.find_all { |revtr| !revtr.nil? && revtr.valid? }\
                                                  .map { |revtr| revtr.hops.map { |h| h.ip } }\
                                                  .flatten
+        if historical_revtr_hops.empty?
+            @logger.warn "historical_revtr_hops empty!" 
+        else
+            @logger.info "historical_revtr_hops passed!" 
+        end
 
-        @logger.warn "historical_revtr_hops empty!" if historical_revtr_hops.empty?
         return historical_revtr_hops
     end
 
@@ -77,6 +81,11 @@ class Initializer
                 @logger.warn "site for #{o.dst_hostname} not specified!" if site.nil?
             else
                 historical_path_hops |= @site2outgoing_hops[site]
+                if @site2outgoing_hops[site].empty?
+                    @logger.info "no outgoing hops for site..."
+                else
+                    @logger.info "found outgoing hops for site!" 
+                end
             end
         end
 
@@ -94,6 +103,12 @@ class Initializer
                 @logger.warn "site for #{o.src} not specified!" if site.nil?
             else
                 all_hops |= @site2incoming_hops[site] unless site.nil?
+
+                if @site2incoming_hops[site].empty?
+                    @logger.info "no incoming hops for site..."
+                else
+                    @logger.info "found incoming hops for site!" 
+                end
             end
         end 
         return all_hops
@@ -131,9 +146,14 @@ class Pruner
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
             site = FailureIsolation.Host2Site[o.src]
-            @logger.warn "site nil! #{o.src}" if site.nil?
+            @logger.warn "intersecting_traces_to_src, site nil! #{o.src}" if site.nil?
             hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(@db, site) unless site.nil?
-            @logger.warn "no hops on traces to site: #{site}" if hops_on_traces.empty?
+            if hops_on_traces.empty?
+                @logger.warn "no hops on traces to site: #{site}"
+            else
+                @logger.info "found intersecting hops on traces to site: #{site}"
+            end
+
             to_remove += hops_on_traces
         end
 
@@ -162,6 +182,8 @@ class Pruner
         if !suspect_set.empty? and src2pingable_dsts.value_set.empty?
             @logger.warn "#{src2pingable_dsts.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
+        else
+            @logger.info "issued pings sucessfully!"
         end
 
         return src2pingable_dsts.value_set

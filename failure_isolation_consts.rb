@@ -11,7 +11,6 @@ $DATADIR ||= "/homes/network/revtr/spoofed_traceroute/data"
 
 # XXX Don't hardcode!!!
 $pptasks = "~ethan/scripts/pptasks"
-$node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 
 # Constants for the entire isolation system
 module FailureIsolation
@@ -30,8 +29,6 @@ module FailureIsolation
     # out of place...
     ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
     RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
-
-    CachedRevtrTool = "~revtr/dave/revtr-test/reverse_traceroute/print_cached_reverse_path.rb"
 
     ReadTraces = "~revtr/colin/Scripts/readouttraces"
     HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipsX_input_filesY\*"

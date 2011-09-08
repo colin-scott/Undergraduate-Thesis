@@ -149,7 +149,9 @@ class FailureDispatcher
             merged_outage2id = assign_ids(merged_outages)
 
             merged_outage2id.each do |merged_outage, id|
-                process_merged_outage(merged_outage, id, testing)
+                Thread.new do
+                    process_merged_outage(merged_outage, id, testing)
+                end
             end
         end
     end

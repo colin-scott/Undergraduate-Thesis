@@ -27,6 +27,8 @@ class MergedOutage
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages
         @suspected_failures = {}
+        @initializer2suspectset = {}
+        @pruner2removed = {}
     end
 
     def is_interesting?()

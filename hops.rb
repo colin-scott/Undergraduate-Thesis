@@ -112,7 +112,7 @@ class Path
    end
 
    def to_s
-       @hops.inspect
+       @hops.map { |h| h.to_s }.inspect
    end
 
    def link_listify!
@@ -434,7 +434,7 @@ class Hop
     end
 
     def to_s
-        @formatted or @ip
+        (@formatted or @ip)
     end
 
     # takes a block, and returns any subsequent hop for which the block
@@ -563,7 +563,7 @@ class ReverseHop < Hop
     end
 
     def to_s()
-        s = (@formatted.nil?) ? "" : @formatted.clone
+        s = (@formatted.nil?) ? "#{@ip} #{@dns}" : @formatted.clone
     end
 end
 

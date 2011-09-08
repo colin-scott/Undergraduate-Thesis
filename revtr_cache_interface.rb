@@ -64,7 +64,7 @@ class RevtrCache
     
           # still no match, so output the status for probing this node
           results = @connection.query sql
-        end
+        end # end if do_remapping
           if results.num_rows() == 0
             reason = "not yet attempted"
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
