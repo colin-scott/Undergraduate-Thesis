@@ -2,7 +2,7 @@
 $: << File.expand_path("../")
 
 require 'rspec'
-require 'failure_isolation_consts'
+require 'isolation_module'
 require 'drb'
 require 'outage_correlation'
 require 'failure_analyzer'

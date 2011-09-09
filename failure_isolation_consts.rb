@@ -68,7 +68,7 @@ module FailureIsolation
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
         @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hostnames_w_ips.txt | cut -d ' ' -f1,3`\
-                                          .split("\n").map { |line| line.split }.to_hash)
+                                          .split("\n").map { |line| line.split }.custom_to_hash)
     end
 
     def self.Site2Hosts()
@@ -257,7 +257,7 @@ module FailureIsolation
         return  @IPToPoPMapping unless @IPToPoPMapping.nil?
         @IPToPoPMapping = Hash.new { |h,k| PoP::Unknown }
         @IPToPoPMapping.merge!(IO.read(IPToPoPMappingPath)\
-                              .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.to_hash)
+                              .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.custom_to_hash)
     end
 
     TopPoPsScripts = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/generate_N_top_pops.sh"
