@@ -1,6 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 $: << File.expand_path("../")
 
+require 'isolation_module'
 require 'failure_monitor'
 require 'failure_dispatcher'
 

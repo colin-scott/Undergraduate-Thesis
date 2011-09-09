@@ -102,6 +102,9 @@ module FailureIsolation
     # ====================================
     #         Target Sets                #
     # ====================================
+    ToilTargetSetPath = "/home/cs/colin/ping_monitoring/cloudfront_targets/current_target_set.txt"
+    MonitorTargetSetPath = "/home/uw_revtr2/colin/current_target_set.txt"
+
     TargetSetPath = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
     def self.TargetSet
         if @TargetSet.nil?
@@ -194,6 +197,11 @@ module FailureIsolation
         union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
         @TargetSet.merge(union)
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
+        # push out targets to monitoring nodes! 
+        system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
+                    #{TargetSetPath} @:#{MonitorTargetSetPath}"
+        # also push out target set to toil in case it restarts nodes
+        system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}"
     end
 
     # ====================================

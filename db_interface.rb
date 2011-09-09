@@ -89,7 +89,7 @@ class DatabaseInterface
         raise "ips can't be nil!" if ips.nil?
 
         only_ips = ips.map { |ip| ip.is_a?(String) ? @hostname2ip[ip] : ip }
-        raise "ips not ips! #{ips.inspect}" if only_ips.find { |ip| ip !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ and !ip.is_a?(Integer) }
+        raise "ips not ips! #{ips.inspect}" if only_ips.find { |ip| !ip.matches_ip? and !ip.is_a?(Integer) }
 
         #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
         addrs = only_ips.map { |ip| ip.is_a?(String) ? Inet::aton(ip) : ip }

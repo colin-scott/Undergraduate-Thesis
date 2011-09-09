@@ -11,7 +11,6 @@ require 'db_interface'
 # Invariant:
 #    - Never monitor a site that already has a monitoring nodes (only the rest
 #           of the spoofer sites)
-
 class HouseCleaner
     def initialize(logger=LoggerLog.new($stderr), db = DatabaseInterface.new)
         @logger = logger
@@ -34,7 +33,7 @@ class HouseCleaner
         # generate pop, core mappings
         pop2corertrs = Hash.new { |h,k| h[k] = [] }
         FailureIsolation.IPToPoPMapping.each do |ip, pop|
-            pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation.TargetBlacklist.include? ip
+            pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation.TargetBlacklist.include?(ip)
         end
 
         @logger.debug "core routers generated"
@@ -153,23 +152,21 @@ class HouseCleaner
     def find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
         # should only be probing one per site
         unresponsive_spoofers = dataset2unresponsive_targets[DataSets::SpooferTargets] 
-        site2chosen_node = choose_one_spoofer_target_per_site(unresponsive_spoofers)
-        update_pl_pl_meta_data(site2chosen_node)
+        site2chosen_node_ip_tuple = choose_one_spoofer_target_per_site(unresponsive_spoofers)
+        update_pl_pl_meta_data(site2chosen_node_ip_tuple)
 
-        dataset2substitute_targets[DataSets::SpooferTargets] = site2chosen_node.values
+        dataset2substitute_targets[DataSets::SpooferTargets] = site2chosen_node_ip_tuple.values.map { |tuple| tuple[1] }
     end
 
     # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
-    def update_pl_pl_meta_data(site2chosen_node)
+    def update_pl_pl_meta_data(site2chosen_node_ip_tuple)
         # We include both monitoring nodes and spoofer targets
         site2node_ip_tuple = {}
         FailureIsolation.CurrentNodes.each do |spoofer|
             site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, @db.hostname2ip[spoofer]]
         end
 
-        site2chosen_node.each do |site, chosen_node|
-            site2node_ip_tuple[site] = [chosen_node, @db.hostname2ip[chosen_node]]
-        end
+        site2node_ip_tuple.merge!(site2chosen_node_ip_tuple)
 
         output = File.open(FailureIsolation::SpooferTargetsMetaDataPath, "w")
         site2node_ip_tuple.each do |site, node_ip|
@@ -179,10 +176,12 @@ class HouseCleaner
     end
      
     def choose_one_spoofer_target_per_site(bad_targets_ips)
+        raise "not ips! #{bad_targets_ips.find { |ip| !ip.matches_ip? }}" if bad_targets_ips.find { |ip| !ip.matches_ip? }
+
         # prefer spoofers that are already chosen
         # for all sites that don't have a spoofer target or a monitor, add one that hasn't been
         # blacklisted
-        site2chosen_node = {}
+        site2chosen_node_ip_tuple = {}
 
         all_sites = FailureIsolation.Site2Hosts.keys
 
@@ -213,18 +212,22 @@ class HouseCleaner
 
             if site2current_spoofer.include? site and !FailureIsolation.TargetBlacklist.include? site2current_spoofer[site] and 
                          !bad_targets_ips.include? @db.hostname2ip[site2current_spoofer[site]]
-                site2chosen_node[site] = site2current_spoofer[site]
+                node = site2current_spoofer[site]
+                ip = @db.hostname2ip[node]
+                site2chosen_node_ip_tuple[site] = [node, ip]
                 next
             end
 
             site2controllable_nodes[site].delete_if { |hop| FailureIsolation.TargetBlacklist.include? host or \
                                                          bad_targets_ips.include? @db.hostname2ip[host] }
             if !site2controllable_nodes[site].empty?
-                site2chosen_node[site] = site2controllable_nodes[site].shift
+                node = site2controllable_nodes[site].shift
+                ip = @db.hostname2ip[node]
+                site2chosen_node_ip_tuple[site] = [node, ip]
             end
         end
 
-        site2chosen_node
+        site2chosen_node_ip_tuple
     end
 
     def update_data_set(dataset, substitute_targets, bad_targets)
@@ -254,11 +257,15 @@ class HouseCleaner
         FailureIsolation.ReadInDataSets()
 
         @logger.debug "target lists updated"
+
+        # need to push out new target list to VPs!
     end
 
     # TODO: grab subtitute nodes from the database, not the static file
     # TODO: make the blacklist site-specific, not host-specific
     def swap_out_faulty_nodes(faulty_nodes)
+        return if faulty_nodes.empty?
+
         @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
@@ -278,8 +285,6 @@ class HouseCleaner
             system "echo #{broken_vp} > #{FailureIsolation::NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
         end
 
-        
-        
         while current_nodes.size < FailureIsolation::NumActiveNodes
             raise "No more nodes left to swap!" if available_nodes.empty?
             new_vp = available_nodes.shift
@@ -295,6 +300,17 @@ class HouseCleaner
         FailureIsolation.ReadInNodeSets()
 
         system "rm #{FailureIsolation::PingStatePath}/*"
+
+        # NOTE: the mechanism by which new monitors are actually brought
+        # online is implemented on toil. Slider keeps all spoofing nodes
+        # registered with the controller, but toil boots up the ping/trace/dns
+        # processes within 15 minutes of updating the node list
+        
+        # kill the monitoring processes on the old nodes
+        if !system "echo #{faulty_nodes} > /tmp/faulty.txt; #{$pptasks} ssh #{FailureIsolation::MonitorSlice} \
+                     /tmp/faulty.txt 100 100 'killall ping_monitor_client.rb trace_monitor_client.rb dns_monitor_client.rb'"
+            @logger.warn "failed to kill monitoring process on old nodes"
+        end
     end
 
     def add_nodes(nodes)

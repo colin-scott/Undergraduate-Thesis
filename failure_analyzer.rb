@@ -88,7 +88,7 @@ class FailureAnalyzer
             end
 
             all_suspects = initializer2suspectset.value_set
-            all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/ }
+            all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h.matches_ip? }
             
             pruner2removed = {}
             @suspect_set_pruners.each do |pruner|
@@ -151,7 +151,7 @@ class FailureAnalyzer
                 last_tr_hop = outage.tr.last_non_zero_hop
                 last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
                 suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-                outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip]
+                outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip] unless suspected_hop.nil?
             end
 
             if outage.direction == Direction.FALSE_POSITIVE
