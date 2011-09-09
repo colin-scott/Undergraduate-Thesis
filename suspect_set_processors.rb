@@ -168,7 +168,7 @@ class Pruner
 
     def pings_issued_before_suspect_set_processing(suspect_set, merged_outage)
           # TODO: is responsive_targets ip addresses?
-        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets }.flatten.to_set.to_a
+        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets.to_a }.flatten.to_set.to_a
     end
 
     # we want this method to be executed last...
@@ -186,7 +186,7 @@ class Pruner
             @logger.info "issued pings sucessfully!"
         end
 
-        return src2pingable_dsts.value_set
+        return src2pingable_dsts.value_set.to_a
     end
 end
 

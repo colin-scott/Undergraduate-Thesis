@@ -2,6 +2,7 @@
 #
 require 'hops'
 require 'set'
+require 'failure_analyzer'
 require 'failure_isolation_consts'
 
 # encapsulates mutiple (src,dst) pairs identified as being related to the same

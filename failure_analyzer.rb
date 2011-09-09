@@ -93,8 +93,8 @@ class FailureAnalyzer
             pruner2removed = {}
             @suspect_set_pruners.each do |pruner|
                 removed = pruner.call all_suspects, merged_outage
-                pruner2removed[pruner.to_s] = removed & all_suspects
-                @logger.warn "removed & all_suspects empty #{pruner.to_s}, removed: #{removed.to_a.inspect}" if (removed & all_suspects).empty?
+                raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
+                pruner2removed[pruner.to_s] = removed
                 all_suspects -= removed
             end
 
