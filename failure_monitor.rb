@@ -358,6 +358,7 @@ class FailureMonitor
                  # TODO: Multiplex on Symmetry here?
                  srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
                                                           formatted_connected, formatted_unconnected, formatted_never_seen)
+                 srcdst2outage[[src,target]].measurement_times << ["passed_first_lvl_filters", Time.new]
               end
            end
         end

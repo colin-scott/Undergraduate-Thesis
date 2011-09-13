@@ -132,7 +132,7 @@ class FailureDispatcher
             srcdst2outage.each do |srcdst, outage|
                 outage_threads << Thread.new do
                     src,dst = srcdst
-                    outage.measurement_times = deep_copy(measurement_times)
+                    outage.measurement_times += deep_copy(measurement_times)
                     process_srcdst_outage(outage, dst2outage_correlation[dst], testing)
                 end
             end
@@ -160,9 +160,18 @@ class FailureDispatcher
 
     # !!! Edit me for merging heuristics
     def merge_outages(outages)
-       # example: no merging at all:
-       merged_outages = outages.map { |outage| MergedOutage.new([outage]) }
-       return merged_outages
+       # this should get everyone:
+       # bidirectional will appear twice, in forward mergings and reverse
+       # mergings
+       only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
+       dst2outages = only_forward.categorize_on_attr(:dst) 
+       forward_merged = dst2outages.values.map { |outage_list|  MergedOutage.new(outage_list) }
+
+       only_reverse = deep_copy(outages).find_all { |o| o.direction.is_reverse? }
+       src2outages = only_reverse.categorize_on_attr(:src)
+       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list) }
+
+       return forward_merged + reverse_merged
     end
 
     # return a hash

@@ -369,6 +369,7 @@ module LogIterator
                                           measurement_times, passed_filters
     end
 
+    # Start time should be logged... not end time of measurements...
     def LogIterator::parse_time(filename, measurement_times)
         # heuristic 1: if this was after I started logging measurement times, just 
         # take the timestamp of the first measurement

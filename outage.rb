@@ -8,8 +8,11 @@ require 'failure_isolation_consts'
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
 class MergedOutage
-   attr_accessor :outages, :suspected_failures, :file, :initializer2suspectset,
-       :pruner2removed
+   attr_accessor :outages, :suspected_failures, :file,:initializer2suspectset,
+       # FOR BACKWARDS COMPATIBILITY
+       :pruner2removed, 
+       # NEW FIELD
+       :pruner2incount_removed
 
    alias :log_name :file
 
@@ -30,6 +33,14 @@ class MergedOutage
         @suspected_failures = {}
         @initializer2suspectset = {}
         @pruner2removed = {}
+    end
+
+    def pruner2removed()
+        if pruner2removed.nil?
+            return pruner2incount_removed.map_values { |v| v[1] }
+        else
+            return pruner2removed
+        end
     end
 
     def is_interesting?()
@@ -97,6 +108,7 @@ class Outage
         @spliced_paths = []
         @suspected_failures = {}
         @responsive_targets = Set.new
+        @measurement_times = []
 
         case args.size
         when 0

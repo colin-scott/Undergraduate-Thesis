@@ -2,50 +2,7 @@ require 'failure_isolation_consts'
 require 'ip_info'
 require 'suspect_set_processors.rb'
 require 'db_interface'
-
-class Direction
-    # make initializer public during class loading (to deal with load ' ' calls)
-    public_class_method :new
-
-    def initialize(symbol)
-        @symbol = symbol
-    end
-
-    @@forward = Direction.new(:"forward path")
-    @@reverse = Direction.new(:"reverse path")
-    @@both = Direction.new(:"bi-directional")
-    @@false_positive = Direction.new(:"both paths seem to be working...?")
-
-    def self.FORWARD
-        return @@forward
-    end
-
-    def self.REVERSE
-        return @@reverse
-    end
-
-    def self.BOTH
-        return @@both
-    end
-
-    def self.FALSE_POSITIVE
-        return @@false_positive
-    end
-
-    def to_s()
-        @symbol.to_s
-    end
-
-    def is_forward?()
-        return (self == Direction.FORWARD or self == Direction.BOTH)
-    end
-
-    def is_reverse?()
-        return (self == Direction.REVERSE or self == Direction.BOTH)
-    end
-
-    private_class_method :new # singletons
-end
+require 'direction'
 
 class AlternatePath
     FORWARD = :"forward path"
@@ -90,18 +47,19 @@ class FailureAnalyzer
             all_suspects = initializer2suspectset.value_set
             all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h.matches_ip? }
             
-            pruner2removed = {}
+            pruner2incount_removed = {}
             @suspect_set_pruners.each do |pruner|
+                break if all_suspects.empty?
                 removed = pruner.call all_suspects, merged_outage
                 raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-                pruner2removed[pruner.to_s] = removed
+                pruner2incount_removed[pruner.to_s] = [all_suspects.size, removed]
                 all_suspects -= removed
             end
 
-            removed_suspects = pruner2removed.value_set 
+            removed_suspects = pruner2incount_removed.map_values { |v| v[1] }.value_set 
             
             merged_outage.initializer2suspectset = initializer2suspectset
-            merged_outage.pruner2removed = pruner2removed
+            merged_outage.pruner2incount_removed = pruner2incount_removed
 
             remaining_w_inits = (all_suspects - removed_suspects).map do |hop|
                 with_inits = "#{hop.clone} ("
