@@ -8,6 +8,7 @@ require 'hops'
 require 'isolation_module'
 require 'set'
 require 'time'
+require 'outage_correlation'
 require 'outage'
 
 # REV4 is :the only one that matters! everything else has been converted!
@@ -171,6 +172,25 @@ module LogIterator
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
                     self.read_log_rev4(file, &block)
                     $stderr.print ".." if debugging
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::correlation_iterate(files=nil, debugging=false, &block)
+        Dir.chdir FailureIsolation::OutageCorrelation do
+            files ||= Dir.glob("*yml").sort
+
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts file if debugging
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    yield YAML.load_file(file), self.parse_correlation_time(file)
                 rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
                     $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
                 end
@@ -464,6 +484,19 @@ module LogIterator
        elsif second_one
           return [timestamp[0..1], timestamp[2..3], timestamp[4..5], timestamp[6..6]]
        end
+    end
+
+    def self.parse_correlation_time(filename)
+        timestamp = filename.split("_")[-1].split(".")[0]
+        year = timestamp[0..3]
+        month = timestamp[4..5]
+        timestamp = timestamp[6..-1]
+        day = timestamp[0..1]
+        hour = timestamp[2..3]
+        minute = timestamp[4..5]
+        second = timestamp[6..7]
+
+        return Time.local(year, month, day, hour, minute, second)
     end
 end
 

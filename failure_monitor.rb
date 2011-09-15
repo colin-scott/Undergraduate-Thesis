@@ -71,7 +71,7 @@ class FailureMonitor
 
         # minimum time in between successive isolation measurements sent from
         # a source to a destination
-        @@isolation_interval = 30 # we isolate at most every 6*10.33 =~ 60 minutes
+        @@isolation_interval = 90
 
         @current_round = 0
     end

@@ -793,6 +793,7 @@ class FailureDispatcher
 
     def log_outage_correlation(outage_correlation)
         t = Time.new
+        outage_correlation.end_time = t
         t_str = t.strftime("%Y%m%d%H%M%S")
         filename = "#{outage_correlation.target}_#{t_str}.yml"
         File.open(FailureIsolation::OutageCorrelation+"/"+filename, "w") { |f| YAML.dump(outage_correlation, f) }
