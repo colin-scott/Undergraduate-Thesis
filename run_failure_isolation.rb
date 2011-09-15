@@ -47,14 +47,7 @@ begin
 
    Signal.trap("USR1") do 
        logger.puts "reloading modules.."
-       load 'ip_info.rb'
-       load 'mkdot.rb'
-       load 'hops.rb'
-       load 'db_interface.rb'
-       load 'revtr_cache_interface.rb'
-       load 'failure_analyzer.rb'
-       load 'failure_dispatcher.rb'
-       load 'failure_monitor.rb'
+       load 'auxiliary_modules.rb'
 
        # killall threads
        # 
