@@ -39,20 +39,23 @@ class FailureAnalyzer
     # Assumes only one failure in the network...
     def identify_faults(merged_outage)
         if merged_outage.direction != Direction.FORWARD
+            all_suspects = Set.new
             initializer2suspectset = {}
             @suspect_set_initializers.each do |init| 
-              initializer2suspectset[init.to_s] = init.call merged_outage 
+                added = init.call merged_outage 
+                unique_added = added - all_suspects
+                all_suspects |= added
+                initializer2suspectset[init.to_s] = unique_added 
             end
 
-            all_suspects = initializer2suspectset.value_set
             all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h.matches_ip? }
             
             pruner2incount_removed = {}
             @suspect_set_pruners.each do |pruner|
                 break if all_suspects.empty?
-                removed = pruner.call all_suspects, merged_outage
-                raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-                pruner2incount_removed[pruner.to_s] = [all_suspects.size, removed]
+                removed = pruner.call all_suspects.clone, merged_outage
+                #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
+                pruner2incount_removed[pruner.to_s] = [all_suspects.size, removed & all_suspects]
                 all_suspects -= removed
             end
 
@@ -104,7 +107,7 @@ class FailureAnalyzer
 
         # OK, for now, only call this on individual outages
         merged_outage.each do |outage|
-            if outage.direction.is_forward?
+            if outage.direction.is_forward? && outage.passed_filters
                 # the failure is most likely adjacent to the last responsive forward hop
                 last_tr_hop = outage.tr.last_non_zero_hop
                 last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop

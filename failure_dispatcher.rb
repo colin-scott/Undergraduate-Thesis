@@ -141,12 +141,17 @@ class FailureDispatcher
             # more measurements issued for MergedOutage?
             outage_threads.each { |thread| thread.join }
 
-            dst2outage_correlation.values.each do |outage_correlation|
-                log_outage_correlation(outage_correlation) 
+            @logger.debug "got past join"
+
+            if !testing
+                dst2outage_correlation.values.each do |outage_correlation|
+                    log_outage_correlation(outage_correlation) 
+                end
             end
 
-            merged_outages = merge_outages(srcdst2outage.values)
+            merged_outages = merge_outages(srcdst2outage.values, testing)
             merged_outage2id = assign_ids(merged_outages)
+            @logger.debug "merged_outages: #{merged_outages}, merged_outage2id #{merged_outage2id}"
 
             merged_outage2id.each do |merged_outage, id|
                 Thread.new do
@@ -159,18 +164,25 @@ class FailureDispatcher
     # private
 
     # !!! Edit me for merging heuristics
-    def merge_outages(outages)
+    def merge_outages(outages, testing)
        # this should get everyone:
        # bidirectional will appear twice, in forward mergings and reverse
        # mergings
        only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
        dst2outages = only_forward.categorize_on_attr(:dst) 
-       forward_merged = dst2outages.values.map { |outage_list|  MergedOutage.new(outage_list) }
+       forward_merged = dst2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::FORWARD) }
 
        only_reverse = deep_copy(outages).find_all { |o| o.direction.is_reverse? }
        src2outages = only_reverse.categorize_on_attr(:src)
-       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list) }
+       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::REVERSE) }
 
+       if testing
+           # doesn't have a direction...
+           forward_merged << MergedOutage.new(outages, MergingMethod::FORWARD)
+       elsif !outages.find { |o| o.passed_filters }.nil? and forward_merged.empty? and reverse_merged.empty?
+            raise "Not merging properly! #{outages.inspect}"
+       end
+       
        return forward_merged + reverse_merged
     end
 
@@ -247,6 +259,7 @@ class FailureDispatcher
 
     # id goes from 0 to n, where n is the number of merged_outages this round
     def process_merged_outage(merged_outage, id, testing=false)
+        @logger.debug "process_merged_outage: #{merged_outage.sources}, #{merged_outage.destinations}"
         analyze_measurements(merged_outage)    
 
         merged_outage.file = get_uniq_filename(id, id)
@@ -258,8 +271,47 @@ class FailureDispatcher
         # at least one of the inside outages passed filters
         if(merged_outage.is_interesting?)
             Emailer.deliver_isolation_results(merged_outage, testing)
+            @logger.info "Attempted to email isolation results #{Time.now}"
         end
     end
+
+    def analyze_measurements(merged_outage)
+        #TODO: move all of these the (outage) pattern
+        @failure_analyzer.identify_faults(merged_outage)
+
+        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
+        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
+        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
+
+        merged_outage.each do |outage|
+            outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
+                                                        outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
+
+            outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
+
+            outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
+
+            # now... if we found any pingable hops beyond the failure... send
+            # traceroutes to them... their paths must differ somehow
+            # TODO: put me back in?:
+            #
+            #
+            #outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
+            #                                                           outage.spoofed_revtr, outage.historical_revtr)
+            #
+            # TODO: an upstream router in a reverse traceroute at the reachability
+            # horizon: was there a path change? Issue spoofed reverse traceroute,
+            # and compare to historical reverse traceroute.
+            #if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
+            #       !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
+            #    # TODO: should the key be the ip, or the Hop object?
+            #   upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
+            #   outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
+            #   @logger.debug("upstream revtr issued")
+            #end
+        end
+    end
+
 
     # TODO: I should figure out a better way to gather data, rather
     # than this longgg method
@@ -374,43 +426,6 @@ class FailureDispatcher
 
             splice_alternate_paths(outage)
             @logger.debug("alternate path splicing complete")
-        end
-    end
-
-    def analyze_measurements(merged_outage)
-        #TODO: move all of these the (outage) pattern
-        @failure_analyzer.identify_faults(merged_outage)
-
-        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
-        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
-        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
-
-        merged_outage.each do |outage|
-            outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
-                                                        outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
-
-            outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
-
-            outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
-
-            # now... if we found any pingable hops beyond the failure... send
-            # traceroutes to them... their paths must differ somehow
-            # TODO: put me back in?:
-            #
-            #
-            #outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
-            #                                                           outage.spoofed_revtr, outage.historical_revtr)
-            #
-            # TODO: an upstream router in a reverse traceroute at the reachability
-            # horizon: was there a path change? Issue spoofed reverse traceroute,
-            # and compare to historical reverse traceroute.
-            #if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
-            #       !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
-            #    # TODO: should the key be the ip, or the Hop object?
-            #   upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
-            #   outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
-            #   @logger.debug("upstream revtr issued")
-            #end
         end
     end
 

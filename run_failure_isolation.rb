@@ -52,8 +52,11 @@ begin
        # killall threads
        # 
        # will threads be garbage collected if objects are garbage collected?  
+       logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
+       logger.level = Logger::INFO
+       db = DatabaseInterface.new(logger)
        dispatcher = FailureDispatcher.new(db, logger)
-       monitor = FailureMonitor.new(dispatcher, db, logger)
+       monitor = FailureMonitor.new(dispatcher, db, logger) 
        monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
    end
 

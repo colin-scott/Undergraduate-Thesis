@@ -37,7 +37,7 @@ class DatabaseInterface
     def node_hostname(ip)
         hostname = nil
         ip_int = Inet::aton(ip)
-        sql = "select vantage_point from isolation_vantage_points where IP=#{ip_int};"
+        sql = "select vantage_point from vantage_points where IP=#{ip_int};"
         
         results = query(sql)
 
@@ -50,7 +50,7 @@ class DatabaseInterface
 
     def node_ip(node)
         ip = nil
-        sql = "select inet_ntoa(IP) as ip from isolation_vantage_points where vantage_point='#{node}';" 
+        sql = "select inet_ntoa(IP) as ip from vantage_points where vantage_point='#{node}';" 
         
         results = query(sql)
 
@@ -71,7 +71,7 @@ class DatabaseInterface
     def ip2hostname()
         return @ip2hostname unless @ip2hostname.nil?
 
-        sql = "select vantage_point, inet_ntoa(IP) as ip from isolation_vantage_points;"
+        sql = "select vantage_point, inet_ntoa(IP) as ip from vantage_points;"
         
         ip2hostname = Hash.new { |h,k| k }
 

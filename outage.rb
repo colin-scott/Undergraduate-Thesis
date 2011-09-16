@@ -5,10 +5,15 @@ require 'set'
 require 'failure_analyzer'
 require 'failure_isolation_consts'
 
+module MergingMethod
+    REVERSE = :one_src_multiple_dsts
+    FORWARD = :multiple_srcs_one_dst
+end
+
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
 class MergedOutage
-   attr_accessor :outages, :suspected_failures, :file,:initializer2suspectset,
+   attr_accessor :outages, :suspected_failures, :file,:initializer2suspectset, :merging_method,
        # FOR BACKWARDS COMPATIBILITY
        :pruner2removed, 
        # NEW FIELD
@@ -27,12 +32,13 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-    def initialize(outages)
+    def initialize(outages, merging_method)
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages
         @suspected_failures = {}
         @initializer2suspectset = {}
         @pruner2removed = {}
+        @merging_method = merging_method
     end
 
     def pruner2removed()
@@ -62,7 +68,11 @@ class MergedOutage
     end
 
     def sources()
-        return @outages.map { |o| o.src }
+        return @outages.map { |o| o.src }.uniq
+    end
+
+    def destinations()
+        return @outages.map { |o| o.dst }.uniq
     end
 end
 
@@ -259,7 +269,7 @@ class Outage
    end
 
    def to_s()
-       ""
+       "(#{self.src}, #{self.dst}) [passed filters?: #{self.passed_filters}]"
    end
 
    def to_html()
