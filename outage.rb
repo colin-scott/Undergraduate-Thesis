@@ -268,8 +268,10 @@ class Outage
        @spoofed_revtr.link_listify!
    end
 
-   def to_s()
-       "(#{self.src}, #{self.dst}) [passed filters?: #{self.passed_filters}]"
+   def to_s(verbose=true)
+       s = "(#{self.src}, #{self.dst})"
+       s << " [passed filters?: #{self.passed_filters}]" if verbose
+       s
    end
 
    def to_html()

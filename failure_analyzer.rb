@@ -11,6 +11,25 @@ class AlternatePath
     HISTORICAL_FORWARD = :"historical forward path"
 end
 
+# further defined in suspect_processors.rb
+class Suspect
+    attr_accessor :initializer
+end
+
+class MergedSuspect
+    attr_accessor :ip, :outages, :initializers
+
+    def initialize(suspects)
+        @ip = suspects.map { |s| s.ip }.flatten.first
+        @outages = suspects.map { |s| s.outage }.uniq
+        @initializers = suspects.map { |s| s.initializer }.uniq
+    end
+
+    def to_s()
+        "#{ip} [Outage(s): #{outages.map { |o| o.to_s(false) }.join ' '}] {Initializer(s): #{initializers.join ' '}}"
+    end
+end
+
 # The "Brains" of the whole business. In charge of heuristcs for filtering,
 # making sense of the measurements, etc.
 #
@@ -39,43 +58,45 @@ class FailureAnalyzer
     # Assumes only one failure in the network...
     def identify_faults(merged_outage)
         if merged_outage.direction != Direction.FORWARD
-            all_suspects = Set.new
-            initializer2suspectset = {}
-            @suspect_set_initializers.each do |init| 
-                added = init.call merged_outage 
-                unique_added = added - all_suspects
-                all_suspects |= added
-                initializer2suspectset[init.to_s] = unique_added 
+            ip2suspects = Hash.new { |h,k| h[k] = [] }
+            initializer2suspect_set = {}
+
+            @suspect_set_initializers.each do |init|
+                suspects = init.call merged_outage 
+                initializer_name = init.to_s
+
+                suspects.each do |s|
+                    # add in the initializer to the suspect object
+                    s.initializer = initializer_name
+                    # add suspect to ips
+                    ip2suspects[s.ip] << s
+                end
+
+                initializer2suspect_set[initializer_name] = suspects
             end
 
-            all_suspects.each { |h| raise "not an ip! #{h} init: #{initializer2suspectset}" if !h.is_a?(String) or !h.matches_ip? }
-            
+            # XXX we want to do something with # unique targets added ...
+            #     can be done with the ordering of suspect set initializers
+            all_suspect_ips = Set.new(ip2suspects.keys)
+
             pruner2incount_removed = {}
             @suspect_set_pruners.each do |pruner|
-                break if all_suspects.empty?
-                removed = pruner.call all_suspects.clone, merged_outage
+                break if all_suspect_ips.empty?
+                input_targets = all_suspect_ips.clone
+                removed = pruner.call input_targets, merged_outage
                 #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-                pruner2incount_removed[pruner.to_s] = [all_suspects.size, removed & all_suspects]
-                all_suspects -= removed
+                pruner2incount_removed[pruner.to_s] = [input_targets.size, removed & all_suspect_ips]
+                all_suspect_ips -= removed
             end
 
-            removed_suspects = pruner2incount_removed.map_values { |v| v[1] }.value_set 
-            
             merged_outage.initializer2suspectset = initializer2suspectset
             merged_outage.pruner2incount_removed = pruner2incount_removed
 
-            remaining_w_inits = (all_suspects - removed_suspects).map do |hop|
-                with_inits = "#{hop.clone} ("
-                initializer2suspectset.each do |init, suspect_set|
-                   if suspect_set.include? hop
-                      with_inits << "#{init.to_s},"
-                   end 
-                end
-                with_inits << ")"
-                with_inits
-            end
+            removed_ips = pruner2incount_removed.map_values { |v| v[1] }.value_set 
 
-            merged_outage.suspected_failures[Direction.REVERSE] = remaining_w_inits
+            merged_remaining_suspects = ip2suspects.find_all { |ip, suspects| !removed_ips.include? ip }.map { |k,v| MergedSuspect.new(v) }
+
+            merged_outage.suspected_failures[Direction.REVERSE] = merged_remaining_suspects
         end
 
         #if merged_outage.direction.is_reverse?

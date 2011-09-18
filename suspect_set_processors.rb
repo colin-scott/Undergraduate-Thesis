@@ -22,10 +22,21 @@
 #
 # TODO: right now we take /all/ hops on historical traces as suspects.
 #       might make sense to take only hops in the core, not on the edge
+#
+# TODO: wrap suspects in their own class.
 
 require 'utilities'
 require 'db_interface'
 require 'failure_isolation_consts'
+
+class Suspect
+    attr_accessor :ip, :outage
+
+    def initialize(ip, outage)
+        @ip = ip
+        @outage = outage
+    end
+end
 
 # initializer contract:
 #   - takes a MergedOutage object as param
@@ -44,19 +55,22 @@ class Initializer
 
     # (no correlation involved)
     def historical_revtr_dst2src(merged_outage)
-        historical_revtrs = []
-        merged_outage.each { |outage| historical_revtrs << outage.historical_revtr }
+        historical_revtr_suspects = []
+        merged_outage.each do |outage|
+            revtr = outage.historical_revtr
+            next if revtr.nil? or !revtr.valid?
 
-        historical_revtr_hops = historical_revtrs.find_all { |revtr| !revtr.nil? && revtr.valid? }\
-                                                 .map { |revtr| revtr.hops.map { |h| h.ip } }\
-                                                 .flatten
-        if historical_revtr_hops.empty?
-            @logger.warn "historical_revtr_hops empty!" 
-        else
-            @logger.info "historical_revtr_hops passed!" 
+            suspects = revtr.hops.map { |h| Suspect.new(h.ip, outage) }
+            historical_revtr_suspects += suspects
         end
 
-        return historical_revtr_hops
+        if historical_revtr_suspects.empty?
+            @logger.warn "historical_revtr_hops empty!" 
+        else
+            @logger.debug "historical_revtr_hops passed!" 
+        end
+
+        return historical_revtr_suspects
     end
 
     # actually trs, since we control the destination
@@ -71,30 +85,32 @@ class Initializer
         symmetric_outages = merged_outage.symmetric_outages
         return [] if symmetric_outages.empty?
 
-        historical_path_hops = []
+        historical_path_suspects = []
 
         symmetric_outages.each do |o|
             # select all historical hops on traceroutes where source is o.src
             # can be liberal, since it's for initializing, not pruning
             site = FailureIsolation.Host2Site[o.dst_hostname]
+
             if site.nil?
                 @logger.warn "site for #{o.dst_hostname} not specified!" if site.nil?
             else
-                historical_path_hops |= @site2outgoing_hops[site]
+                historical_path_suspects += @site2outgoing_hops[site].map { |ip| Suspect.new(ip, o) }
+
                 if @site2outgoing_hops[site].empty?
-                    @logger.info "no outgoing hops for site..."
+                    @logger.warn "no outgoing hops for site..."
                 else
-                    @logger.info "found outgoing hops for site!" 
+                    @logger.debug "found outgoing hops for site!" 
                 end
             end
         end
 
-        return historical_path_hops
+        return historical_path_suspects
     end
 
     # All VPs -> source (ethan's PL traceroutes + isolation VPs -> source)
     def historical_trs_to_src(merged_outage)
-        all_hops = []
+        all_suspects = []
         merged_outage.each do |o|
             # select all hops on historical traceroutes where destination is o.src
             # can be liberal, since it's for initializing, not pruning
@@ -102,16 +118,16 @@ class Initializer
             if site.nil?
                 @logger.warn "site for #{o.src} not specified!" if site.nil?
             else
-                all_hops |= @site2incoming_hops[site] unless site.nil?
+                all_suspects += @site2incoming_hops[site].map { |ip| Suspect.new(ip, o) } unless site.nil?
 
                 if @site2incoming_hops[site].empty?
-                    @logger.info "no incoming hops for site..."
+                    @logger.warn "no incoming hops for site..."
                 else
-                    @logger.info "found incoming hops for site!" 
+                    @logger.debug "found incoming hops for site!" 
                 end
             end
         end 
-        return all_hops
+        return all_suspects
     end
 
     ## all IPs in nearby prefixes
