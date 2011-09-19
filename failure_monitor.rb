@@ -31,7 +31,7 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
         # how often we send out faulty_node_audit reports
-        @@node_audit_period = 60*60*24 / FailureIsolation::DefaultPeriodSeconds / 3
+        @@node_audit_period = 24*60 / @@minutes_per_round
 
         @@outdated_node_threshold = 20
 

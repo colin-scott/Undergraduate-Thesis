@@ -59,7 +59,7 @@ class FailureAnalyzer
     def identify_faults(merged_outage)
         if merged_outage.direction != Direction.FORWARD
             ip2suspects = Hash.new { |h,k| h[k] = [] }
-            initializer2suspect_set = {}
+            initializer2suspectset = {}
 
             @suspect_set_initializers.each do |init|
                 suspects = init.call merged_outage 
@@ -72,7 +72,7 @@ class FailureAnalyzer
                     ip2suspects[s.ip] << s
                 end
 
-                initializer2suspect_set[initializer_name] = suspects
+                initializer2suspectset[initializer_name] = suspects
             end
 
             # XXX we want to do something with # unique targets added ...
