@@ -147,7 +147,7 @@ class Pruner
     end
 
     # To specify an order for your methods to be executed in, add method names here, first to last
-    Pruner::OrderedMethods = ["intersecting_traces_to_src", "pings_issued_before_suspect_set_processing", "trace_hops_src_to_dst",  "pings_from_source"]
+    Pruner::OrderedMethods = [:"intersecting_traces_to_src", :"pings_issued_before_suspect_set_processing", :"trace_hops_src_to_dst", :"pings_from_source"]
 
     ## empty for now... revtr is far too slow...
     #def intersecting_revtrs_to_src(suspected_set, merged_outage)
@@ -190,9 +190,11 @@ class Pruner
     # we want this method to be executed last...
     def pings_from_source(suspect_set, merged_outage)
         # now issue more pings!
-        srcs = merged_outage.map { |o| o.src }
+        srcs = merged_outage.map { |o| o.src }.uniq
 
-        # XXX WHY AREN'T YOU ISSUING?
+        # The controller keeps returning null results, so we instead use
+        # pptasks directly... cp aliasprobe to a different directory?
+
         src2pingable_dsts = @registrar.all_pairs_ping(srcs, suspect_set.to_a)
 
         if !suspect_set.empty? and src2pingable_dsts.value_set.empty?
@@ -203,6 +205,14 @@ class Pruner
         end
 
         return src2pingable_dsts.value_set.to_a
+    end
+     
+    # private methods won't be picked up by the failure_analyzer
+    private
+    
+    # TODO: move me somewhere else.
+    def issue_pings_with_pptasks()
+        
     end
 end
 

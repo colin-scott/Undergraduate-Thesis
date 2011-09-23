@@ -1,3 +1,4 @@
+#!/homes/network/revtr/ruby/bin/ruby
 require 'failure_isolation_consts'
 require 'ip_info'
 require 'suspect_set_processors.rb'
@@ -53,8 +54,12 @@ class FailureAnalyzer
 
         @pruner = Pruner.new(registrar, db, logger)
         public_methods = @pruner.public_methods(false)
+        $stderr.puts "public methods!"
+        $stderr.puts public_methods.inspect
         Pruner::OrderedMethods.each { |method| public_methods.unshift method  }
+        $stderr.puts public_methods.inspect
         @suspect_set_pruners = public_methods.uniq.map { |m| @pruner.method m }
+        $stderr.puts @suspect_set_pruners
     end
 
     # returns the hop suspected to be close to the failure
@@ -446,4 +451,8 @@ class FailureAnalyzer
 
         pingable_targets
     end
+end
+
+if $0 == __FILE__
+    FailureAnalyzer.new
 end

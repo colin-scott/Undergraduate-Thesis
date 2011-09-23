@@ -91,7 +91,7 @@ class FailureMonitor
             start = Time.new
 
             # TODO: cat directly from ssh rather than scp'ing
-            system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
+            system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
 
             node2targetstate = read_in_results()

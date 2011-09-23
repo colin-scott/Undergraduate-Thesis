@@ -307,7 +307,7 @@ class HouseCleaner
         # processes within 15 minutes of updating the node list
         
         # kill the monitoring processes on the old nodes
-        if !system "echo #{faulty_nodes} > /tmp/faulty.txt; #{$pptasks} ssh #{FailureIsolation::MonitorSlice} \
+        if !system "echo #{faulty_nodes} > /tmp/faulty.txt; #{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} \
                      /tmp/faulty.txt 100 100 'killall ping_monitor_client.rb trace_monitor_client.rb dns_monitor_client.rb'"
             @logger.warn "failed to kill monitoring process on old nodes"
         end

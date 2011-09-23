@@ -9,15 +9,14 @@ require 'yaml'
 $REV_TR_TOOL_DIR ||= "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 $DATADIR ||= "/homes/network/revtr/spoofed_traceroute/data"
 
-# XXX Don't hardcode!!!
-$pptasks = "~ethan/scripts/pptasks"
-
 # Constants for the entire isolation system
 module FailureIsolation
     # ====================================
     #         miscellaneous              #
     # ====================================
     DefaultPeriodSeconds = 360
+
+    PPTASKS = "~ethan/scripts/pptasks"
 
     TestPing = "128.208.4.49" # crash.cs.washington.edu
 
@@ -198,7 +197,7 @@ module FailureIsolation
         @TargetSet.merge(union)
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
         # push out targets to monitoring nodes! 
-        system "#{$pptasks} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
+        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                     #{TargetSetPath} @:#{MonitorTargetSetPath}"
         # also push out target set to toil in case it restarts nodes
         system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}"
