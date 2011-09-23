@@ -320,8 +320,11 @@ module PoP
 end
 
 if $0 == __FILE__
-    FailureIsolation.ReadInDataSets
-    FailureIsolation.ReadInNodeSets
+    a = FailureIsolation.ATTTargets
+    t = FailureIsolation.TargetSet
+    $stderr.puts (a - t).to_a.inspect
+    #FailureIsolation.ReadInDataSets
+    #FailureIsolation.ReadInNodeSets
     #puts FailureIsolation.Site2Hosts.inspect
     #puts FailureIsolation.Host2Site.inspect
     #puts FailureIsolation.current_hops_on_pl_pl_traces_to_site("arizona-gigapop.net").to_a.inspect

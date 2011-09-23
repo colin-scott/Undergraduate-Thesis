@@ -4,6 +4,9 @@ require 'suspect_set_processors.rb'
 require 'db_interface'
 require 'direction'
 
+# TODO: run the old isolation algorithm on outages... just b/c it's free, and we
+# occasionally need it in the logs... ?
+
 class AlternatePath
     FORWARD = :"forward path"
     REVERSE = :"reverse path"
@@ -61,8 +64,11 @@ class FailureAnalyzer
             ip2suspects = Hash.new { |h,k| h[k] = [] }
             initializer2suspectset = {}
 
+            # ==============================================================
+            #                       Initialize                             #
+            # ==============================================================
             @suspect_set_initializers.each do |init|
-                suspects = init.call merged_outage 
+                suspects = Set.new(init.call merged_outage)
                 initializer_name = init.to_s
 
                 suspects.each do |s|
@@ -79,66 +85,34 @@ class FailureAnalyzer
             #     can be done with the ordering of suspect set initializers
             all_suspect_ips = Set.new(ip2suspects.keys)
 
+            @logger.debug "all_suspect_ips size : #{all_suspect_ips.size}"
+            @logger.debug "initializer2suspectset : #{initializer2suspectset.values.map { |set| set.to_a.map { |s| s.ip }}.flatten.uniq.size}"
+
+            # ==============================================================
+            #                       Prune                                  #
+            # ==============================================================
             pruner2incount_removed = {}
             @suspect_set_pruners.each do |pruner|
                 break if all_suspect_ips.empty?
-                input_targets = all_suspect_ips.clone
-                removed = pruner.call input_targets, merged_outage
+                removed = pruner.call all_suspect_ips.clone, merged_outage
                 #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-                pruner2incount_removed[pruner.to_s] = [input_targets.size, removed & all_suspect_ips]
+                pruner2incount_removed[pruner.to_s] = [all_suspect_ips.size, removed & all_suspect_ips]
                 all_suspect_ips -= removed
             end
 
             merged_outage.initializer2suspectset = initializer2suspectset
             merged_outage.pruner2incount_removed = pruner2incount_removed
-
-            removed_ips = pruner2incount_removed.map_values { |v| v[1] }.value_set 
-
+             
+            removed_ips = pruner2incount_removed.values.map { |v| v[1] }.uniq
+             
             merged_remaining_suspects = ip2suspects.find_all { |ip, suspects| !removed_ips.include? ip }.map { |k,v| MergedSuspect.new(v) }
 
             merged_outage.suspected_failures[Direction.REVERSE] = merged_remaining_suspects
         end
 
-        #if merged_outage.direction.is_reverse?
-            #if !merged_outage.historical_revtr.valid?
-            #    # let m be the first forward hop that does not yield a revtr to s
-            #    tr_suspect = merged_outage.tr.last_responsive_hop
-            #    spooftr_suspect = merged_outage.spoofed_tr.last_responsive_hop
-            #    suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            #    merged_outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
-
-            #    # baaaaah. This is confusing and not all that helpful.
-            #    #
-            #    # do some comparison of m's historical reverse path to infer the router which is either
-            #    # failed or changed its path
-            #    #
-            #    # doesn't make sense when running over logs... fine when run in
-            #    # real-time though
-            #    #
-            #    # Will only have a historical_revtr if the suspected hop is a
-            #    # historical hop, or the hops of the measured path overlap.
-            #    # historical_revtr = fetch_historical_revtr(merged_outage.src, suspected_hop)
-            #    # XXX 
-            #    # return suspected_hop
-            #else
-            #    # TODO: more stuff with
-            #    merged_outage.suspected_failures[Direction.REVERSE] = [merged_outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
-            #end # what if the spoofed revtr went through?
-        #end
-
         # OK, for now, only call this on individual outages
         merged_outage.each do |outage|
-            if outage.direction.is_forward? && outage.passed_filters
-                # the failure is most likely adjacent to the last responsive forward hop
-                last_tr_hop = outage.tr.last_non_zero_hop
-                last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
-                suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-                outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip] unless suspected_hop.nil?
-            end
-
-            if outage.direction == Direction.FALSE_POSITIVE
-                outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
-            end
+            identify_fault_single_outage(outage)
         end
 
         merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
@@ -149,6 +123,45 @@ class FailureAnalyzer
         # XXX Why won't the html in the email display the class... only the
         # '#' ...........
         merged_outage.suspected_failures[Direction.FORWARD].delete(nil)
+    end
+
+    def identify_fault_single_outage(outage)
+        if outage.direction.is_forward?
+            # the failure is most likely adjacent to the last responsive forward hop
+            last_tr_hop = outage.tr.last_non_zero_hop
+            last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
+            suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
+            outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip] unless suspected_hop.nil?
+        elsif outage.direction.is_reverse?
+            identify_failure_old(outage)
+        elsif outage.direction == Direction.FALSE_POSITIVE
+            outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
+        end
+    end
+
+    def identify_failure_old(outage)
+        if !outage.historical_revtr.valid?
+            # let m be the first forward hop that does not yield a revtr to s
+            tr_suspect = outage.tr.last_responsive_hop
+            spooftr_suspect = outage.spoofed_tr.last_responsive_hop
+            suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
+            outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
+
+            # baaaaah. This is confusing and not all that helpful.
+            #
+            # do some comparison of m's historical reverse path to infer the router which is either
+            # failed or changed its path
+            #
+            # doesn't make sense when running over logs... fine when run in
+            # real-time though
+            #
+            # Will only have a historical_revtr if the suspected hop is a
+            # historical hop, or the hops of the measured path overlap.
+            # historical_revtr = fetch_historical_revtr(merged_outage.src, suspected_hop)
+        else
+            # TODO: more stuff with
+            outage.suspected_failures[Direction.REVERSE] = [outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
+        end # what if the spoofed revtr went through?
     end
 
     # TODO: add as_hops_from_src to Hop objects

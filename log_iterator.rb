@@ -10,6 +10,9 @@ require 'set'
 require 'time'
 require 'outage_correlation'
 require 'outage'
+require 'direction'
+require 'failure_isolation_consts'
+require 'time'
 
 # REV4 is :the only one that matters! everything else has been converted!
 
@@ -20,6 +23,7 @@ require 'outage'
 
 module LogIterator
 #    IPINFO = IpInfo.new # hmmm
+    #
 
     def LogIterator::jpg2yml_rev4(jpg)
        FailureIsolation::IsolationResults+"/"+File.basename(jpg).gsub(/jpg$/, "yml")
@@ -150,6 +154,26 @@ module LogIterator
                     $stderr.puts file if debugging
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
                     self.read_log_rev4(file, &block)
+                    $stderr.print ".." if debugging
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+        end
+    end
+
+    def LogIterator::merged_iterate(files=nil, debugging=false, &block)
+        Dir.chdir FailureIsolation::MergedIsolationResults do
+            files ||= Dir.glob("*bin").sort
+
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts file if debugging
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    yield Marshal.load(IO.read(file))
                     $stderr.print ".." if debugging
                 rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
                     $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"

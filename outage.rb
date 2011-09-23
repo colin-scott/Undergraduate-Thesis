@@ -4,6 +4,7 @@ require 'hops'
 require 'set'
 require 'failure_analyzer'
 require 'failure_isolation_consts'
+require 'log_iterator'
 
 module MergingMethod
     REVERSE = :one_src_multiple_dsts
@@ -13,9 +14,9 @@ end
 # encapsulates mutiple (src,dst) pairs identified as being related to the same
 # failure
 class MergedOutage
-   attr_accessor :outages, :suspected_failures, :file,:initializer2suspectset, :merging_method,
+   attr_accessor :outages, :suspected_failures, :file, :initializer2suspectset, :merging_method,
        # FOR BACKWARDS COMPATIBILITY
-       :pruner2removed, 
+       :pruner2removed,
        # NEW FIELD
        :pruner2incount_removed
 
@@ -32,12 +33,12 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-    def initialize(outages, merging_method)
+    def initialize(outages, merging_method=MergingMethod::REVERSE)
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages
         @suspected_failures = {}
         @initializer2suspectset = {}
-        @pruner2removed = {}
+        @pruner2incount_removed = {}
         @merging_method = merging_method
     end
 
@@ -58,9 +59,9 @@ class MergedOutage
     end
 
     def direction()
-         return Direction.REVERSE unless @outages.find { |o| o.direction == Direction.REVERSE }.nil?
-         return Direction.FORWARD unless @outages.find { |o| o.direction == Direction.FORWARD }.nil?
-         return Direction.BOTH
+        return Direction.REVERSE unless @outages.find { |o| o.direction == Direction.REVERSE }.nil?
+        return Direction.FORWARD unless @outages.find { |o| o.direction == Direction.FORWARD }.nil?
+        return Direction.BOTH
     end
 
     def datasets()
