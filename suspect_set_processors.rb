@@ -194,28 +194,40 @@ class Pruner
 
         # The controller keeps returning null results, so we instead use
         # pptasks directly... cp aliasprobe to a different directory?
+        responsive_targets = issue_pings_with_pptasks(srcs, suspect_set.to_a)
 
-        src2pingable_dsts = @registrar.all_pairs_ping(srcs, suspect_set.to_a)
-
-        if !suspect_set.empty? and src2pingable_dsts.value_set.empty?
+        if !suspect_set.empty? and responsive_targets.empty?
             @logger.warn "#{src2pingable_dsts.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
         else
             @logger.info "issued pings sucessfully!"
         end
 
-        return src2pingable_dsts.value_set.to_a
+        return responsive_targets
     end
      
     # private methods won't be picked up by the failure_analyzer
-    private
+    # XXX Absolutely need to puts back in private
+    #private
     
     # TODO: move me somewhere else.
-    def issue_pings_with_pptasks()
-        
+    def issue_pings_with_pptasks(sources, targets)
+        #delimited = targets.join "\\\\n"
+        File.open("/tmp/sources", "w") { |f| f.puts sources.join "\n" } 
+        File.open("/tmp/targets", "w") { |f| f.puts targets.join "\n" } 
+
+        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources 100 100 \
+                    /tmp/targets @:/tmp/targets"
+
+        # TODO: don't assume eth0!
+        results = Set.new(`#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources 100 100 \
+                    "cd colin/Scripts; sudo 2>/dev/null ./aliasprobe 40 /tmp/targets eth0 | cut -d ' ' -f1 | sort | uniq"`.split("\n"))
     end
 end
 
 if $0 == __FILE__
-    i = Initializer.new(nil,DatabaseInterface.new, LoggerLog.new($stderr))
+    #i = Initializer.new(nil,DatabaseInterface.new, LoggerLog.new($stderr))
+    pruner = Pruner.new(nil,DatabaseInterface.new, LoggerLog.new($stderr))
+
+    puts pruner.issue_pings_with_pptasks(["mlab1.ath01.measurement-lab.org", "planetlab1.csuohio.edu"] , ["193.138.215.1", "193.138.212.6", "212.103.65.134", "217.11.217.229"]).inspect
 end
