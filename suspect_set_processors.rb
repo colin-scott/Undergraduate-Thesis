@@ -211,16 +211,18 @@ class Pruner
     
     # TODO: move me somewhere else.
     def issue_pings_with_pptasks(sources, targets)
-        #delimited = targets.join "\\\\n"
-        File.open("/tmp/sources", "w") { |f| f.puts sources.join "\n" } 
-        File.open("/tmp/targets", "w") { |f| f.puts targets.join "\n" } 
+        # RACE CONDITION ON /TMP/SOURCES! 
+        id = Thread.current.__id__
 
-        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources 100 100 \
-                    /tmp/targets @:/tmp/targets"
+        File.open("/tmp/sources#{id}", "w") { |f| f.puts sources.join "\n" } 
+        File.open("/tmp/targets#{id}", "w") { |f| f.puts targets.join "\n" } 
+
+        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+                    /tmp/targets#{id} @:/tmp/targets#{id}"
 
         # TODO: don't assume eth0!
-        results = Set.new(`#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources 100 100 \
-                    "cd colin/Scripts; sudo 2>/dev/null ./aliasprobe 40 /tmp/targets eth0 | cut -d ' ' -f1 | sort | uniq"`.split("\n"))
+        results = Set.new(`#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+                    "cd colin/Scripts; sudo 2>/dev/null ./aliasprobe 40 /tmp/targets#{id} eth0 | cut -d ' ' -f1 | sort | uniq"`.split("\n"))
     end
 end
 

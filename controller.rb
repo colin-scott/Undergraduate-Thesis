@@ -104,12 +104,19 @@ class Registrar
     # raises the exception that 
     # note that this is different behavior than controller.register, which
     # just returns the exception
-    def register(vp, id=nil)
+    def register(vp)
+        @controller.log("Register attempt: #{vp}")
+
+        name = nil
+        begin
+            name = vp.name
+        rescue
+        end
 
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
-        result=@controller.register(uri)
+        result=@controller.register(uri, name)
         if not result.nil?
             raise result
         end
@@ -119,12 +126,17 @@ class Registrar
 
     # unregisters this VP at this URI only
     def unregister(vp)
+        name = nil
+        begin
+            name = vp.name
+        rescue
+        end
 
         uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
-        host=Controller::uri2hostname(uri)
-        @controller.unregister_host(host,uri)
+        name ||= Controller::uri2hostname(uri)
+        @controller.unregister_host(name,uri)
     end
 
     def garbage_collect()
@@ -632,8 +644,7 @@ class Controller
     # slow
     # need to parallelize
     # also need to make multithreaded access to the hashes safe
-    def register(uri, hostname=nil)
-
+    def register(uri, name=nil)
         open_fds=lsof.length
         begin
             uri,hostname=Controller::rename_uri_and_host(uri,hostname)
@@ -641,6 +652,8 @@ class Controller
             log("Unable to rename #{hostname} as #{uri}: #{$!}")
             return $!
         end
+
+        name ||= hostname
 
         if ( self.ulimit - open_fds < vp_count )
             log("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
@@ -650,7 +663,7 @@ class Controller
         wait=0
         retries=1
         
-        if @vp_lock.synchronize{@hostname2uri.has_key?(hostname) and @hostname2uri[hostname]==uri}
+        if @vp_lock.synchronize{@hostname2uri.has_key?(name) and @hostname2uri[name]==uri}
             #**** should i retest here?****#
             return
         end
@@ -663,21 +676,20 @@ class Controller
                 # register here
                 new_vp=DRbObject.new nil, uri
                 @vp_lock.synchronize do
-                    @hostname2vp[hostname]=new_vp
-                    @hostname2uri[hostname]=uri
+                    @hostname2vp[name]=new_vp
+                    @hostname2uri[name]=uri
                 end
-                log("Registered #{hostname} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
+                log("Registered #{name} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
                 return nil
             end
-            log("Unsuccessful register #{hostname} as #{uri}, retrying: #{except}")
+            log("Unsuccessful register #{name} as #{uri}, retrying: #{except}")
             wait= (wait==0)? 10 : wait*10
         end
-        log("Unable to register #{hostname} as #{uri}: #{except}")
+        log("Unable to register #{name} as #{uri}: #{except}")
         return except
     end
 
     def register_vp(vp,retries,wait=0)
-
         open_fds=lsof.length
         if ( self.ulimit - open_fds < vp_count )
             log("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
