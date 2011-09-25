@@ -1,9 +1,12 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
-require 'file_lock'
+#$: << "."
+#$stderr.puts $:.inspect
+
+require_relative 'file_lock'
 Lock::acquire_lock("controller_lock.txt")
 
-require 'utilities'
+require_relative 'utilities'
 
 #  Is controller_log used?
 #  it does update controller on all VPs in the main thread, but now that will
@@ -23,7 +26,6 @@ require 'optparse'
 require 'socket'
 require 'set'
 require 'resolv'
-
 
 # we use this for test pings
 $ZOOTER_IP="128.208.2.159"
@@ -102,7 +104,7 @@ class Registrar
     # raises the exception that 
     # note that this is different behavior than controller.register, which
     # just returns the exception
-    def register(vp)
+    def register(vp, id=nil)
 
         uri=vp.uri
         # could add in next line for backwards compatability
@@ -131,7 +133,6 @@ class Registrar
 
     # vp can either be a string or a Prober object (via DRb)
      def client_reverse_traceroute(vp,dsts,backoff_endhost=true)
-
         @controller.log("Trying to measure reverse traceroute from #{dsts.join(",")} back to #{vp}")    
         pings=[]
         uri= (vp.is_a?(String) ? vp : vp.uri)
@@ -223,7 +224,6 @@ class Registrar
     end
 
     def send_spoofed_pings(source, dests, receivers, already_registered=false)
-
         pingspoof_interface(source, dests, receivers, already_registered) do |hostname, dests, receivers|
             SpoofedPing::sendProbes(hostname, dests, receivers, @controller)
         end
@@ -257,7 +257,6 @@ class Registrar
 
     # TODO: automatically check if the VP is already registered
     def traceroute(source, dests, already_registered=false)
-
         # reduuundanttt
         if !already_registered
            register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
@@ -279,7 +278,6 @@ class Registrar
     private
 
     def pingspoof_interface(source, dests, helper_vps, already_registered, &block)
-
         raise ArgumentError.new "Cannot distinguish more than 2047 paths at once" if dests.size > 2047
         hostname = source.is_a?(String) ? source : source.hostname
         helper_vps.delete(hostname) if helper_vps.is_a?(Array)
@@ -335,7 +333,6 @@ class Controller
     $rename_vp={ "planetlab1.esl" => "planetlab1.cs.colorado.edu", "planetlab2.esl" => "planetlab2.cs.colorado.edu", "swsat1502.mpi-sws.mpg.de" => "planetlab03.mpi-sws.mpg.de", "swsat1500.mpi-sws.mpg.de" => "planetlab01.mpi-sws.mpg.de", "swsat1501.mpi-sws.mpg.de" => "planetlab02.mpi-sws.mpg.de", "swsat1505.mpi-sws.mpg.de" => "planetlab06.mpi-sws.mpg.de", "swsat1503.mpi-sws.mpg.de" => "planetlab04.mpi-sws.mpg.de", "planetslug7.soe.ucsc.edu" => "planetslug7.cse.ucsc.edu" }
 
     def Controller::rename_uri_and_host(uri,hostname=nil)
-
         if hostname.nil? and uri.nil?
             return [nil,nil]
         end
@@ -474,14 +471,13 @@ class Controller
     end
 
     def has_host?(hostname)
-
         first_result = @vp_lock.synchronize{@hostname2vp.has_key?(hostname.downcase)}
         return true if first_result # uglyyyy
         @vp_lock.synchronize{@hostname2vp.has_key?(@resolver.getaddress(hostname).to_s)}
     end
+
     # raises UnknownVPError if can't find it
     def get_vp(hostname)
-
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
 
         if vp.nil?
@@ -511,7 +507,6 @@ class Controller
 
     # raises UnknownVPError if can't find it
     def get_uri(hostname)
-
         uri=@vp_lock.synchronize{@hostname2uri[hostname.downcase]}
 
         if uri.nil?
@@ -524,12 +519,10 @@ class Controller
     # note that this will return the IP, not the hostname, if the given URI
     # has an IP instead of hostname
     def Controller::uri2hostname(uri)
-
         uri.chomp("\n").split("/").at(-1).split(":").at(0).downcase
     end
 
     def shutdown(code=7)
-
         begin
             log("Exiting controller: Received shutdown message #{code}")
             fn=""
@@ -599,7 +592,6 @@ class Controller
     # get list of open FDs
     # plus will also include . and ..
     def lsof
-
         Dir.new("/proc/#{Process.pid}/fd/").entries
     end
 
@@ -608,7 +600,6 @@ class Controller
     # otherwise return the exception (does not raise it - returns it as the
     # return value)
     def vp_broken?(vp)
-
         begin
             Timeout::timeout(30, SockTimeout.new("#{vp.uri} timed out after 30 on a test ping")){
                 pings=vp.ping([$ZOOTER_IP]).split("\n")

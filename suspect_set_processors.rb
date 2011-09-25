@@ -197,7 +197,7 @@ class Pruner
         responsive_targets = issue_pings_with_pptasks(srcs, suspect_set.to_a)
 
         if !suspect_set.empty? and responsive_targets.empty?
-            @logger.warn "#{src2pingable_dsts.inspect} was empty?!" 
+            @logger.warn "#{responsive_targets.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
         else
             @logger.info "issued pings sucessfully!"
@@ -207,8 +207,7 @@ class Pruner
     end
      
     # private methods won't be picked up by the failure_analyzer
-    # XXX Absolutely need to puts back in private
-    #private
+    private
     
     # TODO: move me somewhere else.
     def issue_pings_with_pptasks(sources, targets)
