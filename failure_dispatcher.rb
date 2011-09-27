@@ -519,7 +519,7 @@ class FailureDispatcher
             historical_trace_timestamp]
     end
 
-    def replace_receivers_for_riot!(srcdst2outage)
+    def replace_receivers_for_riot!(srcdst2receivers)
         # ==================================== #
         #   riot specific!                     #
         # ==================================== #
