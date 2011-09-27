@@ -94,6 +94,11 @@ class FailureMonitor
             system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                      @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
 
+            # ==================================== #                                                                                                                                 
+            #    riot specific!                    #                                                                                                                                 
+            # ==================================== #                                                                                                                                 
+            system "scp cs@riot.cs.washington.edu:~/ping_monitors/state.* #{FailureIsolation::PingMonitorRepo}"
+
             node2targetstate = read_in_results()
 
             update_auxiliary_state(node2targetstate)

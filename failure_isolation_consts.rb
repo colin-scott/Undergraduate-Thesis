@@ -14,6 +14,8 @@ module FailureIsolation
     # ====================================
     #         miscellaneous              #
     # ====================================
+    PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX"]
+    
     DefaultPeriodSeconds = 360
 
     PPTASKS = "~ethan/scripts/pptasks"
@@ -201,6 +203,10 @@ module FailureIsolation
                     #{TargetSetPath} @:#{MonitorTargetSetPath}"
         # also push out target set to toil in case it restarts nodes
         system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}"
+        # ============================== #
+        #      riot specific!            #
+        # ============================== #
+        system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/"
     end
 
     # ====================================

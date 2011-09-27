@@ -200,6 +200,7 @@ class Registrar
         if receivers.nil?
             receivers = @controller.hosts.clone[0..5] # TODO: randomize the receivers
             # XXX 5 is a magic number
+            #
         end
 
         pingspoof_interface(source, dests, receivers, already_registered) do |hostname, dests, receivers|
@@ -225,7 +226,6 @@ class Registrar
 
     # sends out spoofed pings from the given set of nodes as the source 
     def receive_spoofed_pings(source, dests, spoofers, already_registered=false)
-
         pingspoof_interface(source, dests, spoofers, already_registered) do |hostname, dests, spoofers|
             SpoofedPing::receiveProbes(hostname, dests, spoofers, @controller)
         end

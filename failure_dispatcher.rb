@@ -261,11 +261,29 @@ class FailureDispatcher
     def process_merged_outage(merged_outage, id, testing=false)
         @logger.debug "process_merged_outage: #{merged_outage.sources}, #{merged_outage.destinations}"
         analyze_measurements(merged_outage)    
-
+    
         merged_outage.file = get_uniq_filename(id, id)
 
         if(!testing)
             log_merged_outage(merged_outage)
+        end
+
+        # ================================================== #
+        #         Special case for riot!                     #
+        # ================================================== #
+        merged_outage.each do |o|
+            # run the old isolation algorithm!
+            #   at least until Arvind and I work out the correlation one
+            #
+            #   TODO: also run for bidirectional outages?
+            if FailureIsolation::PoisonerNames.include? o.src and o.direction == Direction.REVERSE
+                @failure_analyzer.identify_failure_old(o)
+
+                if !o.suspected_failures[Direction.REVERSE].nil? and !o.suspected_failures[Direction.REVERSE].empty?
+                    # POISON!!!!!!!!
+                    suspected_as = o.suspected_failures[Direction.REVERSE].first.asn
+                end
+            end
         end
 
         # at least one of the inside outages passed filters
@@ -501,9 +519,26 @@ class FailureDispatcher
             historical_trace_timestamp]
     end
 
+    def replace_receivers_for_riot!(srcdst2outage)
+        # ==================================== #
+        #   riot specific!                     #
+        # ==================================== #
+        srcdst2receivers.each do |srcdst, receivers| 
+            # Mux monitors can only spoof to other Mux monitors
+            src, dst = srcdst
+            if FailureIsolation::PoisonerNames.include? src
+                srcdst2receivers[srcdst] = FailureIsolation::PoisonerNames - src
+            end
+        end
+    end
+
     def issue_pings_towards_srcs(srcdst2outage)
+        srcdst2receivers = srcdst2outage.map_values { |outage| outage.receivers }
+
+        replace_receivers_for_riot!(srcdst2receivers)
+        
         # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2outage.map_values { |outage| outage.receivers })
+        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
 
         @logger.debug "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
@@ -519,14 +554,16 @@ class FailureDispatcher
 
     def issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage={})
         @spoof_tr_mutex.synchronize do
-            # for symmetric outages
+            # merging for symmetric outages
             merged_srcdst2outage = dstsrc2outage.merge(srcdst2outage)
             # TODO: add in the other node as the receiver, since we have
             # control over it?
+            
+            srcdst2stillconnected = merged_srcdst2outage.map_values { |outage| outage.receivers }
+            replace_receivers_for_riot!(srcdst2stillconnected)
 
-            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(
-                                                merged_srcdst2outage.map_values { |outage| outage.receivers })
-
+            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
+                                                
             srcdst2outage.each do |srcdst, outage|
                 outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
             end

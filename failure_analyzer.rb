@@ -147,11 +147,11 @@ class FailureAnalyzer
 
     def identify_failure_old(outage)
         if !outage.historical_revtr.valid?
-            # let m be the first forward hop that does not yield a revtr to s
-            tr_suspect = outage.tr.last_responsive_hop
-            spooftr_suspect = outage.spoofed_tr.last_responsive_hop
-            suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
+            ## let m be the first forward hop that does not yield a revtr to s
+            #tr_suspect = outage.tr.last_responsive_hop
+            #spooftr_suspect = outage.spoofed_tr.last_responsive_hop
+            #suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
+            #outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
 
             # baaaaah. This is confusing and not all that helpful.
             #

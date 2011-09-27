@@ -272,6 +272,7 @@ class Outage
    def to_s(verbose=true)
        s = "(#{self.src}, #{self.dst})"
        s << " [passed filters?: #{self.passed_filters}]" if verbose
+       s << " {id=#{self.file}.bin}" if verbose
        s
    end
 
