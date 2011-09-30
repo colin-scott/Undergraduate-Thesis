@@ -253,6 +253,15 @@ class Outage
        end
    end
 
+   # get actual duration
+   def get_measurement_duration
+       duration = 0
+       0.upto(@measurement_times.size - 2) do |i|
+           duration += @measurement_times[i+1][1] - @measurement_times[i][1]
+       end
+       return duration
+   end
+
    # Our fake builder pattern
    def build()
         insert_measurement_durations

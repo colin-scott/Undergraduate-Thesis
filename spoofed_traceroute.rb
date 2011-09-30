@@ -95,6 +95,8 @@ module SpoofedTR
 
     # results is [[probes, reciever], [probes, receiever], ...] 
     def SpoofedTR::parse_path(results, id2dest)
+        controller.log.debug "parse_path(), results #{results.inspect}"
+
         # DRb can't unmarshall hashes initialized with blocks...
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
 
@@ -116,8 +118,8 @@ module SpoofedTR
             end
         end
 
-        #controller.log.debug "parse_path(), id2dest #{id2dest.inspect}"
-        #controller.log.debug "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}"
+        controller.log.debug "parse_path(), id2dest #{id2dest.inspect}"
+        controller.log.debug "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}"
 
         # why would dest ever be nil?  id2dest didn't include the id...
         # We saw one case where one of the hops was attached to a nil key, not
@@ -148,7 +150,7 @@ module SpoofedTR
             end
         end
 
-        #controller.log.debug "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
+        controller.log.debug "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
         
         dest2sortedttlrtrs = {}
 
@@ -183,7 +185,7 @@ module SpoofedTR
             dest2sortedttlrtrs[dest] = sortedttlrtrs
         end
 
-        #controller.log.debug "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
+        controller.log.debug "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
 
         dest2sortedttlrtrs
    end

@@ -2,10 +2,6 @@
 
 #$: << "."
 #$stderr.puts $:.inspect
-
-require_relative 'file_lock'
-Lock::acquire_lock("controller_lock.txt")
-
 require_relative 'utilities'
 
 #  Is controller_log used?
@@ -105,7 +101,7 @@ class Registrar
     # note that this is different behavior than controller.register, which
     # just returns the exception
     def register(vp)
-        @controller.log("Register attempt: #{vp}")
+        @controller.log("Register attempt: #{vp.uri}")
 
         name = nil
         begin
@@ -213,7 +209,6 @@ class Registrar
     end
 
     def receive_batched_spoofed_pings(srcdst2stillconnected)
-        SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
         SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
     end
 
@@ -380,12 +375,11 @@ class Controller
     end
 
     # if test_controller is true, won't do things like dump VPs
-    def initialize(test_controller,configfn,log_level,vpfn=nil)
+    def initialize(test_controller,configfn,logger,vpfn=nil)
         @test=test_controller
         @configfn=configfn
-        @controller_log=LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
-        @controller_log.level = log_level
-
+        @controller_log = logger 
+        
         acl=ACL.new(%w[deny all
                     allow *.cs.washington.edu
                     allow localhost
@@ -490,6 +484,11 @@ class Controller
 
     # raises UnknownVPError if can't find it
     def get_vp(hostname)
+        if !hostname.respond_to?(:downcase)
+            log("Given hostname doesn't respond to :downcase")
+            raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
+        end
+
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
 
         if vp.nil?
@@ -611,16 +610,16 @@ class Controller
     # return nil if it works (isn't broken)
     # otherwise return the exception (does not raise it - returns it as the
     # return value)
-    def vp_broken?(vp)
+    def vp_broken?(vp, test_ip=$ZOOTER_IP)
         begin
             Timeout::timeout(30, SockTimeout.new("#{vp.uri} timed out after 30 on a test ping")){
-                pings=vp.ping([$ZOOTER_IP]).split("\n")
+                pings=vp.ping([test_ip]).split("\n")
                 raise EmptyPingError.new(vp.uri) if pings.length==0
-                if (pings.length==1 and pings[0].split(" ")[0]==$ZOOTER_IP)
+                if (pings.length==1 and pings[0].split(" ")[0]==test_ip)
                     return nil
                 else
                     pings << "length: #{pings.length}"
-                    pings << "#{ZOOTER_IP}!=#{pings[0].split(" ")[0]}"
+                    pings << "#{test_ip}!=#{pings[0].split(" ")[0]}"
                     raise BadPingError.new(vp.uri,pings)
                 end
             }
@@ -630,7 +629,6 @@ class Controller
     end
 
     def vp_at_uri_broken?(uri)
-
         begin
             vp=DRbObject.new nil, uri
             return vp_broken?(vp)
@@ -645,6 +643,7 @@ class Controller
     # need to parallelize
     # also need to make multithreaded access to the hashes safe
     def register(uri, name=nil)
+        log("register attempt, inside controller. #{name}")
         open_fds=lsof.length
         begin
             uri,hostname=Controller::rename_uri_and_host(uri,hostname)
@@ -654,6 +653,7 @@ class Controller
         end
 
         name ||= hostname
+        name = name.downcase
 
         if ( self.ulimit - open_fds < vp_count )
             log("Unable to register #{hostname} as #{uri}, too many open FDs: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs", 1)
@@ -667,6 +667,23 @@ class Controller
             #**** should i retest here?****#
             return
         end
+        
+        # HACK for riot VPs. Mux VPs aren't able to ping zooter... so we
+        # should ping something stable, but I can't find anything that's
+        # stable and reachable from all riot VPs. For example, the (e.g.
+        # ducttape) can only be reached from the VP at the respecitive Mux
+        # site.
+        if $POISONERS.include? name
+            log("Poisoner detected!")
+            new_vp=DRbObject.new nil, uri
+            @vp_lock.synchronize do
+                @hostname2vp[name]=new_vp
+                @hostname2uri[name]=uri
+            end
+            log("Registered #{name} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
+            return nil
+        end
+
         except=true
         while retries>=0
             sleep(wait)
@@ -937,7 +954,6 @@ class Controller
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def ping(hostname2targets,settings={ :timeout => 180, :retry => false, :maxalert => TEXT})
-        
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -1068,7 +1084,6 @@ class Controller
     # spoofer measurement, so retry_command is for the receiver onlyc
     # not positive if retry is always safe with our tools?
     def spoof_and_receive_probes(receiver2spoofer2targets, settings={ :probe_type => :rr, :retry => false }, &probe_requests_to_destinations )
-
         # thread out on receivers
         # iterate through until the next one will add too many targets
         # each time, add the targets to the receiver targets
@@ -1308,9 +1323,14 @@ optparse = OptionParser.new do |opts|
         $LOG.puts "setting vp uri list to #{f}"
         options[:vp_uri_list] = f
     end
-    options[:log_level] = Logger::INFO
+    options[:log_level] = Logger::DEBUG
     opts.on( '-l', '--log-level [LEVEL]', "The log level to use (e.g. Logger::INFO, Logger::DEBUG)") do|l|
+        # This doesn't work....
         options[:log_level] = l
+    end
+    options[:actual_test] = false
+    opts.on( '-a', '--[no-]test-real', "Whether this is a test and should NOT be considered the live controller (default=false)" ) do|n|
+          options[:actual_test] = n
     end
 end
 
@@ -1322,6 +1342,9 @@ end
 optparse.parse!
 
 require options[:config]
+
+require_relative 'file_lock'
+Lock::acquire_lock("controller_lock.txt") unless options[:actual_test]
 
 require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
@@ -1349,7 +1372,10 @@ if options[:kill]
     }
 end
 
-c=Controller.new(options[:test],options[:config],options[:log_level],options[:vp_uri_list])
+controller_log = (options[:actual_test]) ? LoggerLog.new($stderr) : LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+controller_log.level = options[:log_level]
+
+c=Controller.new(options[:test],options[:config],controller_log,options[:vp_uri_list])
 
 # # We need the uri of the service to connect a client
 puts c.uri
@@ -1412,8 +1438,10 @@ Signal.trap("ALRM") {}
 #end
 
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
+registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_ip="druby://#{my_ip}:#{registrar_uri_port}"
 c.log("Registrar started at #{registrar_uri_ip}")
+
 
 if not options[:test]
     `mkdir -p #{$DATADIR}/uris`
@@ -1423,7 +1451,11 @@ if not options[:test]
     `ssh #{$SERVER} "echo #{registrar_uri_ip} > ~revtr/www/vps/registrar.txt; chmod g+w ~revtr/www/vps/registrar.txt"`
     sleep 30 # sleep to give a chance for all VPs to register
     c.probe_from_all{|vp| vp.update_controller(registrar_uri_ip)}
-else
+
+elsif not options[:actual_test]
+    # Origninally I was always running as test so that other controllers wouldn't be killed
+    # Then I added this in here, which makes it a pain to /actually/ run a
+    # test controller.
     ProbeController::set_server_uri(:controller,c.uri)
 
     # XXX Colin's HACK

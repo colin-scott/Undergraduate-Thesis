@@ -1,8 +1,8 @@
 #!/homes/network/revtr/ruby/bin/ruby
+$: << "../"
 
 require 'drb'
 require 'isolation_module'
-require '../spooftr_config.rb'
 
 controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
 registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)

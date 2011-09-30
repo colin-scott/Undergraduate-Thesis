@@ -587,26 +587,30 @@ end
 # if the $PL_HOSTNAMES_W_IPS includes double entries for these, we map from
 # all IPs to the hostname, but we map from the hostname only to the first IP
 # in the file
-$pl_ip2host = Hash.new{ |h,k| h.has_key?(k) ? h[k] : k }
-$pl_host2ip = Hash.new{ |h,k| h.has_key?(k) ? h[k] : k }
+$pl_ip2host = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+$pl_host2ip = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+
 def loadPLHostnames
   File.open( $PL_HOSTNAMES_W_IPS.chomp("\n"), "r"){|f|
     f.each_line{|line|
       info = line.chomp("\n").split(" ")
-      $pl_ip2host[ info.at(1) ] = info.at(0)
+      $pl_ip2host[ info.at(1).downcase ] = info.at(0)
       next if $pl_host2ip.has_key?(info.at(0)) # skip duplicate hostnames
-      $pl_host2ip[ info.at(0) ] = info.at(1)
+      $pl_host2ip[ info.at(0).downcase ] = info.at(1)
     }
   }
 end
+
 # mappings from PL hostname to site; can be used to check if 2 are at the same
 # site in order to exclude probes from the target site, say
-$pl_host2site = Hash.new{ |h,k| h.has_key?(k) ? h[k] : k }
+$pl_host2site = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+
 def loadPLSites
   File.open( $PL_HOSTNAMES_W_SITES.chomp("\n"),"r"){|f|
     f.each_line{|line|
       info = line.chomp("\n").split(" ")
-      $pl_host2site[ info.at(0) ] = info.at(1)
+      next if info[0].nil?
+      $pl_host2site[ info.at(0).downcase ] = info.at(1)
     }
   }
 end

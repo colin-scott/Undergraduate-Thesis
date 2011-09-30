@@ -313,9 +313,9 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        no_historical_trace = (historical_tr.empty?)
+        no_historical_trace = (historical_tr.empty? && !FailureIsolation::PoisonerNames.include?(src))
 
-        historical_trace_didnt_reach = (!no_historical_trace && historical_tr[-1].ip == "0.0.0.0")
+        historical_trace_didnt_reach = (!no_historical_trace && !FailureIsolation::PoisonerNames.include?(src) && historical_tr[-1].ip == "0.0.0.0")
 
         @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
