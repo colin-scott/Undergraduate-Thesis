@@ -21,7 +21,7 @@ module SpoofedTR
 
         controller.log.debug "SpoofedTR::sendProbes(#{hostname} #{dests.inspect}), results,unsuccessful_receivers,privates,blacklisted"
         controller.log.debug "#{results.inspect},#{unsuccessful_receivers.inspect},#{privates.inspect},#{blacklisted.inspect}"
-        SpoofedTR::parse_path(results, id2dest)
+        SpoofedTR::parse_path(results, id2dest, controller)
     end
 
     def SpoofedTR::sendBatchProbes(srcdst2receivers, controller)
@@ -38,7 +38,7 @@ module SpoofedTR
         id2srcdst = SpoofedTR::allocate_batch_ids(receiver2spoofer2targets)
 
         results,unsuccessful_receivers,privates,blacklisted = controller.spoof_tr(receiver2spoofer2targets)
-        SpoofedTR::parse_path(results, id2srcdst) # this actually works with either id2srcdst or id2dst...
+        SpoofedTR::parse_path(results, id2srcdst, controller) # this actually works with either id2srcdst or id2dst...
     end
 
     private
@@ -94,7 +94,7 @@ module SpoofedTR
     end
 
     # results is [[probes, reciever], [probes, receiever], ...] 
-    def SpoofedTR::parse_path(results, id2dest)
+    def SpoofedTR::parse_path(results, id2dest, controller)
         controller.log.debug "parse_path(), results #{results.inspect}"
 
         # DRb can't unmarshall hashes initialized with blocks...

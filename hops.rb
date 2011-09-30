@@ -437,6 +437,10 @@ class Hop
         (@formatted or @ip)
     end
 
+    def inspect
+        "Hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
+    end
+
     # takes a block, and returns any subsequent hop for which the block
     # evaluates to true
     def find_subsequent()
@@ -478,6 +482,10 @@ class ForwardHop < Hop
     def to_s()
         "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
     end
+
+    def inspect
+        "Fwd hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
+    end
 end
 
 class HistoricalForwardHop < Hop
@@ -499,6 +507,10 @@ class HistoricalForwardHop < Hop
        end
        s << "  </ul>\n"
        s
+    end
+
+    def inspect
+        "Historical fwd hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
     end
 end
 
@@ -565,6 +577,10 @@ class ReverseHop < Hop
     def to_s()
         s = (@formatted.nil?) ? "#{@ip} #{@dns}" : @formatted.clone
     end
+
+    def inspect
+        "Reverse hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
+    end
 end
 
 class SpoofedForwardHop < Hop
@@ -581,6 +597,10 @@ class SpoofedForwardHop < Hop
         s << " (pingable from S?: #{@ping_responsive})" unless @ping_responsive.nil?
         s << " [historically pingable?: #{@last_responsive}]" unless @last_responsive.nil?
         s
+    end
+
+    def inspect
+        "Spoofed fwd hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
     end
 end
 

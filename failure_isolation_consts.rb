@@ -28,8 +28,8 @@ module FailureIsolation
     RevtrRequests = "/homes/network/revtr/failure_isolation/revtr_requests/current_requests.txt"
 
     # out of place...
-    ControllerUri = IO.read("#{$DATADIR}/uris/controller.txt").chomp
-    RegistrarUri = IO.read("#{$DATADIR}/uris/registrar.txt").chomp
+    ControllerUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_controller.txt").chomp : IO.read("#{$DATADIR}/uris/controller.txt").chomp
+    RegistrarUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_registrar.txt").chomp : IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
     ReadTraces = "~revtr/colin/Scripts/readouttraces"
     HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipsX_input_filesY\*"

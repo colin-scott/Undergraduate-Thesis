@@ -1462,6 +1462,10 @@ elsif not options[:actual_test]
     `echo #{uri_ip} > #{$DATADIR}/uris/controller.txt`
     `echo #{registrar_uri_ip} > #{$DATADIR}/uris/registrar.txt`
     `ssh #{$SERVER} "echo #{registrar_uri_ip} > ~revtr/www/vps/isolation_registrar.txt; chmod g+w ~revtr/www/vps/isolation_registrar.txt"`
+elsif options[:actual_test]
+    `echo #{uri_ip} > #{$DATADIR}/uris/test_controller.txt`
+    `echo #{registrar_uri_ip} > #{$DATADIR}/uris/test_registrar.txt`
+    `ssh #{$SERVER} "echo #{registrar_uri_ip} > ~revtr/www/vps/test_isolation_registrar.txt; chmod g+w ~revtr/www/vps/test_isolation_registrar.txt"`
 end
 
 # wait for the DRb service to finish before exiting

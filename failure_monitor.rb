@@ -132,7 +132,7 @@ class FailureMonitor
             mtime = input.mtime
             input.close
 
-            node = yaml.split("state.")[1]
+            node = yaml.split("state.")[1].downcase
 
             seconds_difference = (current_time - mtime).abs
             if seconds_difference >= @@timestamp_bound
