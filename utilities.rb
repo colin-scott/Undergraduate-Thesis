@@ -298,6 +298,7 @@ module Inet
   end
 
   def Inet::aton(dotted)
+    raise "not a valid IP address #{dotted}" unless dotted.matches_ip?
     ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
     val=0
     ints.each{|n| val=(val*256)+n}
@@ -370,21 +371,21 @@ class TruncatedTraceFileException < RuntimeError
   end
 end
 # return an array of recordroutes, where each is [dst,hops array, rtt, ttl]
-# will throw TruncatedTraceFileException for malformed files
+# will throw truncatedtracefileexception for malformed files
 def convert_binary_recordroutes(data, print=false)
   offset=0
   recordroutes=[]
   #while not probes.eof?
   while not offset>=data.length
-    rr=data[offset,72].unpack("N3LfL2N9L2")
+    rr=data[offset,72].unpack("n3lfl2n9l2")
     offset += 72
     if rr.nil? or rr.include?(nil)
-      raise TruncatedTraceFileException.new(recordroutes), "Error reading header", caller
+      raise truncatedtracefileexception.new(recordroutes), "error reading header", caller
     end
-    dst=Inet::ntoa(rr.at(0))
+    dst=inet::ntoa(rr.at(0))
     rtt=rr.at(4)
     ttl=rr.at(5)
-    hops=rr[7..15].collect{|x| Inet::ntoa(x)}
+    hops=rr[7..15].collect{|x| inet::ntoa(x)}
     recordroutes << [dst,hops,rtt,ttl]
     if print
       $stdout.puts "#{dst} #{rtt} #{hops.join(" ")}"
@@ -392,6 +393,31 @@ def convert_binary_recordroutes(data, print=false)
   end
   return recordroutes
 end
+# return an array of recordroutes, where each is [dst,hops array, rtt, ttl]
+# will throw truncatedtracefileexception for malformed files
+def self.convert_binary_recordroutes(data, print=false)
+  offset=0
+  recordroutes=[]
+  #while not probes.eof?
+  while not offset>=data.length
+    rr=data[offset,72].unpack("n3lfl2n9l2")
+    offset += 72
+    if rr.nil? or rr.include?(nil)
+      raise truncatedtracefileexception.new(recordroutes), "error reading header", caller
+    end
+    dst=inet::ntoa(rr.at(0))
+    rtt=rr.at(4)
+    ttl=rr.at(5)
+    hops=rr[7..15].collect{|x| inet::ntoa(x)}
+    recordroutes << [dst,hops,rtt,ttl]
+    if print
+      $stdout.puts "#{dst} #{rtt} #{hops.join(" ")}"
+    end
+  end
+  return recordroutes
+end
+
+
 
 # take data, a string read in from an iplane-format binary trace.out file
 # return an array of traceroutes, where each is [dst,hops array, rtts array,
@@ -588,12 +614,19 @@ end
 # all IPs to the hostname, but we map from the hostname only to the first IP
 # in the file
 $pl_ip2host = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
-$pl_host2ip = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+$pl_host2ip = Hash.new do |h,k|
+   if (k.respond_to?(:downcase) && h.has_key?(k.downcase))
+      return h[k.downcase]
+   else 
+       raise "Does not contain hostname: #{hostname}" 
+   end
+end
 
 def loadPLHostnames
   File.open( $PL_HOSTNAMES_W_IPS.chomp("\n"), "r"){|f|
     f.each_line{|line|
       info = line.chomp("\n").split(" ")
+      next if info.empty? or !info[1].respond_to?(:downcase) or !info[0].respond_to?(:downcase)
       $pl_ip2host[ info.at(1).downcase ] = info.at(0)
       next if $pl_host2ip.has_key?(info.at(0)) # skip duplicate hostnames
       $pl_host2ip[ info.at(0).downcase ] = info.at(1)

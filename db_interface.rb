@@ -63,8 +63,25 @@ class DatabaseInterface
 
     def hostname2ip()
         return @hostname2ip unless @hostname2ip.nil?
-        hostname2ip = Hash.new { |h,k| k }
-        hostname2ip.merge!(ip2hostname.invert)
+
+        hostname2ip = Hash.new do |h,k| 
+            if k.respond_to?(:downcase) and h.include? k.downcase 
+                return h[k.downcase]
+            elsif !k.respond_to?(:matches_ip?) or !k.matches_ip?
+                raise "unknown hostname #{k}"
+            else
+                return k
+            end
+        end
+
+        sql = "select vantage_point, inet_ntoa(IP) as ip from vantage_points;"
+        
+        results = query(sql)
+
+        results.each_hash do |row|
+            hostname2ip[row["vantage_point"].downcase] = row["ip"]
+        end
+
         hostname2ip
     end
 
@@ -88,7 +105,7 @@ class DatabaseInterface
     def fetch_pingability(ips)
         raise "ips can't be nil!" if ips.nil?
 
-        only_ips = ips.map { |ip| ip.is_a?(String) ? @hostname2ip[ip] : ip }
+        only_ips = ips.map { |ip| ip.is_a?(String) ? @hostname2ip[ip] : ip }.find_all { |elt| !elt.nil? }
         raise "ips not ips! #{ips.inspect}" if only_ips.find { |ip| !ip.matches_ip? and !ip.is_a?(Integer) }
 
         #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
@@ -205,7 +222,6 @@ class DatabaseInterface
         }
 
         hostname2ip
-
     end
 end
 

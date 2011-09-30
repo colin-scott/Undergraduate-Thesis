@@ -80,6 +80,7 @@ begin
    monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
 rescue Exception => e
    Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
+   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("<br />")}"
    monitor.persist_state unless monitor.nil?
    throw e
 end
