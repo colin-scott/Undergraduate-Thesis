@@ -167,7 +167,7 @@ module SpoofedTR
 
             # turn sets into arrays
             dest2ttl2rtrs[dest].each do |ttl, rtrs|
-               dest2ttl2rtrs[dest][ttl] = rtrs.to_a 
+               dest2ttl2rtrs[dest][ttl] = rtrs.to_a.map { |h| h.strip }
             end
 
             # convert into [ttl, rtrs] pairs

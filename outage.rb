@@ -75,6 +75,10 @@ class MergedOutage
     def destinations()
         return @outages.map { |o| o.dst }.uniq
     end
+
+    def time()
+        return @outages.first.time
+    end
 end
 
 # TODO: builder pattern?

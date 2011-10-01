@@ -132,7 +132,7 @@ class FailureMonitor
             mtime = input.mtime
             input.close
 
-            node = yaml.split("state.")[1].downcase
+            node = yaml.split("state.")[1].strip.downcase
 
             seconds_difference = (current_time - mtime).abs
             if seconds_difference >= @@timestamp_bound
@@ -146,14 +146,20 @@ class FailureMonitor
 
             # "state.node1.pl.edu"
             begin
-                hash = YAML.load_file(yaml)
+                yml_hash = YAML.load_file(yaml)
+
+                if !yml_hash.is_a?(Hash)
+                    @logger.puts "#{node}'s data was not a hash!!"
+                    next
+                end
+
+                # we want to strip targets
+                hash = {}
+                yml_hash.each do |k,v|
+                   hash[k.strip] = v
+                end 
             rescue
                 @logger.puts "Corrupt YAML file: #{node}"
-                next
-            end
-
-            if !hash.is_a?(Hash)
-                @logger.puts "#{node}'s data was not a hash!!"
                 next
             end
 

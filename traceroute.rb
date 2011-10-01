@@ -37,12 +37,12 @@ module Traceroute
             end
 
             trs.each do |tr|
-                dst = tr[0]
+                dst = tr[0].strip
                 hops = tr[1]
 
                 ttlhoptuples = []
                 hops.each_with_index do |hop, ttl|
-                    ttlhoptuples << [ttl+1, hop] 
+                    ttlhoptuples << [ttl+1, hop.strip] 
                 end
                 
                 dst2ttlhoptuples[dst] = ttlhoptuples

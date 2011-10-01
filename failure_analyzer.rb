@@ -314,9 +314,9 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        no_historical_trace = skip_hist_tr or (historical_tr.empty? && !FailureIsolation::PoisonerNames.include?(src))
+        no_historical_trace = !skip_hist_tr and (historical_tr.empty? && !FailureIsolation::PoisonerNames.include?(src))
 
-        historical_trace_didnt_reach = skip_hist_tr or (!no_historical_trace  && !FailureIsolation::PoisonerNames.include?(src)  && historical_tr[-1].ip == "0.0.0.0")
+        historical_trace_didnt_reach = !skip_hist_tr and (!no_historical_trace  && !FailureIsolation::PoisonerNames.include?(src)  && historical_tr[-1].ip == "0.0.0.0")
 
         @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
@@ -334,7 +334,7 @@ class FailureAnalyzer
                 :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
                 :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
 
-            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}#{file.nil? ? "" : (", "+file) }): #{bool_vector.inspect}"
+            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}#{(file.nil? ? "" : (", "+file)) }): #{bool_vector.inspect}"
             return [false, bool_vector]
         else
             return [true, {}]
@@ -420,6 +420,8 @@ class FailureAnalyzer
 
             #elsif last_unresponsive.find_subsequent { |hop| hop.no_longer_pingable? }
             #    return :no_clear_reachability_horizon
+        end
+
     end
 
     def pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
@@ -451,6 +453,7 @@ class FailureAnalyzer
 
         pingable_targets
     end
+
 end
 
 if $0 == __FILE__

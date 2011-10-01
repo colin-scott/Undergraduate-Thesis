@@ -65,13 +65,16 @@ class DatabaseInterface
         return @hostname2ip unless @hostname2ip.nil?
 
         hostname2ip = Hash.new do |h,k| 
+            result = nil
             if k.respond_to?(:downcase) and h.include? k.downcase 
-                return h[k.downcase]
+                result = h[k.downcase]
             elsif !k.respond_to?(:matches_ip?) or !k.matches_ip?
                 raise "unknown hostname #{k}"
             else
-                return k
+                result = k
             end
+
+            result
         end
 
         sql = "select vantage_point, inet_ntoa(IP) as ip from vantage_points;"

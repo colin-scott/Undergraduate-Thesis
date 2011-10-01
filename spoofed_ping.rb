@@ -92,6 +92,8 @@ module SpoofedPing
             results.split("\n").each do |line|
                 # 128.208.4.102 1 10 0
                 target, id, ttl, src = line.split
+                target = target.strip
+                src = src.strip
                 # XXX
                 if !src.eql? "0"
                     target2receiver2succesfulsenders[target] = {} unless target2receiver2succesfulsenders.include? target
