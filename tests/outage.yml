@@ -1,0 +1,2159 @@
+--- !ruby/object:Outage 
+additional_traces: {}
+
+alternate_paths: 
+- :"forward path"
+as_hops_from_dst: 3
+as_hops_from_src: 2
+dataset: Harsha's most well-connected PoPs
+direction: reverse path
+dst: 134.75.108.209
+file: node2.planetlab.albany.edu_134.75.108.209_20110602081643
+formatted_connected: 
+- pl1.6test.edu.cn [(n/a)]
+- planetlab-2.sjtu.edu.cn [(n/a)]
+- planetlab1.nvlab.org [(n/a)]
+- pl2.rcc.uottawa.ca [(n/a)]
+- planetlab1.cs.colorado.edu [(n/a)]
+- planetlab-node3.it-sudparis.eu [(n/a)]
+- planetlab2.netmedia.gist.ac.kr [(n/a)]
+- planetlab-2.cs.auckland.ac.nz [(n/a)]
+- planetlab-01.kusa.ac.jp [(n/a)]
+- planetlab2.pc.cis.udel.edu [(n/a)]
+formatted_unconnected: 
+- node2.planetlab.albany.edu [2 minutes]
+- planetlab1.eecs.ucf.edu [2 minutes]
+historical_revtr: !ruby/object:HistoricalReversePath 
+  dst: ""
+  hops: 
+  - &id013 !ruby/object:ReverseHop 
+    asn: "1237"
+    dns: 134.75.108.209
+    formatted: 1.  134.75.108.209 (134.75.108.209) dst-sym
+    ip: 134.75.108.209
+    last_responsive: "2011-05-30"
+    next: &id012 !ruby/object:ReverseHop 
+      asn: "3303"
+      dns: kreonet-1-lo-jmb-706.sttlwa.pacificwave.net
+      formatted: 2.  kreonet-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.6) rr
+      ip: 207.231.240.6
+      last_responsive: false
+      next: &id011 !ruby/object:ReverseHop 
+        asn: "3303"
+        dns: nlr-1-lo-jmb-706.sttlwa.pacificwave.net
+        formatted: 3.  nlr-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.14) tr2src
+        ip: 207.231.240.14
+        last_responsive: false
+        next: &id010 !ruby/object:ReverseHop 
+          asn: "19401"
+          dns: 216.24.186.69
+          formatted: 4.  216.24.186.69 (216.24.186.69) tr2src
+          ip: 216.24.186.69
+          last_responsive: "2011-05-30"
+          next: &id009 !ruby/object:ReverseHop 
+            asn: "19401"
+            dns: 216.24.186.71
+            formatted: 5.  216.24.186.71 (216.24.186.71) tr2src
+            ip: 216.24.186.71
+            last_responsive: "2011-05-30"
+            next: &id008 !ruby/object:ReverseHop 
+              asn: "19401"
+              dns: 216.24.186.62
+              formatted: 6.  216.24.186.62 (216.24.186.62) tr2src
+              ip: 216.24.186.62
+              last_responsive: "2011-05-30"
+              next: &id007 !ruby/object:ReverseHop 
+                asn: "19401"
+                dns: 216.24.186.61
+                formatted: 7.  216.24.186.61 (216.24.186.61) tr2src
+                ip: 216.24.186.61
+                last_responsive: "2011-05-30"
+                next: &id006 !ruby/object:ReverseHop 
+                  asn: "19401"
+                  dns: 216.24.186.67
+                  formatted: 8.  216.24.186.67 (216.24.186.67) tr2src
+                  ip: 216.24.186.67
+                  last_responsive: "2011-05-30"
+                  next: &id005 !ruby/object:ReverseHop 
+                    asn: "3754"
+                    dns: 199.109.4.157
+                    formatted: 9.  199.109.4.157 (199.109.4.157) tr2src
+                    ip: 199.109.4.157
+                    last_responsive: "2011-05-30"
+                    next: &id004 !ruby/object:ReverseHop 
+                      asn: "3754"
+                      dns: alb-7600-nyc-7600.nysernet.net
+                      formatted: 10.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                      ip: 199.109.7.97
+                      last_responsive: "2011-05-30"
+                      next: &id003 !ruby/object:ReverseHop 
+                        asn: "3754"
+                        dns: ualbany-alb-7600.nysenret.net
+                        formatted: 11.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                        ip: 199.109.8.2
+                        last_responsive: "2011-05-30"
+                        next: &id002 !ruby/object:ReverseHop 
+                          asn: "22990"
+                          dns: 6513_internet.gw.albany.edu
+                          formatted: 12.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                          ip: 169.226.13.42
+                          last_responsive: "2011-05-30"
+                          next: &id001 !ruby/object:ReverseHop 
+                            asn: "22990"
+                            dns: node2.planetlab.albany.edu
+                            formatted: 13.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                            ip: 169.226.40.4
+                            last_responsive: "2011-05-30"
+                            next: &id014 !ruby/object:ReverseHop 
+                              asn: "22990"
+                              dns: node2.planetlab.albany.edu
+                              formatted: 14.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                              ip: 169.226.40.4
+                              last_responsive: "2011-05-30"
+                              next: 
+                              ping_responsive: true
+                              prefix: 169.226.0.0/16
+                              previous: *id001
+                              ttl: 14
+                              type: :tr2src
+                              valid_ip: true
+                            ping_responsive: true
+                            prefix: 169.226.0.0/16
+                            previous: *id002
+                            ttl: 13
+                            type: :tr2src
+                            valid_ip: true
+                          ping_responsive: true
+                          prefix: 169.226.0.0/16
+                          previous: *id003
+                          ttl: 12
+                          type: :tr2src
+                          valid_ip: true
+                        ping_responsive: true
+                        prefix: 199.109.8.0/24
+                        previous: *id004
+                        ttl: 11
+                        type: :tr2src
+                        valid_ip: true
+                      ping_responsive: true
+                      prefix: 199.109.7.0/24
+                      previous: *id005
+                      ttl: 10
+                      type: :tr2src
+                      valid_ip: true
+                    ping_responsive: true
+                    prefix: 199.109.4.0/24
+                    previous: *id006
+                    ttl: 9
+                    type: :tr2src
+                    valid_ip: true
+                  ping_responsive: true
+                  prefix: 216.24.176.0/20
+                  previous: *id007
+                  ttl: 8
+                  type: :tr2src
+                  valid_ip: true
+                ping_responsive: false
+                prefix: 216.24.176.0/20
+                previous: *id008
+                reachable_from_other_vps: false
+                ttl: 7
+                type: :tr2src
+                valid_ip: true
+              ping_responsive: false
+              prefix: 216.24.176.0/20
+              previous: *id009
+              reachable_from_other_vps: false
+              ttl: 6
+              type: :tr2src
+              valid_ip: true
+            ping_responsive: false
+            prefix: 216.24.176.0/20
+            previous: *id010
+            reachable_from_other_vps: false
+            ttl: 5
+            type: :tr2src
+            valid_ip: true
+          ping_responsive: false
+          prefix: 216.24.176.0/20
+          previous: *id011
+          reachable_from_other_vps: true
+          ttl: 4
+          type: :tr2src
+          valid_ip: true
+        ping_responsive: false
+        prefix: 204.0.0.0/6
+        previous: *id012
+        reachable_from_other_vps: false
+        ttl: 3
+        type: :tr2src
+        valid_ip: true
+      ping_responsive: false
+      prefix: 204.0.0.0/6
+      previous: *id013
+      reachable_from_other_vps: false
+      ttl: 2
+      type: :rr
+      valid_ip: true
+    ping_responsive: false
+    prefix: 134.75.0.0/16
+    previous: 
+    reachable_from_other_vps: true
+    ttl: 1
+    type: :"dst-sym"
+    valid_ip: true
+  - *id012
+  - *id011
+  - *id010
+  - *id009
+  - *id008
+  - *id007
+  - *id006
+  - *id005
+  - *id004
+  - *id003
+  - *id002
+  - *id001
+  - *id014
+  invalid_reason: unknown
+  src: ""
+  timestamp: 0
+  valid: false
+historical_tr: !ruby/object:ForwardPath 
+  hops: 
+  - &id124 !ruby/object:HistoricalForwardHop 
+    asn: "22990"
+    dns: 169.226.40.1
+    formatted: "169.226.40.1 (169.226.40.1) [169.226.0.0/16, ASN: 22990]"
+    ip: 169.226.40.1
+    last_responsive: "2011-05-30"
+    next: &id123 !ruby/object:HistoricalForwardHop 
+      asn: "22990"
+      dns: internet_7206.gw.albany.edu
+      formatted: "internet_7206.gw.albany.edu (169.226.13.41) [169.226.0.0/16, ASN: 22990]"
+      ip: 169.226.13.41
+      last_responsive: "2011-05-30"
+      next: &id118 !ruby/object:HistoricalForwardHop 
+        asn: "3754"
+        dns: alb-7600-ualbany.nysernet.net
+        formatted: "alb-7600-ualbany.nysernet.net (199.109.8.1) [199.109.8.0/24, ASN: 3754]"
+        ip: 199.109.8.1
+        last_responsive: "2011-05-30"
+        next: &id112 !ruby/object:HistoricalForwardHop 
+          asn: "3754"
+          dns: nyc-7600-alb-7600.nysernet.net
+          formatted: "nyc-7600-alb-7600.nysernet.net (199.109.7.98) [199.109.7.0/24, ASN: 3754]"
+          ip: 199.109.7.98
+          last_responsive: "2011-05-30"
+          next: &id105 !ruby/object:HistoricalForwardHop 
+            asn: "3754"
+            dns: 199.109.4.158
+            formatted: "199.109.4.158 (199.109.4.158) [199.109.4.0/24, ASN: 3754]"
+            ip: 199.109.4.158
+            last_responsive: "2011-05-30"
+            next: &id097 !ruby/object:HistoricalForwardHop 
+              asn: "19401"
+              dns: 216.24.186.66
+              formatted: "216.24.186.66 (216.24.186.66) [216.24.176.0/20, ASN: 19401]"
+              ip: 216.24.186.66
+              last_responsive: "2011-05-30"
+              next: &id088 !ruby/object:HistoricalForwardHop 
+                asn: "19401"
+                dns: 216.24.186.60
+                formatted: "216.24.186.60 (216.24.186.60) [216.24.176.0/20, ASN: 19401]"
+                ip: 216.24.186.60
+                last_responsive: "2011-05-30"
+                next: &id078 !ruby/object:HistoricalForwardHop 
+                  asn: "19401"
+                  dns: 216.24.186.63
+                  formatted: "216.24.186.63 (216.24.186.63) [216.24.176.0/20, ASN: 19401]"
+                  ip: 216.24.186.63
+                  last_responsive: "2011-05-30"
+                  next: &id067 !ruby/object:HistoricalForwardHop 
+                    asn: "19401"
+                    dns: 216.24.186.70
+                    formatted: "216.24.186.70 (216.24.186.70) [216.24.176.0/20, ASN: 19401]"
+                    ip: 216.24.186.70
+                    last_responsive: "2011-05-30"
+                    next: &id055 !ruby/object:HistoricalForwardHop 
+                      asn: "19401"
+                      dns: 216.24.186.68
+                      formatted: "216.24.186.68 (216.24.186.68) [216.24.176.0/20, ASN: 19401]"
+                      ip: 216.24.186.68
+                      last_responsive: "2011-05-30"
+                      next: &id042 !ruby/object:HistoricalForwardHop 
+                        asn: "3303"
+                        dns: kreonet-1-lo-jmb-706.sttlwa.pacificwave.net
+                        formatted: "kreonet-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.6) [204.0.0.0/6, ASN: 3303]"
+                        ip: 207.231.240.6
+                        last_responsive: false
+                        next: &id125 !ruby/object:HistoricalForwardHop 
+                          asn: "1237"
+                          dns: 134.75.108.209
+                          formatted: "134.75.108.209 (134.75.108.209) [134.75.0.0/16, ASN: 1237]"
+                          ip: 134.75.108.209
+                          last_responsive: "2011-05-30"
+                          next: 
+                          ping_responsive: false
+                          prefix: 134.75.0.0/16
+                          previous: *id042
+                          reachable_from_other_vps: true
+                          reverse_path: !ruby/object:HistoricalReversePath 
+                            dst: ""
+                            hops: 
+                            - &id027 !ruby/object:ReverseHop 
+                              asn: "1237"
+                              dns: 134.75.108.209
+                              formatted: 1.  134.75.108.209 (134.75.108.209) dst-sym
+                              ip: 134.75.108.209
+                              last_responsive: "2011-05-30"
+                              next: &id026 !ruby/object:ReverseHop 
+                                asn: "3303"
+                                dns: kreonet-1-lo-jmb-706.sttlwa.pacificwave.net
+                                formatted: 2.  kreonet-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.6) rr
+                                ip: 207.231.240.6
+                                last_responsive: false
+                                next: &id025 !ruby/object:ReverseHop 
+                                  asn: "3303"
+                                  dns: nlr-1-lo-jmb-706.sttlwa.pacificwave.net
+                                  formatted: 3.  nlr-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.14) tr2src
+                                  ip: 207.231.240.14
+                                  last_responsive: false
+                                  next: &id024 !ruby/object:ReverseHop 
+                                    asn: "19401"
+                                    dns: 216.24.186.69
+                                    formatted: 4.  216.24.186.69 (216.24.186.69) tr2src
+                                    ip: 216.24.186.69
+                                    last_responsive: "2011-05-30"
+                                    next: &id023 !ruby/object:ReverseHop 
+                                      asn: "19401"
+                                      dns: 216.24.186.71
+                                      formatted: 5.  216.24.186.71 (216.24.186.71) tr2src
+                                      ip: 216.24.186.71
+                                      last_responsive: "2011-05-30"
+                                      next: &id022 !ruby/object:ReverseHop 
+                                        asn: "19401"
+                                        dns: 216.24.186.62
+                                        formatted: 6.  216.24.186.62 (216.24.186.62) tr2src
+                                        ip: 216.24.186.62
+                                        last_responsive: "2011-05-30"
+                                        next: &id021 !ruby/object:ReverseHop 
+                                          asn: "19401"
+                                          dns: 216.24.186.61
+                                          formatted: 7.  216.24.186.61 (216.24.186.61) tr2src
+                                          ip: 216.24.186.61
+                                          last_responsive: "2011-05-30"
+                                          next: &id020 !ruby/object:ReverseHop 
+                                            asn: "19401"
+                                            dns: 216.24.186.67
+                                            formatted: 8.  216.24.186.67 (216.24.186.67) tr2src
+                                            ip: 216.24.186.67
+                                            last_responsive: "2011-05-30"
+                                            next: &id019 !ruby/object:ReverseHop 
+                                              asn: "3754"
+                                              dns: 199.109.4.157
+                                              formatted: 9.  199.109.4.157 (199.109.4.157) tr2src
+                                              ip: 199.109.4.157
+                                              last_responsive: "2011-05-30"
+                                              next: &id018 !ruby/object:ReverseHop 
+                                                asn: "3754"
+                                                dns: alb-7600-nyc-7600.nysernet.net
+                                                formatted: 10.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                                                ip: 199.109.7.97
+                                                last_responsive: "2011-05-30"
+                                                next: &id017 !ruby/object:ReverseHop 
+                                                  asn: "3754"
+                                                  dns: ualbany-alb-7600.nysenret.net
+                                                  formatted: 11.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                                                  ip: 199.109.8.2
+                                                  last_responsive: "2011-05-30"
+                                                  next: &id016 !ruby/object:ReverseHop 
+                                                    asn: "22990"
+                                                    dns: 6513_internet.gw.albany.edu
+                                                    formatted: 12.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                                    ip: 169.226.13.42
+                                                    last_responsive: "2011-05-30"
+                                                    next: &id015 !ruby/object:ReverseHop 
+                                                      asn: "22990"
+                                                      dns: node2.planetlab.albany.edu
+                                                      formatted: 13.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                                      ip: 169.226.40.4
+                                                      last_responsive: "2011-05-30"
+                                                      next: &id028 !ruby/object:ReverseHop 
+                                                        asn: "22990"
+                                                        dns: node2.planetlab.albany.edu
+                                                        formatted: 14.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                                        ip: 169.226.40.4
+                                                        last_responsive: "2011-05-30"
+                                                        next: 
+                                                        ping_responsive: true
+                                                        prefix: 169.226.0.0/16
+                                                        previous: *id015
+                                                        ttl: 14
+                                                        type: :tr2src
+                                                        valid_ip: true
+                                                      ping_responsive: true
+                                                      prefix: 169.226.0.0/16
+                                                      previous: *id016
+                                                      ttl: 13
+                                                      type: :tr2src
+                                                      valid_ip: true
+                                                    ping_responsive: true
+                                                    prefix: 169.226.0.0/16
+                                                    previous: *id017
+                                                    ttl: 12
+                                                    type: :tr2src
+                                                    valid_ip: true
+                                                  ping_responsive: true
+                                                  prefix: 199.109.8.0/24
+                                                  previous: *id018
+                                                  ttl: 11
+                                                  type: :tr2src
+                                                  valid_ip: true
+                                                ping_responsive: true
+                                                prefix: 199.109.7.0/24
+                                                previous: *id019
+                                                ttl: 10
+                                                type: :tr2src
+                                                valid_ip: true
+                                              ping_responsive: true
+                                              prefix: 199.109.4.0/24
+                                              previous: *id020
+                                              ttl: 9
+                                              type: :tr2src
+                                              valid_ip: true
+                                            ping_responsive: true
+                                            prefix: 216.24.176.0/20
+                                            previous: *id021
+                                            ttl: 8
+                                            type: :tr2src
+                                            valid_ip: true
+                                          ping_responsive: false
+                                          prefix: 216.24.176.0/20
+                                          previous: *id022
+                                          reachable_from_other_vps: false
+                                          ttl: 7
+                                          type: :tr2src
+                                          valid_ip: true
+                                        ping_responsive: false
+                                        prefix: 216.24.176.0/20
+                                        previous: *id023
+                                        reachable_from_other_vps: false
+                                        ttl: 6
+                                        type: :tr2src
+                                        valid_ip: true
+                                      ping_responsive: false
+                                      prefix: 216.24.176.0/20
+                                      previous: *id024
+                                      reachable_from_other_vps: false
+                                      ttl: 5
+                                      type: :tr2src
+                                      valid_ip: true
+                                    ping_responsive: false
+                                    prefix: 216.24.176.0/20
+                                    previous: *id025
+                                    reachable_from_other_vps: true
+                                    ttl: 4
+                                    type: :tr2src
+                                    valid_ip: true
+                                  ping_responsive: false
+                                  prefix: 204.0.0.0/6
+                                  previous: *id026
+                                  reachable_from_other_vps: false
+                                  ttl: 3
+                                  type: :tr2src
+                                  valid_ip: true
+                                ping_responsive: false
+                                prefix: 204.0.0.0/6
+                                previous: *id027
+                                reachable_from_other_vps: false
+                                ttl: 2
+                                type: :rr
+                                valid_ip: true
+                              ping_responsive: false
+                              prefix: 134.75.0.0/16
+                              previous: 
+                              reachable_from_other_vps: true
+                              ttl: 1
+                              type: :"dst-sym"
+                              valid_ip: true
+                            - *id026
+                            - *id025
+                            - *id024
+                            - *id023
+                            - *id022
+                            - *id021
+                            - *id020
+                            - *id019
+                            - *id018
+                            - *id017
+                            - *id016
+                            - *id015
+                            - *id028
+                            invalid_reason: unknown
+                            src: ""
+                            timestamp: 0
+                            valid: false
+                          ttl: 12
+                        ping_responsive: false
+                        prefix: 204.0.0.0/6
+                        previous: *id055
+                        reachable_from_other_vps: false
+                        reverse_path: !ruby/object:HistoricalReversePath 
+                          dst: ""
+                          hops: 
+                          - &id040 !ruby/object:ReverseHop 
+                            asn: "3303"
+                            dns: kreonet-1-lo-jmb-706.sttlwa.pacificwave.net
+                            formatted: 1.  kreonet-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.6) dst-sym
+                            ip: 207.231.240.6
+                            last_responsive: false
+                            next: &id039 !ruby/object:ReverseHop 
+                              asn: "3303"
+                              dns: nlr-1-lo-jmb-706.sttlwa.pacificwave.net
+                              formatted: 2.  nlr-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.14) tr2src
+                              ip: 207.231.240.14
+                              last_responsive: false
+                              next: &id038 !ruby/object:ReverseHop 
+                                asn: "19401"
+                                dns: 216.24.186.69
+                                formatted: 3.  216.24.186.69 (216.24.186.69) tr2src
+                                ip: 216.24.186.69
+                                last_responsive: "2011-05-30"
+                                next: &id037 !ruby/object:ReverseHop 
+                                  asn: "19401"
+                                  dns: 216.24.186.71
+                                  formatted: 4.  216.24.186.71 (216.24.186.71) tr2src
+                                  ip: 216.24.186.71
+                                  last_responsive: "2011-05-30"
+                                  next: &id036 !ruby/object:ReverseHop 
+                                    asn: "19401"
+                                    dns: 216.24.186.62
+                                    formatted: 5.  216.24.186.62 (216.24.186.62) tr2src
+                                    ip: 216.24.186.62
+                                    last_responsive: "2011-05-30"
+                                    next: &id035 !ruby/object:ReverseHop 
+                                      asn: "19401"
+                                      dns: 216.24.186.61
+                                      formatted: 6.  216.24.186.61 (216.24.186.61) tr2src
+                                      ip: 216.24.186.61
+                                      last_responsive: "2011-05-30"
+                                      next: &id034 !ruby/object:ReverseHop 
+                                        asn: "19401"
+                                        dns: 216.24.186.67
+                                        formatted: 7.  216.24.186.67 (216.24.186.67) tr2src
+                                        ip: 216.24.186.67
+                                        last_responsive: "2011-05-30"
+                                        next: &id033 !ruby/object:ReverseHop 
+                                          asn: "3754"
+                                          dns: 199.109.4.157
+                                          formatted: 8.  199.109.4.157 (199.109.4.157) tr2src
+                                          ip: 199.109.4.157
+                                          last_responsive: "2011-05-30"
+                                          next: &id032 !ruby/object:ReverseHop 
+                                            asn: "3754"
+                                            dns: alb-7600-nyc-7600.nysernet.net
+                                            formatted: 9.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                                            ip: 199.109.7.97
+                                            last_responsive: "2011-05-30"
+                                            next: &id031 !ruby/object:ReverseHop 
+                                              asn: "3754"
+                                              dns: ualbany-alb-7600.nysenret.net
+                                              formatted: 10.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                                              ip: 199.109.8.2
+                                              last_responsive: "2011-05-30"
+                                              next: &id030 !ruby/object:ReverseHop 
+                                                asn: "22990"
+                                                dns: 6513_internet.gw.albany.edu
+                                                formatted: 11.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                                ip: 169.226.13.42
+                                                last_responsive: "2011-05-30"
+                                                next: &id029 !ruby/object:ReverseHop 
+                                                  asn: "22990"
+                                                  dns: node2.planetlab.albany.edu
+                                                  formatted: 12.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                                  ip: 169.226.40.4
+                                                  last_responsive: "2011-05-30"
+                                                  next: &id041 !ruby/object:ReverseHop 
+                                                    asn: "22990"
+                                                    dns: node2.planetlab.albany.edu
+                                                    formatted: 13.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                                    ip: 169.226.40.4
+                                                    last_responsive: "2011-05-30"
+                                                    next: 
+                                                    ping_responsive: true
+                                                    prefix: 169.226.0.0/16
+                                                    previous: *id029
+                                                    ttl: 13
+                                                    type: :tr2src
+                                                    valid_ip: true
+                                                  ping_responsive: true
+                                                  prefix: 169.226.0.0/16
+                                                  previous: *id030
+                                                  ttl: 12
+                                                  type: :tr2src
+                                                  valid_ip: true
+                                                ping_responsive: true
+                                                prefix: 169.226.0.0/16
+                                                previous: *id031
+                                                ttl: 11
+                                                type: :tr2src
+                                                valid_ip: true
+                                              ping_responsive: true
+                                              prefix: 199.109.8.0/24
+                                              previous: *id032
+                                              ttl: 10
+                                              type: :tr2src
+                                              valid_ip: true
+                                            ping_responsive: true
+                                            prefix: 199.109.7.0/24
+                                            previous: *id033
+                                            ttl: 9
+                                            type: :tr2src
+                                            valid_ip: true
+                                          ping_responsive: true
+                                          prefix: 199.109.4.0/24
+                                          previous: *id034
+                                          ttl: 8
+                                          type: :tr2src
+                                          valid_ip: true
+                                        ping_responsive: true
+                                        prefix: 216.24.176.0/20
+                                        previous: *id035
+                                        ttl: 7
+                                        type: :tr2src
+                                        valid_ip: true
+                                      ping_responsive: false
+                                      prefix: 216.24.176.0/20
+                                      previous: *id036
+                                      reachable_from_other_vps: false
+                                      ttl: 6
+                                      type: :tr2src
+                                      valid_ip: true
+                                    ping_responsive: false
+                                    prefix: 216.24.176.0/20
+                                    previous: *id037
+                                    reachable_from_other_vps: false
+                                    ttl: 5
+                                    type: :tr2src
+                                    valid_ip: true
+                                  ping_responsive: false
+                                  prefix: 216.24.176.0/20
+                                  previous: *id038
+                                  reachable_from_other_vps: false
+                                  ttl: 4
+                                  type: :tr2src
+                                  valid_ip: true
+                                ping_responsive: false
+                                prefix: 216.24.176.0/20
+                                previous: *id039
+                                reachable_from_other_vps: true
+                                ttl: 3
+                                type: :tr2src
+                                valid_ip: true
+                              ping_responsive: false
+                              prefix: 204.0.0.0/6
+                              previous: *id040
+                              reachable_from_other_vps: false
+                              ttl: 2
+                              type: :tr2src
+                              valid_ip: true
+                            ping_responsive: false
+                            prefix: 204.0.0.0/6
+                            previous: 
+                            reachable_from_other_vps: false
+                            ttl: 1
+                            type: :"dst-sym"
+                            valid_ip: true
+                          - *id039
+                          - *id038
+                          - *id037
+                          - *id036
+                          - *id035
+                          - *id034
+                          - *id033
+                          - *id032
+                          - *id031
+                          - *id030
+                          - *id029
+                          - *id041
+                          invalid_reason: unknown
+                          src: ""
+                          timestamp: 0
+                          valid: false
+                        ttl: 11
+                      ping_responsive: false
+                      prefix: 216.24.176.0/20
+                      previous: *id067
+                      reachable_from_other_vps: true
+                      reverse_path: !ruby/object:HistoricalReversePath 
+                        dst: ""
+                        hops: 
+                        - &id053 !ruby/object:ReverseHop 
+                          asn: "19401"
+                          dns: 216.24.186.68
+                          formatted: 1.  216.24.186.68 (216.24.186.68) dst-sym
+                          ip: 216.24.186.68
+                          last_responsive: "2011-05-30"
+                          next: &id052 !ruby/object:ReverseHop 
+                            asn: "19401"
+                            dns: 216.24.186.70
+                            formatted: "2.  216.24.186.70 (216.24.186.70) sym {non-spoof reachable: rr? no ts? unknown | spoof: rr? unknown ts? unknown}"
+                            ip: 216.24.186.70
+                            last_responsive: "2011-05-30"
+                            next: &id051 !ruby/object:ReverseHop 
+                              asn: "19401"
+                              dns: 216.24.186.63
+                              formatted: 3.  216.24.186.63 (216.24.186.63) rr
+                              ip: 216.24.186.63
+                              last_responsive: "2011-05-30"
+                              next: &id050 !ruby/object:ReverseHop 
+                                asn: "19401"
+                                dns: 216.24.186.60
+                                formatted: 4.  216.24.186.60 (216.24.186.60) rr
+                                ip: 216.24.186.60
+                                last_responsive: "2011-05-30"
+                                next: &id049 !ruby/object:ReverseHop 
+                                  asn: "19401"
+                                  dns: 216.24.186.66
+                                  formatted: 5.  216.24.186.66 (216.24.186.66) rr
+                                  ip: 216.24.186.66
+                                  last_responsive: "2011-05-30"
+                                  next: &id048 !ruby/object:ReverseHop 
+                                    asn: "3754"
+                                    dns: 199.109.4.158
+                                    formatted: 6.  199.109.4.158 (199.109.4.158) rr
+                                    ip: 199.109.4.158
+                                    last_responsive: "2011-05-30"
+                                    next: &id047 !ruby/object:ReverseHop 
+                                      asn: "3754"
+                                      dns: nyc-7600-alb-7600.nysernet.net
+                                      formatted: 7.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                                      ip: 199.109.7.98
+                                      last_responsive: "2011-05-30"
+                                      next: &id046 !ruby/object:ReverseHop 
+                                        asn: "3754"
+                                        dns: alb-7600-nyc-7600.nysernet.net
+                                        formatted: 8.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                                        ip: 199.109.7.97
+                                        last_responsive: "2011-05-30"
+                                        next: &id045 !ruby/object:ReverseHop 
+                                          asn: "3754"
+                                          dns: ualbany-alb-7600.nysenret.net
+                                          formatted: 9.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                                          ip: 199.109.8.2
+                                          last_responsive: "2011-05-30"
+                                          next: &id044 !ruby/object:ReverseHop 
+                                            asn: "22990"
+                                            dns: 6513_internet.gw.albany.edu
+                                            formatted: 10.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                            ip: 169.226.13.42
+                                            last_responsive: "2011-05-30"
+                                            next: &id043 !ruby/object:ReverseHop 
+                                              asn: "22990"
+                                              dns: node2.planetlab.albany.edu
+                                              formatted: 11.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                              ip: 169.226.40.4
+                                              last_responsive: "2011-05-30"
+                                              next: &id054 !ruby/object:ReverseHop 
+                                                asn: "22990"
+                                                dns: node2.planetlab.albany.edu
+                                                formatted: 12.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                                ip: 169.226.40.4
+                                                last_responsive: "2011-05-30"
+                                                next: 
+                                                ping_responsive: true
+                                                prefix: 169.226.0.0/16
+                                                previous: *id043
+                                                ttl: 12
+                                                type: :tr2src
+                                                valid_ip: true
+                                              ping_responsive: true
+                                              prefix: 169.226.0.0/16
+                                              previous: *id044
+                                              ttl: 11
+                                              type: :tr2src
+                                              valid_ip: true
+                                            ping_responsive: true
+                                            prefix: 169.226.0.0/16
+                                            previous: *id045
+                                            ttl: 10
+                                            type: :tr2src
+                                            valid_ip: true
+                                          ping_responsive: true
+                                          prefix: 199.109.8.0/24
+                                          previous: *id046
+                                          ttl: 9
+                                          type: :tr2src
+                                          valid_ip: true
+                                        ping_responsive: true
+                                        prefix: 199.109.7.0/24
+                                        previous: *id047
+                                        ttl: 8
+                                        type: :tr2src
+                                        valid_ip: true
+                                      ping_responsive: true
+                                      prefix: 199.109.7.0/24
+                                      previous: *id048
+                                      ttl: 7
+                                      type: :rr
+                                      valid_ip: true
+                                    ping_responsive: true
+                                    prefix: 199.109.4.0/24
+                                    previous: *id049
+                                    ttl: 6
+                                    type: :rr
+                                    valid_ip: true
+                                  ping_responsive: false
+                                  prefix: 216.24.176.0/20
+                                  previous: *id050
+                                  reachable_from_other_vps: false
+                                  ttl: 5
+                                  type: :rr
+                                  valid_ip: true
+                                ping_responsive: false
+                                prefix: 216.24.176.0/20
+                                previous: *id051
+                                reachable_from_other_vps: false
+                                ttl: 4
+                                type: :rr
+                                valid_ip: true
+                              ping_responsive: false
+                              prefix: 216.24.176.0/20
+                              previous: *id052
+                              reachable_from_other_vps: false
+                              ttl: 3
+                              type: :rr
+                              valid_ip: true
+                            ping_responsive: false
+                            prefix: 216.24.176.0/20
+                            previous: *id053
+                            reachable_from_other_vps: true
+                            ttl: 2
+                            type: :sym
+                            valid_ip: true
+                          ping_responsive: false
+                          prefix: 216.24.176.0/20
+                          previous: 
+                          reachable_from_other_vps: true
+                          ttl: 1
+                          type: :"dst-sym"
+                          valid_ip: true
+                        - *id052
+                        - *id051
+                        - *id050
+                        - *id049
+                        - *id048
+                        - *id047
+                        - *id046
+                        - *id045
+                        - *id044
+                        - *id043
+                        - *id054
+                        invalid_reason: unknown
+                        src: ""
+                        timestamp: 0
+                        valid: false
+                      ttl: 10
+                    ping_responsive: false
+                    prefix: 216.24.176.0/20
+                    previous: *id078
+                    reachable_from_other_vps: true
+                    reverse_path: !ruby/object:HistoricalReversePath 
+                      dst: ""
+                      hops: 
+                      - &id065 !ruby/object:ReverseHop 
+                        asn: "19401"
+                        dns: 216.24.186.70
+                        formatted: 1.  216.24.186.70 (216.24.186.70) dst-sym
+                        ip: 216.24.186.70
+                        last_responsive: "2011-05-30"
+                        next: &id064 !ruby/object:ReverseHop 
+                          asn: "19401"
+                          dns: 216.24.186.63
+                          formatted: "2.  216.24.186.63 (216.24.186.63) sym {non-spoof reachable: rr? no ts? no | spoof: rr? unknown ts? unknown}"
+                          ip: 216.24.186.63
+                          last_responsive: "2011-05-30"
+                          next: &id063 !ruby/object:ReverseHop 
+                            asn: "19401"
+                            dns: 216.24.186.60
+                            formatted: 3.  216.24.186.60 (216.24.186.60) rr
+                            ip: 216.24.186.60
+                            last_responsive: "2011-05-30"
+                            next: &id062 !ruby/object:ReverseHop 
+                              asn: "19401"
+                              dns: 216.24.186.66
+                              formatted: 4.  216.24.186.66 (216.24.186.66) rr
+                              ip: 216.24.186.66
+                              last_responsive: "2011-05-30"
+                              next: &id061 !ruby/object:ReverseHop 
+                                asn: "3754"
+                                dns: 199.109.4.158
+                                formatted: 5.  199.109.4.158 (199.109.4.158) rr
+                                ip: 199.109.4.158
+                                last_responsive: "2011-05-30"
+                                next: &id060 !ruby/object:ReverseHop 
+                                  asn: "3754"
+                                  dns: nyc-7600-alb-7600.nysernet.net
+                                  formatted: 6.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                                  ip: 199.109.7.98
+                                  last_responsive: "2011-05-30"
+                                  next: &id059 !ruby/object:ReverseHop 
+                                    asn: "3754"
+                                    dns: alb-7600-nyc-7600.nysernet.net
+                                    formatted: 7.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                                    ip: 199.109.7.97
+                                    last_responsive: "2011-05-30"
+                                    next: &id058 !ruby/object:ReverseHop 
+                                      asn: "3754"
+                                      dns: ualbany-alb-7600.nysenret.net
+                                      formatted: 8.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                                      ip: 199.109.8.2
+                                      last_responsive: "2011-05-30"
+                                      next: &id057 !ruby/object:ReverseHop 
+                                        asn: "22990"
+                                        dns: 6513_internet.gw.albany.edu
+                                        formatted: 9.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                        ip: 169.226.13.42
+                                        last_responsive: "2011-05-30"
+                                        next: &id056 !ruby/object:ReverseHop 
+                                          asn: "22990"
+                                          dns: node2.planetlab.albany.edu
+                                          formatted: 10.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                          ip: 169.226.40.4
+                                          last_responsive: "2011-05-30"
+                                          next: &id066 !ruby/object:ReverseHop 
+                                            asn: "22990"
+                                            dns: node2.planetlab.albany.edu
+                                            formatted: 11.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                            ip: 169.226.40.4
+                                            last_responsive: "2011-05-30"
+                                            next: 
+                                            ping_responsive: true
+                                            prefix: 169.226.0.0/16
+                                            previous: *id056
+                                            ttl: 11
+                                            type: :tr2src
+                                            valid_ip: true
+                                          ping_responsive: true
+                                          prefix: 169.226.0.0/16
+                                          previous: *id057
+                                          ttl: 10
+                                          type: :tr2src
+                                          valid_ip: true
+                                        ping_responsive: true
+                                        prefix: 169.226.0.0/16
+                                        previous: *id058
+                                        ttl: 9
+                                        type: :tr2src
+                                        valid_ip: true
+                                      ping_responsive: true
+                                      prefix: 199.109.8.0/24
+                                      previous: *id059
+                                      ttl: 8
+                                      type: :tr2src
+                                      valid_ip: true
+                                    ping_responsive: true
+                                    prefix: 199.109.7.0/24
+                                    previous: *id060
+                                    ttl: 7
+                                    type: :tr2src
+                                    valid_ip: true
+                                  ping_responsive: true
+                                  prefix: 199.109.7.0/24
+                                  previous: *id061
+                                  ttl: 6
+                                  type: :rr
+                                  valid_ip: true
+                                ping_responsive: true
+                                prefix: 199.109.4.0/24
+                                previous: *id062
+                                ttl: 5
+                                type: :rr
+                                valid_ip: true
+                              ping_responsive: false
+                              prefix: 216.24.176.0/20
+                              previous: *id063
+                              reachable_from_other_vps: false
+                              ttl: 4
+                              type: :rr
+                              valid_ip: true
+                            ping_responsive: false
+                            prefix: 216.24.176.0/20
+                            previous: *id064
+                            reachable_from_other_vps: false
+                            ttl: 3
+                            type: :rr
+                            valid_ip: true
+                          ping_responsive: false
+                          prefix: 216.24.176.0/20
+                          previous: *id065
+                          reachable_from_other_vps: false
+                          ttl: 2
+                          type: :sym
+                          valid_ip: true
+                        ping_responsive: false
+                        prefix: 216.24.176.0/20
+                        previous: 
+                        reachable_from_other_vps: true
+                        ttl: 1
+                        type: :"dst-sym"
+                        valid_ip: true
+                      - *id064
+                      - *id063
+                      - *id062
+                      - *id061
+                      - *id060
+                      - *id059
+                      - *id058
+                      - *id057
+                      - *id056
+                      - *id066
+                      invalid_reason: unknown
+                      src: ""
+                      timestamp: 0
+                      valid: false
+                    ttl: 9
+                  ping_responsive: false
+                  prefix: 216.24.176.0/20
+                  previous: *id088
+                  reachable_from_other_vps: false
+                  reverse_path: !ruby/object:HistoricalReversePath 
+                    dst: ""
+                    hops: 
+                    - &id076 !ruby/object:ReverseHop 
+                      asn: "19401"
+                      dns: 216.24.186.63
+                      formatted: 1.  216.24.186.63 (216.24.186.63) dst-sym
+                      ip: 216.24.186.63
+                      last_responsive: "2011-05-30"
+                      next: &id075 !ruby/object:ReverseHop 
+                        asn: "19401"
+                        dns: 216.24.186.60
+                        formatted: "2.  216.24.186.60 (216.24.186.60) sym {non-spoof reachable: rr? no ts? unknown | spoof: rr? unknown ts? unknown}"
+                        ip: 216.24.186.60
+                        last_responsive: "2011-05-30"
+                        next: &id074 !ruby/object:ReverseHop 
+                          asn: "19401"
+                          dns: 216.24.186.66
+                          formatted: 3.  216.24.186.66 (216.24.186.66) rr
+                          ip: 216.24.186.66
+                          last_responsive: "2011-05-30"
+                          next: &id073 !ruby/object:ReverseHop 
+                            asn: "3754"
+                            dns: 199.109.4.158
+                            formatted: 4.  199.109.4.158 (199.109.4.158) rr
+                            ip: 199.109.4.158
+                            last_responsive: "2011-05-30"
+                            next: &id072 !ruby/object:ReverseHop 
+                              asn: "3754"
+                              dns: nyc-7600-alb-7600.nysernet.net
+                              formatted: 5.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                              ip: 199.109.7.98
+                              last_responsive: "2011-05-30"
+                              next: &id071 !ruby/object:ReverseHop 
+                                asn: "3754"
+                                dns: alb-7600-nyc-7600.nysernet.net
+                                formatted: 6.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                                ip: 199.109.7.97
+                                last_responsive: "2011-05-30"
+                                next: &id070 !ruby/object:ReverseHop 
+                                  asn: "3754"
+                                  dns: ualbany-alb-7600.nysenret.net
+                                  formatted: 7.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                                  ip: 199.109.8.2
+                                  last_responsive: "2011-05-30"
+                                  next: &id069 !ruby/object:ReverseHop 
+                                    asn: "22990"
+                                    dns: 6513_internet.gw.albany.edu
+                                    formatted: 8.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                    ip: 169.226.13.42
+                                    last_responsive: "2011-05-30"
+                                    next: &id068 !ruby/object:ReverseHop 
+                                      asn: "22990"
+                                      dns: node2.planetlab.albany.edu
+                                      formatted: 9.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                      ip: 169.226.40.4
+                                      last_responsive: "2011-05-30"
+                                      next: &id077 !ruby/object:ReverseHop 
+                                        asn: "22990"
+                                        dns: node2.planetlab.albany.edu
+                                        formatted: 10.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                        ip: 169.226.40.4
+                                        last_responsive: "2011-05-30"
+                                        next: 
+                                        ping_responsive: true
+                                        prefix: 169.226.0.0/16
+                                        previous: *id068
+                                        ttl: 10
+                                        type: :tr2src
+                                        valid_ip: true
+                                      ping_responsive: true
+                                      prefix: 169.226.0.0/16
+                                      previous: *id069
+                                      ttl: 9
+                                      type: :tr2src
+                                      valid_ip: true
+                                    ping_responsive: true
+                                    prefix: 169.226.0.0/16
+                                    previous: *id070
+                                    ttl: 8
+                                    type: :tr2src
+                                    valid_ip: true
+                                  ping_responsive: true
+                                  prefix: 199.109.8.0/24
+                                  previous: *id071
+                                  ttl: 7
+                                  type: :tr2src
+                                  valid_ip: true
+                                ping_responsive: true
+                                prefix: 199.109.7.0/24
+                                previous: *id072
+                                ttl: 6
+                                type: :tr2src
+                                valid_ip: true
+                              ping_responsive: true
+                              prefix: 199.109.7.0/24
+                              previous: *id073
+                              ttl: 5
+                              type: :rr
+                              valid_ip: true
+                            ping_responsive: true
+                            prefix: 199.109.4.0/24
+                            previous: *id074
+                            ttl: 4
+                            type: :rr
+                            valid_ip: true
+                          ping_responsive: false
+                          prefix: 216.24.176.0/20
+                          previous: *id075
+                          reachable_from_other_vps: false
+                          ttl: 3
+                          type: :rr
+                          valid_ip: true
+                        ping_responsive: false
+                        prefix: 216.24.176.0/20
+                        previous: *id076
+                        reachable_from_other_vps: false
+                        ttl: 2
+                        type: :sym
+                        valid_ip: true
+                      ping_responsive: false
+                      prefix: 216.24.176.0/20
+                      previous: 
+                      reachable_from_other_vps: false
+                      ttl: 1
+                      type: :"dst-sym"
+                      valid_ip: true
+                    - *id075
+                    - *id074
+                    - *id073
+                    - *id072
+                    - *id071
+                    - *id070
+                    - *id069
+                    - *id068
+                    - *id077
+                    invalid_reason: unknown
+                    src: ""
+                    timestamp: 0
+                    valid: false
+                  ttl: 8
+                ping_responsive: false
+                prefix: 216.24.176.0/20
+                previous: *id097
+                reachable_from_other_vps: false
+                reverse_path: !ruby/object:HistoricalReversePath 
+                  dst: ""
+                  hops: 
+                  - &id086 !ruby/object:ReverseHop 
+                    asn: "19401"
+                    dns: 216.24.186.60
+                    formatted: 1.  216.24.186.60 (216.24.186.60) dst-sym
+                    ip: 216.24.186.60
+                    last_responsive: "2011-05-30"
+                    next: &id085 !ruby/object:ReverseHop 
+                      asn: "19401"
+                      dns: 216.24.186.66
+                      formatted: 2.  216.24.186.66 (216.24.186.66) rr
+                      ip: 216.24.186.66
+                      last_responsive: "2011-05-30"
+                      next: &id084 !ruby/object:ReverseHop 
+                        asn: "3754"
+                        dns: 199.109.4.158
+                        formatted: 3.  199.109.4.158 (199.109.4.158) rr
+                        ip: 199.109.4.158
+                        last_responsive: "2011-05-30"
+                        next: &id083 !ruby/object:ReverseHop 
+                          asn: "3754"
+                          dns: nyc-7600-alb-7600.nysernet.net
+                          formatted: 4.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                          ip: 199.109.7.98
+                          last_responsive: "2011-05-30"
+                          next: &id082 !ruby/object:ReverseHop 
+                            asn: "3754"
+                            dns: alb-7600-ualbany.nysernet.net
+                            formatted: "5.  alb-7600-ualbany.nysernet.net (199.109.8.1) sym {non-spoof reachable: rr? no ts? unknown | spoof: rr? unknown ts? unknown}"
+                            ip: 199.109.8.1
+                            last_responsive: "2011-05-30"
+                            next: &id081 !ruby/object:ReverseHop 
+                              asn: "3754"
+                              dns: ualbany-alb-7600.nysenret.net
+                              formatted: 6.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                              ip: 199.109.8.2
+                              last_responsive: "2011-05-30"
+                              next: &id080 !ruby/object:ReverseHop 
+                                asn: "22990"
+                                dns: 6513_internet.gw.albany.edu
+                                formatted: 7.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                                ip: 169.226.13.42
+                                last_responsive: "2011-05-30"
+                                next: &id079 !ruby/object:ReverseHop 
+                                  asn: "22990"
+                                  dns: node2.planetlab.albany.edu
+                                  formatted: 8.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                  ip: 169.226.40.4
+                                  last_responsive: "2011-05-30"
+                                  next: &id087 !ruby/object:ReverseHop 
+                                    asn: "22990"
+                                    dns: node2.planetlab.albany.edu
+                                    formatted: 9.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                    ip: 169.226.40.4
+                                    last_responsive: "2011-05-30"
+                                    next: 
+                                    ping_responsive: true
+                                    prefix: 169.226.0.0/16
+                                    previous: *id079
+                                    ttl: 9
+                                    type: :tr2src
+                                    valid_ip: true
+                                  ping_responsive: true
+                                  prefix: 169.226.0.0/16
+                                  previous: *id080
+                                  ttl: 8
+                                  type: :tr2src
+                                  valid_ip: true
+                                ping_responsive: true
+                                prefix: 169.226.0.0/16
+                                previous: *id081
+                                ttl: 7
+                                type: :tr2src
+                                valid_ip: true
+                              ping_responsive: true
+                              prefix: 199.109.8.0/24
+                              previous: *id082
+                              ttl: 6
+                              type: :tr2src
+                              valid_ip: true
+                            ping_responsive: true
+                            prefix: 199.109.8.0/24
+                            previous: *id083
+                            ttl: 5
+                            type: :sym
+                            valid_ip: true
+                          ping_responsive: true
+                          prefix: 199.109.7.0/24
+                          previous: *id084
+                          ttl: 4
+                          type: :rr
+                          valid_ip: true
+                        ping_responsive: true
+                        prefix: 199.109.4.0/24
+                        previous: *id085
+                        ttl: 3
+                        type: :rr
+                        valid_ip: true
+                      ping_responsive: false
+                      prefix: 216.24.176.0/20
+                      previous: *id086
+                      reachable_from_other_vps: false
+                      ttl: 2
+                      type: :rr
+                      valid_ip: true
+                    ping_responsive: false
+                    prefix: 216.24.176.0/20
+                    previous: 
+                    reachable_from_other_vps: false
+                    ttl: 1
+                    type: :"dst-sym"
+                    valid_ip: true
+                  - *id085
+                  - *id084
+                  - *id083
+                  - *id082
+                  - *id081
+                  - *id080
+                  - *id079
+                  - *id087
+                  invalid_reason: unknown
+                  src: ""
+                  timestamp: 0
+                  valid: false
+                ttl: 7
+              ping_responsive: false
+              prefix: 216.24.176.0/20
+              previous: *id105
+              reachable_from_other_vps: false
+              reverse_path: !ruby/object:HistoricalReversePath 
+                dst: ""
+                hops: 
+                - &id095 !ruby/object:ReverseHop 
+                  asn: "19401"
+                  dns: 216.24.186.66
+                  formatted: 1.  216.24.186.66 (216.24.186.66) dst-sym
+                  ip: 216.24.186.66
+                  last_responsive: "2011-05-30"
+                  next: &id094 !ruby/object:ReverseHop 
+                    asn: "3754"
+                    dns: 199.109.4.158
+                    formatted: 2.  199.109.4.158 (199.109.4.158) rr
+                    ip: 199.109.4.158
+                    last_responsive: "2011-05-30"
+                    next: &id093 !ruby/object:ReverseHop 
+                      asn: "3754"
+                      dns: nyc-7600-alb-7600.nysernet.net
+                      formatted: 3.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                      ip: 199.109.7.98
+                      last_responsive: "2011-05-30"
+                      next: &id092 !ruby/object:ReverseHop 
+                        asn: "3754"
+                        dns: alb-7600-nyc-7600.nysernet.net
+                        formatted: 4.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                        ip: 199.109.7.97
+                        last_responsive: "2011-05-30"
+                        next: &id091 !ruby/object:ReverseHop 
+                          asn: "3754"
+                          dns: ualbany-alb-7600.nysenret.net
+                          formatted: 5.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                          ip: 199.109.8.2
+                          last_responsive: "2011-05-30"
+                          next: &id090 !ruby/object:ReverseHop 
+                            asn: "22990"
+                            dns: 6513_internet.gw.albany.edu
+                            formatted: 6.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                            ip: 169.226.13.42
+                            last_responsive: "2011-05-30"
+                            next: &id089 !ruby/object:ReverseHop 
+                              asn: "22990"
+                              dns: node2.planetlab.albany.edu
+                              formatted: 7.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                              ip: 169.226.40.4
+                              last_responsive: "2011-05-30"
+                              next: &id096 !ruby/object:ReverseHop 
+                                asn: "22990"
+                                dns: node2.planetlab.albany.edu
+                                formatted: 8.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                                ip: 169.226.40.4
+                                last_responsive: "2011-05-30"
+                                next: 
+                                ping_responsive: true
+                                prefix: 169.226.0.0/16
+                                previous: *id089
+                                ttl: 8
+                                type: :tr2src
+                                valid_ip: true
+                              ping_responsive: true
+                              prefix: 169.226.0.0/16
+                              previous: *id090
+                              ttl: 7
+                              type: :tr2src
+                              valid_ip: true
+                            ping_responsive: true
+                            prefix: 169.226.0.0/16
+                            previous: *id091
+                            ttl: 6
+                            type: :tr2src
+                            valid_ip: true
+                          ping_responsive: true
+                          prefix: 199.109.8.0/24
+                          previous: *id092
+                          ttl: 5
+                          type: :tr2src
+                          valid_ip: true
+                        ping_responsive: true
+                        prefix: 199.109.7.0/24
+                        previous: *id093
+                        ttl: 4
+                        type: :tr2src
+                        valid_ip: true
+                      ping_responsive: true
+                      prefix: 199.109.7.0/24
+                      previous: *id094
+                      ttl: 3
+                      type: :rr
+                      valid_ip: true
+                    ping_responsive: true
+                    prefix: 199.109.4.0/24
+                    previous: *id095
+                    ttl: 2
+                    type: :rr
+                    valid_ip: true
+                  ping_responsive: false
+                  prefix: 216.24.176.0/20
+                  previous: 
+                  reachable_from_other_vps: false
+                  ttl: 1
+                  type: :"dst-sym"
+                  valid_ip: true
+                - *id094
+                - *id093
+                - *id092
+                - *id091
+                - *id090
+                - *id089
+                - *id096
+                invalid_reason: unknown
+                src: ""
+                timestamp: 0
+                valid: false
+              ttl: 6
+            ping_responsive: true
+            prefix: 199.109.4.0/24
+            previous: *id112
+            reverse_path: !ruby/object:HistoricalReversePath 
+              dst: ""
+              hops: 
+              - &id103 !ruby/object:ReverseHop 
+                asn: "3754"
+                dns: 199.109.4.158
+                formatted: 1.  199.109.4.158 (199.109.4.158) dst-sym
+                ip: 199.109.4.158
+                last_responsive: "2011-05-30"
+                next: &id102 !ruby/object:ReverseHop 
+                  asn: "3754"
+                  dns: nyc-7600-alb-7600.nysernet.net
+                  formatted: 2.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) rr
+                  ip: 199.109.7.98
+                  last_responsive: "2011-05-30"
+                  next: &id101 !ruby/object:ReverseHop 
+                    asn: "3754"
+                    dns: alb-7600-ualbany.nysernet.net
+                    formatted: 3.  alb-7600-ualbany.nysernet.net (199.109.8.1) rr
+                    ip: 199.109.8.1
+                    last_responsive: "2011-05-30"
+                    next: &id100 !ruby/object:ReverseHop 
+                      asn: "22990"
+                      dns: internet_7206.gw.albany.edu
+                      formatted: 4.  internet_7206.gw.albany.edu (169.226.13.41) rr
+                      ip: 169.226.13.41
+                      last_responsive: "2011-05-30"
+                      next: &id099 !ruby/object:ReverseHop 
+                        asn: "22990"
+                        dns: 6513_internet.gw.albany.edu
+                        formatted: 5.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                        ip: 169.226.13.42
+                        last_responsive: "2011-05-30"
+                        next: &id098 !ruby/object:ReverseHop 
+                          asn: "22990"
+                          dns: node2.planetlab.albany.edu
+                          formatted: 6.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                          ip: 169.226.40.4
+                          last_responsive: "2011-05-30"
+                          next: &id104 !ruby/object:ReverseHop 
+                            asn: "22990"
+                            dns: node2.planetlab.albany.edu
+                            formatted: 7.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                            ip: 169.226.40.4
+                            last_responsive: "2011-05-30"
+                            next: 
+                            ping_responsive: true
+                            prefix: 169.226.0.0/16
+                            previous: *id098
+                            ttl: 7
+                            type: :tr2src
+                            valid_ip: true
+                          ping_responsive: true
+                          prefix: 169.226.0.0/16
+                          previous: *id099
+                          ttl: 6
+                          type: :tr2src
+                          valid_ip: true
+                        ping_responsive: true
+                        prefix: 169.226.0.0/16
+                        previous: *id100
+                        ttl: 5
+                        type: :tr2src
+                        valid_ip: true
+                      ping_responsive: true
+                      prefix: 169.226.0.0/16
+                      previous: *id101
+                      ttl: 4
+                      type: :rr
+                      valid_ip: true
+                    ping_responsive: true
+                    prefix: 199.109.8.0/24
+                    previous: *id102
+                    ttl: 3
+                    type: :rr
+                    valid_ip: true
+                  ping_responsive: true
+                  prefix: 199.109.7.0/24
+                  previous: *id103
+                  ttl: 2
+                  type: :rr
+                  valid_ip: true
+                ping_responsive: true
+                prefix: 199.109.4.0/24
+                previous: 
+                ttl: 1
+                type: :"dst-sym"
+                valid_ip: true
+              - *id102
+              - *id101
+              - *id100
+              - *id099
+              - *id098
+              - *id104
+              invalid_reason: unknown
+              src: ""
+              timestamp: 0
+              valid: false
+            ttl: 5
+          ping_responsive: true
+          prefix: 199.109.7.0/24
+          previous: *id118
+          reverse_path: !ruby/object:HistoricalReversePath 
+            dst: ""
+            hops: 
+            - &id110 !ruby/object:ReverseHop 
+              asn: "3754"
+              dns: nyc-7600-alb-7600.nysernet.net
+              formatted: 1.  nyc-7600-alb-7600.nysernet.net (199.109.7.98) dst-sym
+              ip: 199.109.7.98
+              last_responsive: "2011-05-30"
+              next: &id109 !ruby/object:ReverseHop 
+                asn: "3754"
+                dns: alb-7600-nyc-7600.nysernet.net
+                formatted: 2.  alb-7600-nyc-7600.nysernet.net (199.109.7.97) tr2src
+                ip: 199.109.7.97
+                last_responsive: "2011-05-30"
+                next: &id108 !ruby/object:ReverseHop 
+                  asn: "3754"
+                  dns: ualbany-alb-7600.nysenret.net
+                  formatted: 3.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+                  ip: 199.109.8.2
+                  last_responsive: "2011-05-30"
+                  next: &id107 !ruby/object:ReverseHop 
+                    asn: "22990"
+                    dns: 6513_internet.gw.albany.edu
+                    formatted: 4.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                    ip: 169.226.13.42
+                    last_responsive: "2011-05-30"
+                    next: &id106 !ruby/object:ReverseHop 
+                      asn: "22990"
+                      dns: node2.planetlab.albany.edu
+                      formatted: 5.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                      ip: 169.226.40.4
+                      last_responsive: "2011-05-30"
+                      next: &id111 !ruby/object:ReverseHop 
+                        asn: "22990"
+                        dns: node2.planetlab.albany.edu
+                        formatted: 6.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                        ip: 169.226.40.4
+                        last_responsive: "2011-05-30"
+                        next: 
+                        ping_responsive: true
+                        prefix: 169.226.0.0/16
+                        previous: *id106
+                        ttl: 6
+                        type: :tr2src
+                        valid_ip: true
+                      ping_responsive: true
+                      prefix: 169.226.0.0/16
+                      previous: *id107
+                      ttl: 5
+                      type: :tr2src
+                      valid_ip: true
+                    ping_responsive: true
+                    prefix: 169.226.0.0/16
+                    previous: *id108
+                    ttl: 4
+                    type: :tr2src
+                    valid_ip: true
+                  ping_responsive: true
+                  prefix: 199.109.8.0/24
+                  previous: *id109
+                  ttl: 3
+                  type: :tr2src
+                  valid_ip: true
+                ping_responsive: true
+                prefix: 199.109.7.0/24
+                previous: *id110
+                ttl: 2
+                type: :tr2src
+                valid_ip: true
+              ping_responsive: true
+              prefix: 199.109.7.0/24
+              previous: 
+              ttl: 1
+              type: :"dst-sym"
+              valid_ip: true
+            - *id109
+            - *id108
+            - *id107
+            - *id106
+            - *id111
+            invalid_reason: unknown
+            src: ""
+            timestamp: 0
+            valid: false
+          ttl: 4
+        ping_responsive: true
+        prefix: 199.109.8.0/24
+        previous: *id123
+        reverse_path: !ruby/object:HistoricalReversePath 
+          dst: ""
+          hops: 
+          - &id116 !ruby/object:ReverseHop 
+            asn: "3754"
+            dns: alb-7600-ualbany.nysernet.net
+            formatted: 1.  alb-7600-ualbany.nysernet.net (199.109.8.1) dst-sym
+            ip: 199.109.8.1
+            last_responsive: "2011-05-30"
+            next: &id115 !ruby/object:ReverseHop 
+              asn: "3754"
+              dns: ualbany-alb-7600.nysenret.net
+              formatted: 2.  ualbany-alb-7600.nysenret.net (199.109.8.2) tr2src
+              ip: 199.109.8.2
+              last_responsive: "2011-05-30"
+              next: &id114 !ruby/object:ReverseHop 
+                asn: "22990"
+                dns: 6513_internet.gw.albany.edu
+                formatted: 3.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+                ip: 169.226.13.42
+                last_responsive: "2011-05-30"
+                next: &id113 !ruby/object:ReverseHop 
+                  asn: "22990"
+                  dns: node2.planetlab.albany.edu
+                  formatted: 4.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                  ip: 169.226.40.4
+                  last_responsive: "2011-05-30"
+                  next: &id117 !ruby/object:ReverseHop 
+                    asn: "22990"
+                    dns: node2.planetlab.albany.edu
+                    formatted: 5.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                    ip: 169.226.40.4
+                    last_responsive: "2011-05-30"
+                    next: 
+                    ping_responsive: true
+                    prefix: 169.226.0.0/16
+                    previous: *id113
+                    ttl: 5
+                    type: :tr2src
+                    valid_ip: true
+                  ping_responsive: true
+                  prefix: 169.226.0.0/16
+                  previous: *id114
+                  ttl: 4
+                  type: :tr2src
+                  valid_ip: true
+                ping_responsive: true
+                prefix: 169.226.0.0/16
+                previous: *id115
+                ttl: 3
+                type: :tr2src
+                valid_ip: true
+              ping_responsive: true
+              prefix: 199.109.8.0/24
+              previous: *id116
+              ttl: 2
+              type: :tr2src
+              valid_ip: true
+            ping_responsive: true
+            prefix: 199.109.8.0/24
+            previous: 
+            ttl: 1
+            type: :"dst-sym"
+            valid_ip: true
+          - *id115
+          - *id114
+          - *id113
+          - *id117
+          invalid_reason: unknown
+          src: ""
+          timestamp: 0
+          valid: false
+        ttl: 3
+      ping_responsive: true
+      prefix: 169.226.0.0/16
+      previous: *id124
+      reverse_path: !ruby/object:HistoricalReversePath 
+        dst: ""
+        hops: 
+        - &id121 !ruby/object:ReverseHop 
+          asn: "22990"
+          dns: internet_7206.gw.albany.edu
+          formatted: 1.  internet_7206.gw.albany.edu (169.226.13.41) dst-sym
+          ip: 169.226.13.41
+          last_responsive: "2011-05-30"
+          next: &id120 !ruby/object:ReverseHop 
+            asn: "22990"
+            dns: 6513_internet.gw.albany.edu
+            formatted: 2.  6513_internet.gw.albany.edu (169.226.13.42) tr2src
+            ip: 169.226.13.42
+            last_responsive: "2011-05-30"
+            next: &id119 !ruby/object:ReverseHop 
+              asn: "22990"
+              dns: node2.planetlab.albany.edu
+              formatted: 3.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+              ip: 169.226.40.4
+              last_responsive: "2011-05-30"
+              next: &id122 !ruby/object:ReverseHop 
+                asn: "22990"
+                dns: node2.planetlab.albany.edu
+                formatted: 4.  node2.planetlab.albany.edu (169.226.40.4) tr2src
+                ip: 169.226.40.4
+                last_responsive: "2011-05-30"
+                next: 
+                ping_responsive: true
+                prefix: 169.226.0.0/16
+                previous: *id119
+                ttl: 4
+                type: :tr2src
+                valid_ip: true
+              ping_responsive: true
+              prefix: 169.226.0.0/16
+              previous: *id120
+              ttl: 3
+              type: :tr2src
+              valid_ip: true
+            ping_responsive: true
+            prefix: 169.226.0.0/16
+            previous: *id121
+            ttl: 2
+            type: :tr2src
+            valid_ip: true
+          ping_responsive: true
+          prefix: 169.226.0.0/16
+          previous: 
+          ttl: 1
+          type: :"dst-sym"
+          valid_ip: true
+        - *id120
+        - *id119
+        - *id122
+        invalid_reason: unknown
+        src: ""
+        timestamp: 0
+        valid: false
+      ttl: 2
+    ping_responsive: true
+    prefix: 169.226.0.0/16
+    previous: 
+    reverse_path: !ruby/object:HistoricalReversePath 
+      dst: ""
+      hops: 
+      - !ruby/object:ReverseHop 
+        asn: 
+        dns: ""
+        formatted: "From node2.planetlab.albany.edu to 169.226.40.1 at 0:"
+        ip: 0.0.0.0
+        prefix: 
+        ttl: -1
+        type: 
+        valid_ip: false
+      - !ruby/object:ReverseHop 
+        asn: 
+        dns: ""
+        formatted: "Failed query, reason: dst_not_reachable at 2011-06-02 07:37:51"
+        ip: 0.0.0.0
+        prefix: 
+        ttl: -1
+        type: 
+        valid_ip: false
+      invalid_reason: unknown
+      src: ""
+      timestamp: 0
+      valid: false
+    ttl: 1
+  - *id123
+  - *id118
+  - *id112
+  - *id105
+  - *id097
+  - *id088
+  - *id078
+  - *id067
+  - *id055
+  - *id042
+  - *id125
+historical_trace_timestamp: 2011-06-01 09:46:07 -07:00
+measured_working_direction: true
+measurement_times: 
+- - spoof_ping
+  - 2011-06-02 08:11:02.462097 -07:00
+  - (12.467824 seconds)
+- - spoof_tr
+  - 2011-06-02 08:11:14.929921 -07:00
+  - (78.08219 seconds)
+- - tr_time
+  - 2011-06-02 08:12:33.012111 -07:00
+  - (87.156422 seconds)
+- - non-revtr pings
+  - 2011-06-02 08:14:00.168533 -07:00
+  - (15.820329 seconds)
+- - pings_to_nonresponsive_hops
+  - 2011-06-02 08:14:15.988862 -07:00
+  - (95.387667 seconds)
+- - measurements completed
+  - 2011-06-02 08:15:51.376529 -07:00
+passed_filters: true
+path_changed: false
+pings_towards_src: []
+
+spoofed_revtr: !ruby/object:SpoofedReversePath 
+  hops: []
+
+spoofed_tr: !ruby/object:ForwardPath 
+  hops: 
+  - &id136 !ruby/object:SpoofedForwardHop 
+    asn: "22990"
+    dns: 169.226.40.1
+    formatted: "169.226.40.1 (169.226.40.1) [169.226.0.0/16, ASN: 22990]"
+    ip: 169.226.40.1
+    last_responsive: "2011-05-30"
+    next: &id135 !ruby/object:SpoofedForwardHop 
+      asn: "22990"
+      dns: internet_7206.gw.albany.edu
+      formatted: "internet_7206.gw.albany.edu (169.226.13.41) [169.226.0.0/16, ASN: 22990]"
+      ip: 169.226.13.41
+      last_responsive: "2011-05-30"
+      next: &id134 !ruby/object:SpoofedForwardHop 
+        asn: "3754"
+        dns: alb-7600-ualbany.nysernet.net
+        formatted: "alb-7600-ualbany.nysernet.net (199.109.8.1) [199.109.8.0/24, ASN: 3754]"
+        ip: 199.109.8.1
+        last_responsive: "2011-05-30"
+        next: &id133 !ruby/object:SpoofedForwardHop 
+          asn: "3754"
+          dns: nyc-7600-alb-7600.nysernet.net
+          formatted: "nyc-7600-alb-7600.nysernet.net (199.109.7.98) [199.109.7.0/24, ASN: 3754]"
+          ip: 199.109.7.98
+          last_responsive: "2011-05-30"
+          next: &id132 !ruby/object:SpoofedForwardHop 
+            asn: "3754"
+            dns: 199.109.4.158
+            formatted: "199.109.4.158 (199.109.4.158) [199.109.4.0/24, ASN: 3754]"
+            ip: 199.109.4.158
+            last_responsive: "2011-05-30"
+            next: &id131 !ruby/object:SpoofedForwardHop 
+              asn: "19401"
+              dns: 216.24.186.58
+              formatted: "216.24.186.58 (216.24.186.58) [216.24.176.0/20, ASN: 19401]"
+              ip: 216.24.186.58
+              last_responsive: N/A
+              next: &id130 !ruby/object:SpoofedForwardHop 
+                asn: "19401"
+                dns: 216.24.186.56
+                formatted: "216.24.186.56 (216.24.186.56) [216.24.176.0/20, ASN: 19401]"
+                ip: 216.24.186.56
+                last_responsive: N/A
+                next: &id129 !ruby/object:SpoofedForwardHop 
+                  asn: "19401"
+                  dns: 216.24.186.63
+                  formatted: "216.24.186.63 (216.24.186.63) [216.24.176.0/20, ASN: 19401]"
+                  ip: 216.24.186.63
+                  last_responsive: "2011-05-30"
+                  next: &id128 !ruby/object:SpoofedForwardHop 
+                    asn: "19401"
+                    dns: 216.24.186.70
+                    formatted: "216.24.186.70 (216.24.186.70) [216.24.176.0/20, ASN: 19401]"
+                    ip: 216.24.186.70
+                    last_responsive: "2011-05-30"
+                    next: &id127 !ruby/object:SpoofedForwardHop 
+                      asn: "19401"
+                      dns: 216.24.186.68
+                      formatted: "216.24.186.68 (216.24.186.68) [216.24.176.0/20, ASN: 19401]"
+                      ip: 216.24.186.68
+                      last_responsive: "2011-05-30"
+                      next: &id126 !ruby/object:SpoofedForwardHop 
+                        asn: "3303"
+                        dns: kreonet-1-lo-jmb-706.sttlwa.pacificwave.net
+                        formatted: "kreonet-1-lo-jmb-706.sttlwa.pacificwave.net (207.231.240.6) [204.0.0.0/6, ASN: 3303]"
+                        ip: 207.231.240.6
+                        last_responsive: false
+                        next: &id137 !ruby/object:SpoofedForwardHop 
+                          asn: "1237"
+                          dns: 134.75.108.209
+                          formatted: "134.75.108.209 (134.75.108.209) [134.75.0.0/16, ASN: 1237]"
+                          ip: 134.75.108.209
+                          last_responsive: "2011-05-30"
+                          next: 
+                          ping_responsive: false
+                          prefix: 134.75.0.0/16
+                          previous: *id126
+                          reachable_from_other_vps: true
+                          ttl: 12
+                        ping_responsive: false
+                        prefix: 204.0.0.0/6
+                        previous: *id127
+                        reachable_from_other_vps: false
+                        ttl: 11
+                      ping_responsive: false
+                      prefix: 216.24.176.0/20
+                      previous: *id128
+                      reachable_from_other_vps: true
+                      ttl: 10
+                    ping_responsive: false
+                    prefix: 216.24.176.0/20
+                    previous: *id129
+                    reachable_from_other_vps: true
+                    ttl: 9
+                  ping_responsive: false
+                  prefix: 216.24.176.0/20
+                  previous: *id130
+                  reachable_from_other_vps: false
+                  ttl: 8
+                ping_responsive: true
+                prefix: 216.24.176.0/20
+                previous: *id131
+                ttl: 7
+              ping_responsive: true
+              prefix: 216.24.176.0/20
+              previous: *id132
+              ttl: 6
+            ping_responsive: true
+            prefix: 199.109.4.0/24
+            previous: *id133
+            ttl: 5
+          ping_responsive: true
+          prefix: 199.109.7.0/24
+          previous: *id134
+          ttl: 4
+        ping_responsive: true
+        prefix: 199.109.8.0/24
+        previous: *id135
+        ttl: 3
+      ping_responsive: true
+      prefix: 169.226.0.0/16
+      previous: *id136
+      ttl: 2
+    ping_responsive: true
+    prefix: 169.226.0.0/16
+    previous: 
+    ttl: 1
+  - *id135
+  - *id134
+  - *id133
+  - *id132
+  - *id131
+  - *id130
+  - *id129
+  - *id128
+  - *id127
+  - *id126
+  - *id137
+src: node2.planetlab.albany.edu
+suspected_failure: *id007
+tr: !ruby/object:ForwardPath 
+  hops: 
+  - &id146 !ruby/object:ForwardHop 
+    asn: "22990"
+    dns: 169.226.40.1
+    formatted: "169.226.40.1 (169.226.40.1) [169.226.0.0/16, ASN: 22990]"
+    ip: 169.226.40.1
+    last_responsive: true
+    next: &id145 !ruby/object:ForwardHop 
+      asn: "22990"
+      dns: internet_7206.gw.albany.edu
+      formatted: "internet_7206.gw.albany.edu (169.226.13.41) [169.226.0.0/16, ASN: 22990]"
+      ip: 169.226.13.41
+      last_responsive: true
+      next: &id144 !ruby/object:ForwardHop 
+        asn: "3754"
+        dns: alb-7600-ualbany.nysernet.net
+        formatted: "alb-7600-ualbany.nysernet.net (199.109.8.1) [199.109.8.0/24, ASN: 3754]"
+        ip: 199.109.8.1
+        last_responsive: true
+        next: &id143 !ruby/object:ForwardHop 
+          asn: "3754"
+          dns: nyc-7600-alb-7600.nysernet.net
+          formatted: "nyc-7600-alb-7600.nysernet.net (199.109.7.98) [199.109.7.0/24, ASN: 3754]"
+          ip: 199.109.7.98
+          last_responsive: true
+          next: &id142 !ruby/object:ForwardHop 
+            asn: "3754"
+            dns: 199.109.4.158
+            formatted: "199.109.4.158 (199.109.4.158) [199.109.4.0/24, ASN: 3754]"
+            ip: 199.109.4.158
+            last_responsive: true
+            next: &id141 !ruby/object:ForwardHop 
+              asn: 
+              dns: 0.0.0.0
+              formatted: "0.0.0.0 (0.0.0.0) [, ASN: ]"
+              ip: 0.0.0.0
+              last_responsive: false
+              next: &id140 !ruby/object:ForwardHop 
+                asn: 
+                dns: 0.0.0.0
+                formatted: "0.0.0.0 (0.0.0.0) [, ASN: ]"
+                ip: 0.0.0.0
+                last_responsive: false
+                next: &id139 !ruby/object:ForwardHop 
+                  asn: 
+                  dns: 0.0.0.0
+                  formatted: "0.0.0.0 (0.0.0.0) [, ASN: ]"
+                  ip: 0.0.0.0
+                  last_responsive: false
+                  next: &id138 !ruby/object:ForwardHop 
+                    asn: 
+                    dns: 0.0.0.0
+                    formatted: "0.0.0.0 (0.0.0.0) [, ASN: ]"
+                    ip: 0.0.0.0
+                    last_responsive: false
+                    next: &id147 !ruby/object:ForwardHop 
+                      asn: 
+                      dns: 0.0.0.0
+                      formatted: "0.0.0.0 (0.0.0.0) [, ASN: ]"
+                      ip: 0.0.0.0
+                      last_responsive: false
+                      next: 
+                      ping_responsive: false
+                      prefix: 
+                      previous: *id138
+                      reverse_path: []
+
+                      ttl: 10
+                    ping_responsive: false
+                    prefix: 
+                    previous: *id139
+                    reverse_path: []
+
+                    ttl: 9
+                  ping_responsive: false
+                  prefix: 
+                  previous: *id140
+                  reverse_path: []
+
+                  ttl: 8
+                ping_responsive: false
+                prefix: 
+                previous: *id141
+                reverse_path: []
+
+                ttl: 7
+              ping_responsive: false
+              prefix: 
+              previous: *id142
+              reverse_path: []
+
+              ttl: 6
+            ping_responsive: true
+            prefix: 199.109.4.0/24
+            previous: *id143
+            reverse_path: []
+
+            ttl: 5
+          ping_responsive: true
+          prefix: 199.109.7.0/24
+          previous: *id144
+          reverse_path: []
+
+          ttl: 4
+        ping_responsive: true
+        prefix: 199.109.8.0/24
+        previous: *id145
+        reverse_path: []
+
+        ttl: 3
+      ping_responsive: true
+      prefix: 169.226.0.0/16
+      previous: *id146
+      reverse_path: []
+
+      ttl: 2
+    ping_responsive: true
+    prefix: 169.226.0.0/16
+    previous: 
+    reverse_path: []
+
+    ttl: 1
+  - *id145
+  - *id144
+  - *id143
+  - *id142
+  - *id141
+  - *id140
+  - *id139
+  - *id138
+  - *id147
+upstream_reverse_paths: 
+  216.24.186.67: !ruby/object:SpoofedReversePath 
+    hops: 
+    - &id153 !ruby/object:ReverseHop 
+      asn: 
+      dns: ""
+      formatted: reverse traceroute from 216.24.186.67 back to 169.226.40.4
+      ip: 0.0.0.0
+      next: &id152 !ruby/object:ReverseHop 
+        asn: "19401"
+        dns: 216.24.186.67
+        formatted: " 0   (216.24.186.67) *                                                                                                    dst"
+        ip: 216.24.186.67
+        next: &id151 !ruby/object:ReverseHop 
+          asn: "3754"
+          dns: nyc-7600-alb-7600.nysernet.net
+          formatted: " 1  nyc-7600-alb-7600.nysernet.net (199.109.7.98) *                                                                       sym"
+          ip: 199.109.7.98
+          next: &id150 !ruby/object:ReverseHop 
+            asn: "3754"
+            dns: alb-7600-ualbany.nysernet.net
+            formatted: " 2  alb-7600-ualbany.nysernet.net (199.109.8.1) *                                                                         rr"
+            ip: 199.109.8.1
+            next: &id149 !ruby/object:ReverseHop 
+              asn: "22990"
+              dns: internet_7206.gw.albany.edu
+              formatted: " 3  internet_7206.gw.albany.edu (169.226.13.41) *                                                                         -rr"
+              ip: 169.226.13.41
+              next: &id148 !ruby/object:ReverseHop 
+                asn: "22990"
+                dns: 169.226.40.1
+                formatted: " 4   (169.226.40.1) *                                                                                                     -rr"
+                ip: 169.226.40.1
+                next: &id154 !ruby/object:ReverseHop 
+                  asn: "22990"
+                  dns: node2.planetlab.albany.edu
+                  formatted: " 5  node2.planetlab.albany.edu (169.226.40.4) *                                                                           -rr"
+                  ip: 169.226.40.4
+                  next: 
+                  prefix: 169.226.0.0/16
+                  previous: *id148
+                  ttl: "5"
+                  type: :rr
+                  valid_ip: true
+                prefix: 169.226.0.0/16
+                previous: *id149
+                ttl: "4"
+                type: :rr
+                valid_ip: true
+              prefix: 169.226.0.0/16
+              previous: *id150
+              ttl: "3"
+              type: :rr
+              valid_ip: true
+            prefix: 199.109.8.0/24
+            previous: *id151
+            ttl: "2"
+            type: :rr
+            valid_ip: true
+          prefix: 199.109.7.0/24
+          previous: *id152
+          ttl: "1"
+          type: :sym
+          valid_ip: true
+        prefix: 216.24.176.0/20
+        previous: *id153
+        ttl: "0"
+        type: :dst
+        valid_ip: true
+      prefix: 
+      previous: 
+      ttl: -1
+      type: 
+      valid_ip: false
+    - *id152
+    - *id151
+    - *id150
+    - *id149
+    - *id148
+    - *id154
