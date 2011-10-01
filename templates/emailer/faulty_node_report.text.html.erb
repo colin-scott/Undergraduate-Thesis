@@ -1,0 +1,66 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+    <center>All of the following isolation vantage points have been swapped out</center>
+    <p>
+        nodes [minutes out of date] running behind:
+        <ul type=none>
+        <% @outdated_nodes.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        nodes [% of targets unreachable] experiencing a source-specific problem:
+        <ul type=none>
+        <% @problems_at_the_source.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        nodes' ping state can't be retrieved via scp
+        <ul type=none>
+        <% @not_sshable.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        nodes failed to consistently return measurement results: 
+        <ul type=none>
+        <% @failed_measurements.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        nodes and 'cold standby vps' identified by Dave to never reach their destinations with a traceroute: 
+        <ul type=none>
+        <% @bad_srcs.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        nodes and 'cold standby vps' not sshable or controllable:
+        <ul type=none>
+        <% @not_controllable.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+        <p>
+        nodes and 'cold standby vps' (not swapped out) identified by Dave to rarely reach their destinations with a traceroute: 
+        <ul type=none>
+        <% @possibly_bad_srcs.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+  </body>
+</html>

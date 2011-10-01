@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+      <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+      <style type="text/css">
+        table {
+            border-color: #600; border-width: 0 0 1px 1px; border-style: solid; font-size: 9pt;
+        }
+        td {
+            border-color: #600;
+            border-width: 1px 1px 0 0;
+            border-style: solid;
+            margin: 0;
+            padding: 4px;
+            background-color: #FFC;
+        }
+      </style>
+  </head>
+  <body>
+    <p>
+    A user (<%=h @email %>, log id <%=h @log_id %>) of the web tool gave us a traceroute to parse. The traceroute
+        follows:
+    </p><p><pre><%=h @tr %></pre>
+    </p><p>
+        The reverse traceroute follows:
+    </p><p><pre><%=h @revtr %></pre>
+    </p><p>
+        Here is a comparison of the given traceroute to our reverse traceroute
+        results:
+    </p>
+    <%=raw @parsed %>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+    <p>
+        An unexpected, critical error has occurred in one of our scripts! 
+        You should check up on this. The error occurred in: <br /><br />
+        <%=h @script %><br /><br/>
+        The error is:<br /><br />
+        <%=h @err %><br/><br/>
+        <%=h @emails %><br/><br/>
+        A backtrace follows.
+    </p><p>
+        <pre><%=h @bt %></pre>
+    </p>
+  </body>
+</html>

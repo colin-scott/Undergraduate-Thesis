@@ -1,0 +1,59 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+    <p>
+    <%=h @target %> (dataset: <%=h @dataset %>) is down, per:<br />
+        <ul type=none>
+        <% @disconnected.each do |node| %>
+        <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        The following active nodes [time of last failed ping for <%=h @target %>] still have connectivity: <br />
+        <ul type=none>
+        <% @connected.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        The following active nodes have never seen a ping response from <%=h @target %>: <br />
+        <ul type=none>
+        <% @never_seen.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <hr />
+    <center>Problematic nodes</center>
+    <p>
+        The following nodes [minutes out of date] are running behind:
+        <ul type=none>
+        <% @outdated_nodes.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        The following nodes [% of targets unreachable] are experiencing a source-specific problem:
+        <ul type=none>
+        <% @problems_at_the_source.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+    <p>
+        The following nodes are unresponsive to ssh:
+        <ul type=none>
+        <% @not_sshable.each do |node| %>
+            <li><%=h node %></li>
+        <% end %>
+        </ul>
+    </p>
+  </body>
+</html>

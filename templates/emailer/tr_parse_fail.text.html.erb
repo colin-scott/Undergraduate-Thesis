@@ -1,0 +1,17 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+    <p>
+        A user (<%=h @email %>, log id <%=h @log_id %>) of the web tool gave
+        us a traceroute to parse, but clean_trace_for_website.pl was unable 
+        to it. It returned the following error:<br/><br/>
+        <%=h @error %><br/><br/>
+        The given traceroute follows.
+    </p>
+    <p><pre><%=h @tr %></pre></p>
+  </body>
+</html>

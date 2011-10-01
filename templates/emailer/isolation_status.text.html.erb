@@ -1,0 +1,46 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+        <p>
+        <u> The following targets have been swapped out because they are never reachable by traceroute: </u>
+        <ul type=none>
+            <% @dataset2unresponsive_targets.each do |dataset, targets| %>
+                <% targets.each do |target| %>
+                    <li><%= target %> (<%= dataset %>)</li>
+                <% end %>
+            <% end %>
+        </ul>
+        </p>
+        <u> I should do something about these targets/hops, but right now they're ignored </u>
+        <p>
+        Targets result in successful measurements less than
+        half the time: <br />
+        <ul type=none>
+            <% @possibly_bad_targets.each do |target| %>
+                <li><%= target %></li>
+            <% end %>
+        </ul>
+        </p>
+        <p> 
+        Hops are never reachable via traceroute (from at least
+        5 sources): <br />
+        <ul type=none>
+            <% @bad_hops.each do |target| %>
+                <li><%= target %></li>
+            <% end %>
+        </ul>
+        </p>
+        <p>
+        Hops result in successful measurements less than
+        half the time: <br />
+        <ul type=none>
+            <% @possibly_bad_hops.each do |target| %>
+                <li><%= target %></li>
+            <% end %>
+        </ul>
+  </body>
+</html>

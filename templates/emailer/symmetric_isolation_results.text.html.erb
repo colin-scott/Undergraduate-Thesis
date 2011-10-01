@@ -1,0 +1,165 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+        <img src="<%= @jpg_url %>" alt="dot" />
+        <a href="http://revtr.cs.washington.edu/isolation_graphs/legend.txt">legend</a>
+        <hr />
+        <center>Synopsis</center>
+        <ul type=none>
+            <li> Source: <%=h @src %></li>
+            <li> Destination: <%=h @dst %></li>
+            <li> Dataset: <%=h @dataset %></li>
+            <li> Nodes [time since last failed ping] with connectivity:
+            <ul type=none>
+            <% @spoofers_w_connectivity.each do |spoofer| %>
+                <li><%= spoofer %></li>
+            <% end %>
+            </ul>
+            </li>
+            <li> Nodes [time since last succesful ping] without connectivity:
+            <ul type=none>
+            <% @formatted_unconnected.each do |spoofer| %>
+                <li><%= spoofer %></li>
+            <% end %>
+            </ul>
+            </li>
+            <li> Suspected failed router(s): <%= @suspected_failure %> (# hops from destination: <%= @as_hops_from_dst %>, source: <%= @as_hops_from_src %>)</li>
+            <li> Suspected direction: <%= @direction %></li>
+            <li> Alternate paths: <%= @alternate_paths.inspect %></li>
+            <li> Measured working direction?: <%= @measured_working_direction %></li>
+            <li> Failure on new or old path?: <%= @path_changed %></li>
+            <li> Measurement times:
+            <ul type=none>
+            <% @measurement_times.each do |time| %>
+                <li><%= time.join ' ' %></li>
+            <% end %>
+            </ul>
+            </li>
+            <li> Measurements reissued due to loops/divergence?: <%= @measurements_reissued %></li>
+        </ul>
+        <hr />
+        <center>Succesful spoofers (towards <%=h @src %>)</center>
+        <ul type=none>
+            <% @pings_towards_src.each do |spoofer| %>
+                <li><%= spoofer %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Normal forward traceroute</center>
+        <ul type=none>
+            <% @normal_forward_path.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Spoofed forward traceroute</center>
+        <ul type=none>
+            <% @spoofed_forward_path.each do |hop| %>
+                <li><%= (hop or "huh?") %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Historical forward traceroute (Issued: <%= @historical_fpath_timestamp %>)</center>
+        <ul type=none>
+            <% @historical_forward_path.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Spoofed reverse traceroute</center>
+        <ul type=none>
+            <% @spoofed_revtr.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Historical reverse traceroute</center>
+        <ul type=none>
+            <% @historical_revtr.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+        <hr />
+        <center>Destination's normal traceroute to <%= @src %></center>
+        <ul type=none>
+            <% @dst_normal_forward_path.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+
+        <hr />
+        <center>Destination's spoofed traceroute to <%= @src %></center>
+        <ul type=none>
+            <% @dst_spoofed_forward_path.each do |hop| %>
+                <li><%= hop %></li>
+            <% end %>
+        </ul>
+        <center>Additional traceroutes</center>
+            <% @additional_traces.each do |trace| %>
+            <ul type=none>
+                <% trace.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            </ul>
+            <hr />
+            <% end %>
+        <hr />
+        <center>Additional spoofed revtrs</center>
+            <% @upstream_reverse_paths.each do |target,trace| %>
+            <ul type=none>
+                <li> Target: <%= target %></li>
+                <% trace.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            </ul>
+            <hr />
+            <% end %>
+        <hr />
+
+<!---
+    # output format:
+    #
+    # synopsis:
+    #    Source:
+    #    Destination:
+    #    Spoofers with connectivity:
+    #    Failed Router:
+    #    Direction: #{forward/reverse/bidirectional}
+    # ==========================================
+    # succesful receivers for #{target}:     
+    #   -
+    #   -
+    #   -
+    # ==========================================
+    # succesful spoofers for #{target}:
+    #   -
+    #   -
+    #   -
+    # ==========================================
+    # spoofed forward traceroute:
+    #   -     (reverse traceroute for each hop?)
+    #   -
+    #   -
+    # ==========================================
+    # historical forward traceroute:
+    #   -     (can still reach?)
+    #   -
+    #   -
+    # ==========================================
+    # spoofed reverse traceroute:
+    #   -     (can S ping each hop?)
+    #   -
+    #   -
+    # ==========================================
+    # historical reverse traceroute:
+    #   -     (still reachable for each hop?)
+    #   -
+    #   -
+-->
+    </p>
+  </body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  </head>
+  <body>
+    <p>
+        Thanks for trying our reverse traceroute tool! The resulting data
+        follows:
+    </p>
+    <p><pre><%=h @traceroute %></pre></p>
+    <p>
+        The rightmost columns explains how we determined a path. A dash prefix
+        indicates that this hop was determined from the same segment as an earlier
+        hop.<br/>
+        dst - This hop is the destination or the destination's uplink. <br/>
+        sym - We had to assume this hop was symmetric to the forward traceroute 
+        in order to generate the path. Note that we always assume that hop1, the 
+        destination's uplink, is symmetric, in order to avoid excess probing of 
+        endhosts.  This assumption will generally be true for endhosts.<br/>
+        tr - This hop was determined from an intersection with a known
+        traceroute.<br/>
+        rr - We used the Record Route option of the Internet Protocol to find 
+        this hop.<br/>
+        ts - We used the Timestamp option of the Internet Protocol to find this
+        hop.<br/><br/>
+        See <a href="http://revtr.cs.washington.edu/FAQ.html#how">here</a>
+        for more details on the different methods.
+    </p><p>
+        Have questions? Check out our <a href="http://revtr.cs.washington.edu/FAQ.html">FAQ</a>!
+    </p>
+  </body>
+</html>
