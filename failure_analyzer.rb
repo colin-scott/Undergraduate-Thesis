@@ -304,6 +304,10 @@ class FailureAnalyzer
 
     def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, 
                                      historical_revtr, direction, testing, file=nil, skip_hist_tr=false)
+        if FailureIsolation::PoisonerNames.include? src
+            skip_hist_tr = true
+        end
+
         # it's uninteresting if no measurements worked... probably the
         # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
@@ -314,9 +318,9 @@ class FailureAnalyzer
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
 
-        no_historical_trace = !skip_hist_tr and (historical_tr.empty? && !FailureIsolation::PoisonerNames.include?(src))
+        no_historical_trace = !skip_hist_tr and historical_tr.empty?
 
-        historical_trace_didnt_reach = !skip_hist_tr and (!no_historical_trace  && !FailureIsolation::PoisonerNames.include?(src)  && historical_tr[-1].ip == "0.0.0.0")
+        historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && historical_tr[-1].ip == "0.0.0.0"
 
         @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
@@ -324,6 +328,7 @@ class FailureAnalyzer
 
         last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
 
+        # should we get rid of this after correlation?
         reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
 
         if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&

@@ -136,6 +136,12 @@ class Emailer < ActionMailer::Base
                     :possibly_bad_targets => possibly_bad_targets,
                    :bad_hops => bad_hops, :possibly_bad_hops => possibly_bad_hops
     end
+    def poison_notification(outage)
+        subject "Poison Opportunity Detected!"
+        from "cs@cs.washington.edu"
+        recipients ["arvind@cs.washington.edu", "ethan@cs.washington.edu", "cs@cs.washington.edu", "choffnes@cs.washington.edu", "cunha@cs.washington.edu"]
+        body :outage => outage
+    end
 end
 
 def email_and_die

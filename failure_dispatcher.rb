@@ -282,6 +282,7 @@ class FailureDispatcher
                 if !o.suspected_failures[Direction.REVERSE].nil? and !o.suspected_failures[Direction.REVERSE].empty?
                     # POISON!!!!!!!!
                     suspected_as = o.suspected_failures[Direction.REVERSE].first.asn
+                    Emailer.deliver_poison_notification(o)
                 end
             end
         end
