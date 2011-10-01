@@ -137,10 +137,16 @@ class FailureAnalyzer
             last_tr_hop = outage.tr.last_non_zero_hop
             last_spooftr_hop = outage.spoofed_tr.last_non_zero_hop
             suspected_hop = Hop.later(last_tr_hop, last_spooftr_hop)
-            outage.suspected_failures[Direction.FORWARD] = [suspected_hop.ip] unless suspected_hop.nil?
-        elsif outage.direction.is_reverse?
+            outage.suspected_failures[Direction.FORWARD] = [suspected_hop] unless suspected_hop.nil?
+        end
+
+        # note: is_reverse? and is_forward? return true for bidirectional
+        # outages
+        if outage.direction.is_reverse?
             identify_failure_old(outage)
-        elsif outage.direction == Direction.FALSE_POSITIVE
+        end
+
+        if outage.direction == Direction.FALSE_POSITIVE
             outage.suspected_failures[Direction.FALSE_POSITIVE] = [:"problem resolved itself"]
         end
     end

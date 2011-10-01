@@ -54,6 +54,8 @@ class FailureDispatcher
 
         @dot_generator = DotGenerator.new(@logger)
 
+        @poisoner = Poisoner.new(@failure_analyzer, @registrar, @ipInfo, @logger)
+
         Thread.new do
             loop do
                 @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
@@ -268,25 +270,8 @@ class FailureDispatcher
             log_merged_outage(merged_outage)
         end
 
-        # ================================================== #
-        #         Special case for riot!                     #
-        # ================================================== #
-        merged_outage.each do |o|
-            # run the old isolation algorithm!
-            #   at least until Arvind and I work out the correlation one
-            #
-            #   TODO: also run for bidirectional outages?
-            if FailureIsolation::PoisonerNames.include? o.src and o.direction == Direction.REVERSE
-                @failure_analyzer.identify_failure_old(o)
-
-                if !o.suspected_failures[Direction.REVERSE].nil? and !o.suspected_failures[Direction.REVERSE].empty?
-                    # POISON!!!!!!!!
-                    suspected_as = o.suspected_failures[Direction.REVERSE].first.asn
-                    Emailer.deliver_poison_notification(o)
-                end
-            end
-        end
-
+        @poisoner.check_poisonability(merged_outage)
+        
         # at least one of the inside outages passed filters
         if(merged_outage.is_interesting?)
             Emailer.deliver_isolation_results(merged_outage, testing)
@@ -625,6 +610,7 @@ class FailureDispatcher
 
         @logger.debug "isolate_outage(#{src}, #{dst}), symbol2srcdst2revtr: #{symbol2srcdst2revtr.inspect}"
 
+        return SpoofedReversePath.new([:unexpected_return_value, symbol2srcdst2revtr]) if symbol2srcdst2revtr.is_a?(Symbol)
         raise "issue_revtr returned an #{symbol2srcdst2revtr.class}: #{symbol2srcdst2revtr.inspect}!" if !symbol2srcdst2revtr.is_a?(Hash) and !symbol2srcdst2revtr.is_a?(DRb::DRbObject)
 
         if symbol2srcdst2revtr.nil? || symbol2srcdst2revtr.values.find { |hash| hash.include? [src,dst] }.nil?
