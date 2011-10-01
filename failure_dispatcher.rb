@@ -527,7 +527,7 @@ class FailureDispatcher
             # Mux monitors can only spoof to other Mux monitors
             src, dst = srcdst
             if FailureIsolation::PoisonerNames.include? src
-                srcdst2receivers[srcdst] = FailureIsolation::PoisonerNames - src
+                srcdst2receivers[srcdst] = FailureIsolation::PoisonerNames - [src]
             end
         end
     end

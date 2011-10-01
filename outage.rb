@@ -15,8 +15,6 @@ end
 # failure
 class MergedOutage
    attr_accessor :outages, :suspected_failures, :file, :initializer2suspectset, :merging_method,
-       # FOR BACKWARDS COMPATIBILITY
-       :pruner2removed,
        # NEW FIELD
        :pruner2incount_removed
 
@@ -42,11 +40,12 @@ class MergedOutage
         @merging_method = merging_method
     end
 
+    # for backwards commpatibliitu
     def pruner2removed()
-        if pruner2removed.nil?
-            return pruner2incount_removed.map_values { |v| v[1] }
+        if @pruner2removed.nil?
+            return @pruner2incount_removed.map_values { |v| v[1] }
         else
-            return pruner2removed
+            return @pruner2removed
         end
     end
 

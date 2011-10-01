@@ -214,6 +214,7 @@ class Pruner
         # RACE CONDITION ON /TMP/SOURCES! 
         id = Thread.current.__id__
 
+        # XXX DOESN'T WORK FOR RIOT NODES!
         File.open("/tmp/sources#{id}", "w") { |f| f.puts sources.join "\n" } 
         File.open("/tmp/targets#{id}", "w") { |f| f.puts targets.join "\n" } 
 

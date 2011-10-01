@@ -14,7 +14,8 @@ module FailureIsolation
     # ====================================
     #         miscellaneous              #
     # ====================================
-    PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX"]
+    PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
+    "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux"]
     
     DefaultPeriodSeconds = 360
 
