@@ -171,6 +171,22 @@ class Array
 
         return true
     end
+
+    def mode()
+        counts = Hash.new(0)
+        self.each { |elt| counts[elt] += 1 }
+        return nil if counts.empty?
+        max_val = counts[self[0]]
+        max_key = self[0]
+
+        counts.each do |elt,count|
+            if count > max_val
+                max_val = count
+                max_key = elt
+            end
+        end
+        max_key
+    end
 end
 
 class String

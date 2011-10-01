@@ -337,7 +337,7 @@ class FailureMonitor
         target2observingnode2rounds.each do |target, observingnode2rounds|
 
             if target2stillconnected[target].size >= @@vp_bound and  # (at least one VP has connectivity)
-                # observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and # (don't issue from nodes that just started seeing the outage)
+                observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and # (don't issue from nodes that just started seeing the outage)
                 # observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and # (don't issue from nodes that have been experiencing the outage for a very long time)
                 !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and # at least one connected host has been consistently connected for at least 4 rounds
                 !observingnode2rounds.empty? # at least one observing node remains

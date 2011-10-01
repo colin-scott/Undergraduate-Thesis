@@ -6,95 +6,97 @@
   </head>
   <body>
   <p>
-  Poison opportunity!
+  Poison opportunity! <%= @outage.direction %>
   <ul type=none>
-        <img src="<%= outage.graph_url %>" alt="dot" />
+        <img src="<%= @outage.graph_url %>" alt="dot" />
         <a href="http://revtr.cs.washington.edu/isolation_graphs/legend.txt">legend</a>
         <hr />
         <center>Synopsis</center>
         <ul type=none>
-            <li> Source: <%=h outage.src %></li>
-            <li> Destination: <%=h outage.dst %></li>
-            <li> Dataset: <%=h outage.dataset %></li>
+            <li> Source: <%=h @outage.src %></li>
+            <li> Destination: <%=h @outage.dst %></li>
+            <li> Suspected Failures: <%= @outage.suspected_failures.inspect ></li>
+            <li> Poisoning: <%= @outage.asn_to_poison %></li>
+            <li> Dataset: <%=h @outage.dataset %></li>
             <li> Nodes [time since last failed ping] with connectivity:
             <ul type=none>
-            <% outage.spoofers_w_connectivity.each do |spoofer| %>
+            <% @outage.spoofers_w_connectivity.each do |spoofer| %>
                 <li><%= spoofer %></li>
             <% end %>
             </ul>
             </li>
             <li> Nodes [time since last succesful ping] without connectivity:
             <ul type=none>
-            <% outage.formatted_unconnected.each do |spoofer| %>
+            <% @outage.formatted_unconnected.each do |spoofer| %>
                 <li><%= spoofer %></li>
             <% end %>
             </ul>
             </li>
             <!---
-            (# AS hops from destination: <%= outage.as_hops_from_dst %>, source: <%= outage.as_hops_from_src %>)</li>
+            (# AS hops from destination: <%= @outage.as_hops_from_dst %>, source: <%= @outage.as_hops_from_src %>)</li>
             -->
-            <li> Suspected direction: <%= outage.direction %></li>
-            <li> Alternate paths: <%= outage.alternate_paths.inspect %></li>
-            <li> Measured working direction?: <%= outage.measured_working_direction %></li>
-            <!---<li> Failure on new or old path?: <%= outage.path_changed %></li> -->
+            <li> Suspected direction: <%= @outage.direction %></li>
+            <li> Alternate paths: <%= @outage.alternate_paths.inspect %></li>
+            <li> Measured working direction?: <%= @outage.measured_working_direction %></li>
+            <!---<li> Failure on new or old path?: <%= @outage.path_changed %></li> -->
             <li> Measurement times:
             <ul type=none>
-            <% outage.measurement_times.each do |time| %>
+            <% @outage.measurement_times.each do |time| %>
                 <li><%= time.join ' ' %></li>
             <% end %>
             </ul>
             </li>
-            <li> Measurements reissued due to loops/divergence?: <%= outage.measurements_reissued.nil? ? "no" : outage.measurements_reissued %></li>
+            <li> Measurements reissued due to loops/divergence?: <%= @outage.measurements_reissued.nil? ? "no" : @outage.measurements_reissued %></li>
         </ul>
         <hr />
-        <center>Succesful spoofers (towards <%=h outage.src %>)</center>
+        <center>Succesful spoofers (towards <%=h @outage.src %>)</center>
         <ul type=none>
-            <% outage.pings_towards_src.each do |spoofer| %>
+            <% @outage.pings_towards_src.each do |spoofer| %>
                 <li><%= spoofer %></li>
             <% end %>
         </ul>
         <hr />
         <center>Normal forward traceroute</center>
         <ul type=none>
-            <% outage.normal_forward_path.each do |hop| %>
+            <% @outage.normal_forward_path.each do |hop| %>
                 <li><%= hop %></li>
             <% end %>
         </ul>
         <hr />
         <center>Spoofed forward traceroute</center>
         <ul type=none>
-            <% outage.spoofed_forward_path.each do |hop| %>
+            <% @outage.spoofed_forward_path.each do |hop| %>
                 <li><%= (hop or "huh?") %></li>
             <% end %>
         </ul>
         <hr />
-        <center>Historical forward traceroute (Issued: <%= outage.historical_fpath_timestamp %>)</center>
+        <center>Historical forward traceroute (Issued: <%= @outage.historical_fpath_timestamp %>)</center>
         <ul type=none>
-            <% outage.historical_forward_path.each do |hop| %>
+            <% @outage.historical_forward_path.each do |hop| %>
                 <li><%= hop %></li>
             <% end %>
         </ul>
         <hr />
         <center>Spoofed reverse traceroute</center>
         <ul type=none>
-            <% outage.spoofed_revtr.each do |hop| %>
+            <% @outage.spoofed_revtr.each do |hop| %>
                 <li><%= hop %></li>
             <% end %>
         </ul>
         <hr />
         <center>Historical reverse traceroute</center>
         <ul type=none>
-            <% outage.historical_revtr.each do |hop| %>
+            <% @outage.historical_revtr.each do |hop| %>
                 <li><%= hop %></li>
             <% end %>
         </ul>
         <hr />
 
-        <!-- Symmetric outage -->
-        <% if outage.symmetric %>
+        <!-- Symmetric @outage -->
+        <% if @outage.symmetric %>
             <center>Destination's normal traceroute to <%= @src %></center>
             <ul type=none>
-                <% outage.dst_tr.each do |hop| %>
+                <% @outage.dst_tr.each do |hop| %>
                     <li><%= hop %></li>
                 <% end %>
             </ul>
@@ -102,15 +104,15 @@
             <hr />
             <center>Destination's spoofed traceroute to <%= @src %></center>
             <ul type=none>
-                <% outage.dst_spoofed_tr.each do |hop| %>
+                <% @outage.dst_spoofed_tr.each do |hop| %>
                     <li><%= hop %></li>
                 <% end %>
             </ul>
             
-            <% if !outage.spliced_paths.empty? %>
+            <% if !@outage.spliced_paths.empty? %>
                 <center>Spliced paths to alternate ingress</center>
                 <hr />
-                <% outage.spliced_paths.each do |spliced_path| %>
+                <% @outage.spliced_paths.each do |spliced_path| %>
                     <ul type=none>
                         <li> Ingress: <%= spliced_path.ingress %> </li>
                         <li> Forward trace: <br/>
@@ -132,10 +134,10 @@
                 <% end %> 
             <% end %>
         <% end %>
-        <!-- \end Symmetric outage -->
+        <!-- \end Symmetric @outage -->
 
         <center>Additional traceroutes</center>
-            <% outage.additional_traces.each do |target,trace| %>
+            <% @outage.additional_traces.each do |target,trace| %>
             <ul type=none>
                 <li> Target: <%= target %></li>
                 <% trace.each do |hop| %>
@@ -146,7 +148,7 @@
             <% end %>
         <hr />
         <center>Additional spoofed revtrs</center>
-            <% outage.upstream_reverse_paths.each do |target,trace| %>
+            <% @outage.upstream_reverse_paths.each do |target,trace| %>
             <ul type=none>
                 <li> Target: <%= target %></li>
                 <% trace.each do |hop| %>

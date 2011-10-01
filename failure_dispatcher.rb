@@ -1,5 +1,5 @@
 require 'failure_isolation_consts'
-require 'drb'
+                    require 'drb'
 require 'drb/acl'
 require 'thread'
 require 'ip_info'
@@ -15,6 +15,7 @@ require 'failure_analyzer'
 require 'mail'
 require 'outage'
 require 'utilities'
+require 'poisoner'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -54,11 +55,15 @@ class FailureDispatcher
 
         @dot_generator = DotGenerator.new(@logger)
 
-        @poisoner = Poisoner.new(@failure_analyzer, @registrar, @ipInfo, @logger)
+        @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
         Thread.new do
             loop do
-                @historical_trace_timestamp, @node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+                @historical_trace_timestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+                @node2target2trace = {}
+                node2target2trace.each do |node, target2trace|
+                   @node2target2trace[node.downcase] = target2trace 
+                end
                 sleep 60 * 60 * 24
             end
         end
@@ -270,7 +275,7 @@ class FailureDispatcher
             log_merged_outage(merged_outage)
         end
 
-        @poisoner.check_poisonability(merged_outage)
+        @poisoner.check_poisonability(merged_outage, testing)
         
         # at least one of the inside outages passed filters
         if(merged_outage.is_interesting?)
@@ -490,6 +495,7 @@ class FailureDispatcher
     end
 
     def retrieve_historical_tr(src, dst)
+        src = src.downcase
         if @node2target2trace.include? src and @node2target2trace[src].include? dst
             historical_tr_ttlhoptuples = @node2target2trace[src][dst]
             historical_trace_timestamp = @historical_trace_timestamp
