@@ -194,7 +194,12 @@ class Pruner
 
         # The controller keeps returning null results, so we instead use
         # pptasks directly... cp aliasprobe to a different directory?
-        responsive_targets = issue_pings_with_pptasks(srcs, suspect_set.to_a)
+        if((srcs & FailureIsolation::PoisonerNames).empty?)
+            responsive_targets = issue_pings_with_pptasks(srcs, suspect_set.to_a)
+        else
+            src2pingable = @registrar.all_pairs_ping(srcs, suspect_set.to_a)
+            responsive_targets = src2pingable.value_set.to_a
+        end
 
         if !suspect_set.empty? and responsive_targets.empty?
             @logger.warn "#{responsive_targets.inspect} was empty?!" 
