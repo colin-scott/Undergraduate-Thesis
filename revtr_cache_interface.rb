@@ -12,10 +12,10 @@ class RevtrCache
     @@max_hops = 30
     @@do_remapping = false
 
-    def initialize(connection, ipInfo, database=DatabaseInterface.new, logger=LoggerLog.new($stderr))
-        @connection = connection
+    def initialize(ipInfo=IpInfo.new, database=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @ipInfo = ipInfo
         @db = database
+        @connection = @db
         @logger = logger
     end
 

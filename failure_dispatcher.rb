@@ -48,7 +48,7 @@ class FailureDispatcher
 
         @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @registrar, @db)
 
-        @revtr_cache = RevtrCache.new(@db, @ipInfo, @db, @logger)
+        @revtr_cache = RevtrCache.new(@ipInfo, @db, @logger)
 
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)

@@ -15,7 +15,7 @@
         <ul type=none>
             <li> Source: <%=h @outage.src %></li>
             <li> Destination: <%=h @outage.dst %></li>
-            <li> Suspected Failures: <%= @outage.suspected_failures.inspect ></li>
+            <li> Suspected Failures: fwd: <%= @outage.suspected_failures[Direction.FORWARD] %> rev: <%= @outage.suspected_failures[Direction.REVERSE] %></li>
             <li> Poisoning: <%= @outage.asn_to_poison %></li>
             <li> Dataset: <%=h @outage.dataset %></li>
             <li> Nodes [time since last failed ping] with connectivity:

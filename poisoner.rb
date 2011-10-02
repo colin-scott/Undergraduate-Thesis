@@ -25,7 +25,7 @@ class Poisoner
         @logger = logger
 
         # TODO: threshold for outage duration!
-        #
+        
         # TODO: what about a border router?
     end
 
@@ -52,11 +52,11 @@ class Poisoner
             end
         end
 
-        poison(src2direction2failures) unless src2direction2failures.empty?
+        poison(src2direction2failures, testing) unless src2direction2failures.empty?
     end
 
     # pre: !suspected_failures.empty?
-    def poison(src2direction2failures)
+    def poison(src2direction2failures, testing)
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:
@@ -71,15 +71,15 @@ class Poisoner
 
                 asn_to_poison = asns_to_poison.delete(nil).mode
                 next if asn_to_poison.nil?
-                execute_poison(src, asn_to_poison)
+                execute_poison(src, asn_to_poison) if !testing
             else # Direction.BOTH
                 # redundant, but I don't cayur
-                asns_to_poison = direction2failures[Direction.FORWARD].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
+                asns_to_poison = direction2failures[Direction.BOTH].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
                                                                       .delete(nil)
 
                 asn_to_poison = asns_to_poison.delete(nil).mode
                 next if asn_to_poison.nil?
-                execute_poison(src, asn_to_poison)
+                execute_poison(src, asn_to_poison) if !testing
             end
         end
     end

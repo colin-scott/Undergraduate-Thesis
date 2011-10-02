@@ -69,7 +69,8 @@ module FailureIsolation
     def self.Host2Site()
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
-        @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hostnames_w_ips.txt | cut -d ' ' -f1,3`\
+        system "cut -d -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt"
+        @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hosts.txt | cut -d ' ' -f1,3`\
                                           .split("\n").map { |line| line.split }.custom_to_hash)
     end
 

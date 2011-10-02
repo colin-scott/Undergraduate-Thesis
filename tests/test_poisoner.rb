@@ -26,5 +26,5 @@ outage1.suspected_failures[Direction.FORWARD] = [Hop.new()]
 
 merged_outage = MergedOutage.new([outage1, outage2])
 
-p.execute_poison("wisc.bgpmux", "1424")
-#p.check_poisonability(merged_outage, true)
+#p.execute_poison("wisc.bgpmux", "1424")
+p.check_poisonability(merged_outage, true)
