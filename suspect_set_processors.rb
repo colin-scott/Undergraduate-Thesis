@@ -42,7 +42,7 @@ end
 #   - takes a MergedOutage object as param
 #   - returns a set of suspects
 class Initializer
-    def initialize(registrar, db, logger)
+    def initialize(registrar=nil, db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @registrar = registrar
         @db = db
         @logger = logger

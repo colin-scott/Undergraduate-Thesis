@@ -41,10 +41,36 @@ module FailureIsolation
 
     # MOVE ME
     def self.current_hops_on_pl_pl_traces_to_site(db, site)
+        self.hops_on_pl_pl_traces_to_site(db, site, CurrentPLPLTracesPath)
+    end
+
+    def self.pl_pl_path_for_date(time)
+        $stderr.puts time
+        root = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/"
+        base = time.strftime("%Y/%m/%d/")
+        up_to_day = root+base
+
+        hour_minute = time.strftime("%H%M")
+
+        hour_minutes = []
+        Dir.chdir(up_to_day) do
+            hour_minutes = Dir.glob("*").sort
+        end
+        idx = hour_minutes.binary_search(hour_minute)
+        idx = (idx < 0) ? -idx-1 : idx
+              
+        hour_minute = hour_minutes[idx]
+        hour_minute = hour_minutes[-1] if hour_minute.nil?
+
+        up_to_day+"/"+hour_minute+"/probes"
+    end
+
+    # current pl pl traces, for pruning
+    def self.hops_on_pl_pl_traces_to_site(db, site, path)
         return nil unless self.Site2Hosts.include? site
         all_src_ips = self.Site2Hosts[site].map { |host| db.hostname2ip[host] }
         File.open("/tmp/site_hosts.txt", "w") { |f| f.puts all_src_ips.join "\n" }
-        Set.new(`#{HopsTowardsSrc} /tmp/site_hosts.txt #{CurrentPLPLTracesPath}/*`.split("\n"))
+        Set.new(`#{HopsTowardsSrc} /tmp/site_hosts.txt #{path}/*`.split("\n"))
     end
 
     # returns direction2site2hops
@@ -69,8 +95,8 @@ module FailureIsolation
     def self.Host2Site()
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
-        system "cut -d -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt"
-        @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hosts.txt | cut -d ' ' -f1,3`\
+        system "cut -d ' ' -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt"
+        @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hosts.txt`\
                                           .split("\n").map { |line| line.split }.custom_to_hash)
     end
 
@@ -327,10 +353,15 @@ module PoP
 end
 
 if $0 == __FILE__
-    a = FailureIsolation.ATTTargets
-    t = FailureIsolation.TargetSet
-    $stderr.puts (a - t).to_a.inspect
-    #FailureIsolation.ReadInDataSets
+    require 'time'
+    t = Time.parse("2011-09-19 11:40:43 -0700")
+    
+    puts FailureIsolation.pl_pl_path_for_date(t)
+
+    #a = FailureIsolation.ATTTargets
+    #t = FailureIsolation.TargetSet
+    #$stderr.puts (a - t).to_a.inspect
+    ##FailureIsolation.ReadInDataSets
     #FailureIsolation.ReadInNodeSets
     #puts FailureIsolation.Site2Hosts.inspect
     #puts FailureIsolation.Host2Site.inspect

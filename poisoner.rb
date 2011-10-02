@@ -46,8 +46,8 @@ class Poisoner
                     src2direction2failures[o.src][o.direction] += o.suspected_failures[Direction.REVERSE]
                 end
             elsif o.direction == Direction.BOTH and !o.suspected_failures[Direction.FORWARD].nil? and !o.suspected_failures[Direction.FORWARD].empty?
-                # POISON!!!!!!!!
-                Emailer.deliver_poison_notification(o, testing)
+                # POISON!!!!!!!! 
+                #Emailer.deliver_poison_notification(o, testing)
                 src2direction2failures[o.src][o.direction] += o.suspected_failures[Direction.FORWARD]
             end
         end
@@ -65,19 +65,28 @@ class Poisoner
         #    failures in same AS
 
         src2direction2failures.each do |src, direction2failures|
-            if direction2failures.include? Direction.REVERSE
+            if direction2failures.include? Direction.REVERSE and !direction2failures[Direction.REVERSE].empty?
                 asns_to_poison = direction2failures[Direction.REVERSE].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
                                                                       .delete(nil)
 
-                asn_to_poison = asns_to_poison.delete(nil).mode
-                next if asn_to_poison.nil?
+                next if asns_to_poison.nil?
+                asn_to_poison = asns_to_poison.mode
+                if asn_to_poison.nil?
+                    @logger.warn "asn_to_poison nil, reverse: #{direction2failures[Direction.REVERSE]}"
+                    next
+                end
                 execute_poison(src, asn_to_poison) if !testing
-            else # Direction.BOTH
+            elsif !direction2failures[Direction.BOTH].empty? # Direction.BOTH
                 # redundant, but I don't cayur
                 asns_to_poison = direction2failures[Direction.BOTH].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
                                                                       .delete(nil)
 
-                asn_to_poison = asns_to_poison.delete(nil).mode
+                next if asns_to_poison.nil?
+                asn_to_poison = asns_to_poison.mode
+                if asn_to_poison.nil?
+                    @logger.warn "asn_to_poison nil, both: #{direction2failures[Direction.BOTH]}"
+                    next
+                end
                 next if asn_to_poison.nil?
                 execute_poison(src, asn_to_poison) if !testing
             end

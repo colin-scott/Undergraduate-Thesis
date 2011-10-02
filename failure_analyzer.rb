@@ -65,54 +65,15 @@ class FailureAnalyzer
     def identify_faults(merged_outage)
         if merged_outage.direction != Direction.FORWARD
             ip2suspects = Hash.new { |h,k| h[k] = [] }
-            initializer2suspectset = {}
+            all_suspect_ips, initial_suspect_ips = initialize_suspect_set(merged_outage, ip2suspects)
+            
+            prune_suspect_set(merged_outage, all_suspect_ips)
 
-            # ============================================================
-            #                       Initialize                           #
-            # ============================================================
-            @suspect_set_initializers.each do |init|
-                suspects = Set.new(init.call merged_outage)
-                initializer_name = init.to_s
-
-                suspects.each do |s|
-                    # add in the initializer to the suspect object
-                    s.initializer = initializer_name
-                    # add suspect to ips
-                    ip2suspects[s.ip] << s
-                end
-
-                initializer2suspectset[initializer_name] = suspects
-            end
-
-            # XXX we want to do something with # unique targets added ...
-            #     can be done with the ordering of suspect set initializers
-            all_suspect_ips = Set.new(ip2suspects.keys)
-            initial_suspect_ips = all_suspect_ips.clone 
-
-            @logger.debug "all_suspect_ips size : #{all_suspect_ips.size}"
-            @logger.debug "initializer2suspectset : #{initializer2suspectset.values.map { |set| set.to_a.map { |s| s.ip }}.flatten.uniq.size}"
-
-            # ============================================================
-            #                       Prune                                #
-            # ============================================================
-            pruner2incount_removed = {}
-            @suspect_set_pruners.each do |pruner|
-                break if all_suspect_ips.empty?
-                removed = pruner.call all_suspect_ips.clone, merged_outage
-                #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-                pruner2incount_removed[pruner.to_s] = [all_suspect_ips.size, removed & all_suspect_ips]
-                all_suspect_ips -= removed
-            end
-
-            merged_outage.initializer2suspectset = initializer2suspectset
-            merged_outage.pruner2incount_removed = pruner2incount_removed
-             
+            # all_suspect_set_ips is modified in prune_suspect_set
             removed_ips = initial_suspect_ips - all_suspect_ips
-
             @logger.debug "removed_ips #{removed_ips.inspect}"
              
             merged_remaining_suspects = ip2suspects.find_all { |ip, suspects| !removed_ips.include? ip }.map { |k,v| MergedSuspect.new(v) }
-
             merged_outage.suspected_failures[Direction.REVERSE] = merged_remaining_suspects
         end
 
@@ -129,6 +90,49 @@ class FailureAnalyzer
         # XXX Why won't the html in the email display the class... only the
         # '#' ...........
         merged_outage.suspected_failures[Direction.FORWARD].delete(nil)
+    end
+
+    def initialize_suspect_set(merged_outage, ip2suspects)
+        initializer2suspectset = {}
+
+        @suspect_set_initializers.each do |init|
+            suspects = Set.new(init.call merged_outage)
+            initializer_name = init.to_s
+
+            suspects.each do |s|
+                # add in the initializer to the suspect object
+                s.initializer = initializer_name
+                # add suspect to ips
+                ip2suspects[s.ip] << s
+            end
+
+            initializer2suspectset[initializer_name] = suspects
+        end
+
+        # XXX we want to do something with # unique targets added ...
+        #     can be done with the ordering of suspect set initializers
+        all_suspect_ips = Set.new(ip2suspects.keys)
+        initial_suspect_ips = all_suspect_ips.clone 
+
+        @logger.debug "all_suspect_ips size : #{all_suspect_ips.size}"
+        @logger.debug "initializer2suspectset : #{initializer2suspectset.values.map { |set| set.to_a.map { |s| s.ip }}.flatten.uniq.size}"
+
+        merged_outage.initializer2suspectset = initializer2suspectset
+
+        return [all_suspect_ips, initial_suspect_ips]
+    end
+
+    def prune_suspect_set(merged_outage, all_suspect_ips)
+        pruner2incount_removed = {}
+        @suspect_set_pruners.each do |pruner|
+            break if all_suspect_ips.empty?
+            removed = pruner.call all_suspect_ips.clone, merged_outage
+            #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
+            pruner2incount_removed[pruner.to_s] = [all_suspect_ips.size, removed & all_suspect_ips]
+            all_suspect_ips -= removed
+        end
+
+        merged_outage.pruner2incount_removed = pruner2incount_removed
     end
 
     def identify_fault_single_outage(outage)
