@@ -30,7 +30,7 @@ class Poisoner
     end
 
     def check_poisonability(merged_outage, testing=false)
-        src2direction2failures = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = [] } }
+        src2direction2outage2failures = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = Hash.new { |h2,k2| h2[k2] = [] } } }
 
         merged_outage.each do |o|
             next unless FailureIsolation::PoisonerNames.include? o.src
@@ -42,21 +42,19 @@ class Poisoner
                 
                 if !o.suspected_failures[Direction.REVERSE].nil? and !o.suspected_failures[Direction.REVERSE].empty?
                     # POISON!!!!!!!!
-                    Emailer.deliver_poison_notification(o, testing)
-                    src2direction2failures[o.src][o.direction] += o.suspected_failures[Direction.REVERSE]
+                    src2direction2outage2failures[o.src][Direction.REVERSE][o] += o.suspected_failures[Direction.REVERSE]
                 end
             elsif o.direction == Direction.BOTH and !o.suspected_failures[Direction.FORWARD].nil? and !o.suspected_failures[Direction.FORWARD].empty?
                 # POISON!!!!!!!! 
-                #Emailer.deliver_poison_notification(o, testing)
-                src2direction2failures[o.src][o.direction] += o.suspected_failures[Direction.FORWARD]
+                src2direction2outage2failures[o.src][Direction.FORWARD][o] += o.suspected_failures[Direction.FORWARD]
             end
         end
 
-        poison(src2direction2failures, testing) unless src2direction2failures.empty?
+        poison(src2direction2outage2failures, merged_outage, testing)
     end
 
     # pre: !suspected_failures.empty?
-    def poison(src2direction2failures, testing)
+    def poison(src2direction2outage2failures, outage, testing)
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:
@@ -64,38 +62,49 @@ class Poisoner
         #    then, which bidirectional outage had the majority of suspected
         #    failures in same AS
 
-        src2direction2failures.each do |src, direction2failures|
-            if direction2failures.include? Direction.REVERSE and !direction2failures[Direction.REVERSE].empty?
-                asns_to_poison = direction2failures[Direction.REVERSE].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
-                                                                      .delete(nil)
+        src2direction2outage2failures.each do |src, direction2outage2failures|
+            if direction2outage2failures.include? Direction.REVERSE and !direction2outage2failures[Direction.REVERSE].empty?
+                outage2failures = direction2outage2failures[Direction.REVERSE]
 
-                next if asns_to_poison.nil?
-                asn_to_poison = asns_to_poison.mode
+                asn_to_poison, outage = asns_to_poison(outage2failures)
+
                 if asn_to_poison.nil?
-                    @logger.warn "asn_to_poison nil, reverse: #{direction2failures[Direction.REVERSE]}"
+                    @logger.warn "asn_to_poison nil, reverse: #{direction2outage2failures[Direction.REVERSE]}"
                     next
                 end
-                execute_poison(src, asn_to_poison) if !testing
-            elsif !direction2failures[Direction.BOTH].empty? # Direction.BOTH
-                # redundant, but I don't cayur
-                asns_to_poison = direction2failures[Direction.BOTH].map { |h| h.is_a?(String) ? @ip_info.getASN(h) : h.asn }\
-                                                                      .delete(nil)
+                execute_poison(src, asn_to_poison, outage, testing)
+            elsif !direction2outage2failures[Direction.FORWARD].empty? # Direction.FORWARD
+                outage2failures = direction2outage2failures[Direction.FORWARD]
 
-                next if asns_to_poison.nil?
-                asn_to_poison = asns_to_poison.mode
+                asn_to_poison, outage = asns_to_poison(outage2failures)
+
                 if asn_to_poison.nil?
-                    @logger.warn "asn_to_poison nil, both: #{direction2failures[Direction.BOTH]}"
+                    @logger.warn "asn_to_poison nil, both: #{direction2outage2failures[Direction.FORWARD]}"
                     next
                 end
-                next if asn_to_poison.nil?
-                execute_poison(src, asn_to_poison) if !testing
+
+                execute_poison(src, asn_to_poison, outage, testing)
             end
         end
     end
 
-    def execute_poison(src, asn)
+    def asns_to_poison(outage2failures)
+        outage2asns = outage2failures.map_values { |failures| failures.map  { |hop| hop.is_a?(String) ? @ip_info.getASN(hop) : hop.asn } }
+        asns_to_poison = outage2asns.value_set.delete(nil).to_a
+
+        asn_to_poison = asns_to_poison.mode
+
+        outage = outage2asns.find { |k,v| v.include? asn_to_poison }[0]
+
+        [asn_to_poison, outage]
+    end
+
+    def execute_poison(src, asn, outage, testing)
+        @logger.debug "Attempting to send poison notification email #{src} #{asn}"
+        Emailer.deliver_poison_notification(outage, testing)
+
         # log event. On riot, I think
         # poison
-        system %{ssh cs@riot.cs.washington.edu "/home/cs/poisoning/execute_poison.rb #{src} #{asn}"}
+        system %{ssh cs@riot.cs.washington.edu "/home/cs/poisoning/execute_poison.rb #{src} #{asn}"} if !testing
     end
 end

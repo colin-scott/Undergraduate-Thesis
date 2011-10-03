@@ -8,7 +8,8 @@ require 'ip_info'
 require 'hops'
 
 class RevtrCache
-    @@freshness = 24*60
+    #   ruby, do you have a Integer.infinity constant?:
+    @@freshness_minutes = -1
     @@max_hops = 30
     @@do_remapping = false
 
@@ -33,9 +34,9 @@ class RevtrCache
       begin
     
         sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
-        if (@@freshness > 0) then
-          buffer = @@freshness
-          #if max_staleness > 0 and max_staleness > @@freshness then buffer = max_staleness else buffer=@@freshness end
+        if (@@freshness_minutes > 0) then
+          buffer = @@freshness_minutes
+          #if max_staleness > 0 and max_staleness > @@freshness_minutes then buffer = max_staleness else buffer=@@freshness_minutes end
           sql += " and date > from_unixtime(#{Time.now.to_i-(buffer*60)})"
         end
         sql += " order by date desc limit 11"
@@ -55,9 +56,9 @@ class RevtrCache
           end
     
           sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
-          if (@@freshness > 0) then
-            buffer = @@freshness
-            #if max_staleness > 0 and max_staleness > @@freshness then buffer = max_staleness else buffer=@@freshness end
+          if (@@freshness_minutes > 0) then
+            buffer = @@freshness_minutes
+            #if max_staleness > 0 and max_staleness > @@freshness_minutes then buffer = max_staleness else buffer=@@freshness_minutes end
             sql += " and date > from_unixtime(#{Time.now.to_i-(buffer*60)})"
           end
           sql += " order by date desc limit 11"
@@ -80,7 +81,7 @@ class RevtrCache
               @logger.puts $!
             end
     
-            @logger.debug "No matches in the past #{@@freshness} minutes!\nProbe status: #{reason}"
+            @logger.debug "No matches in the past #{@@freshness_minutes} minutes!\nProbe status: #{reason}"
     
             path.valid = false
             path.invalid_reason = reason

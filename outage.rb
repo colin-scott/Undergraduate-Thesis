@@ -42,10 +42,12 @@ class MergedOutage
 
     # for backwards commpatibliitu
     def pruner2removed()
-        if @pruner2removed.nil?
+        if @pruner2removed.nil? and !@pruner2incount_removed.nil?
             return @pruner2incount_removed.map_values { |v| v[1] }
-        else
+        elsif !@pruner2removed.nil?
             return @pruner2removed
+        else
+            return {}
         end
     end
 

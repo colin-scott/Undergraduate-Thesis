@@ -45,7 +45,6 @@ module FailureIsolation
     end
 
     def self.pl_pl_path_for_date(time)
-        $stderr.puts time
         root = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/"
         base = time.strftime("%Y/%m/%d/")
         up_to_day = root+base
