@@ -179,6 +179,13 @@ module SpoofedTR
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end
 
+            # NOW!!! IF there were a bunch of zeroes before the last hop, but
+            # the last hop was responsive, we likely have a problem with our
+            # tools (riot). So get rid of it!
+            if sortedttlrtrs.size > 2 and (sortedttlrtrs[-1][0].to_i - sortedttlrtrs[-2][0].to_i) > 4
+                sortedttlrtrs = sortedttlrtrs[0..-2]
+            end
+
             # 0.0.0.0's
             SpoofedTR::fill_in_zeroes!(sortedttlrtrs)
             

@@ -144,19 +144,19 @@ module FailureIsolation
 
     TargetBlacklistPath = "/homes/network/revtr/spoofed_traceroute/target_blacklist.txt"
     def self.TargetBlacklist()
-        @TargetBlacklist ||= Set.new(IO.read(TargetBlacklistPath).split("\n"))
+        @TargetBlacklist ||= Set.new(IO.read(TargetBlacklistPath).split("\n").map { |s| s.strip })
     end
 
     # targets taken from Harsha's most well connected PoPs
     HarshaPoPsPath = "#{DataSetDir}/responsive_corerouters.txt"
     def self.HarshaPoPs()
-        @HarshaPoPs ||= Set.new(IO.read(HarshaPoPsPath).split("\n"))
+        @HarshaPoPs ||= Set.new(IO.read(HarshaPoPsPath).split("\n").map { |s| s.strip })
     end
 
     # targets taken from routers on paths beyond Harsha's most well connected PoPs
     BeyondHarshaPoPsPath = "#{DataSetDir}/responsive_edgerouters.txt"
     def self.BeyondHarshaPoPs()
-        @BeyondHarshaPoPs ||= Set.new(IO.read(BeyondHarshaPoPsPath).split("\n"))
+        @BeyondHarshaPoPs ||= Set.new(IO.read(BeyondHarshaPoPsPath).split("\n").map { |s| s.strip })
     end
 
     # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
@@ -164,25 +164,25 @@ module FailureIsolation
     #  XXX Take in from isolation_vantage_points table instaed of this static list.
     SpooferTargetsPath = "#{DataSetDir}/up_spoofers.ips"
     def self.SpooferTargets()
-        @SpooferTargets ||= Set.new(IO.read(SpooferTargetsPath).split("\n"))
+        @SpooferTargets ||= Set.new(IO.read(SpooferTargetsPath).split("\n").map { |s| s.strip })
     end
 
     # targets taken from cloudfront ips
     CloudfrontTargetsPath = "#{DataSetDir}/cloudfront_ips.txt"
     def self.CloudfrontTargets()
-        @CloudfrontTargets ||= Set.new(IO.read(CloudfrontTargetsPath).split("\n"))
+        @CloudfrontTargets ||= Set.new(IO.read(CloudfrontTargetsPath).split("\n").map { |s| s.strip })
     end
 
     # targets taken from AT&T ips, for potential ground truth
     ATTTargetsPath = "/homes/network/revtr/dave/revtr-test/reverse_traceroute/data/att_responsive_just_ips.txt"
     def self.ATTTargets()
-        @ATTTargets ||= Set.new(IO.read(ATTTargetsPath).split("\n"))
+        @ATTTargets ||= Set.new(IO.read(ATTTargetsPath).split("\n").map { |s| s.strip })
     end
 
     # targets taken from cloudfront ips
     HubbleTargetsPath = "#{DataSetDir}/hubble_targets.txt"
-    def self.HubbleTargetsPath
-        @HubbleTargets ||= Set.new(IO.read(HubbleTargetsPath).split("\n"))
+    def self.HubbleTargets
+        @HubbleTargets ||= Set.new(IO.read(HubbleTargetsPath).split("\n").map { |s| s.strip })
     end
 
     # !!!!!!!!!!!!!!!!!!!
@@ -234,6 +234,10 @@ module FailureIsolation
         @TargetSet = Set.new
         union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
         @TargetSet.merge(union)
+
+        not_valid_ip = @TargetSet.find { |ip| !ip.matches_ip? }
+        raise "Invalid IP address in targets! #{nodt_valid_ip}" if not_valid_ip
+
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
         # push out targets to monitoring nodes! 
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
@@ -370,6 +374,8 @@ if $0 == __FILE__
     t = Time.parse("2011-09-19 11:40:43 -0700")
     
     puts FailureIsolation.pl_pl_path_for_date(t)
+
+    FailureIsolation.ReadInDataSets
 
     #a = FailureIsolation.ATTTargets
     #t = FailureIsolation.TargetSet
