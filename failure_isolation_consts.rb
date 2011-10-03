@@ -179,6 +179,12 @@ module FailureIsolation
         @ATTTargets ||= Set.new(IO.read(ATTTargetsPath).split("\n"))
     end
 
+    # targets taken from cloudfront ips
+    HubbleTargetsPath = "#{DataSetDir}/hubble_targets.txt"
+    def self.HubbleTargetsPath
+        @HubbleTargets ||= Set.new(IO.read(HubbleTargetsPath).split("\n"))
+    end
+
     # !!!!!!!!!!!!!!!!!!!
     #   to add a dataset, mimick the above lines
     def self.get_dataset(dst)
@@ -192,6 +198,8 @@ module FailureIsolation
             return DataSets::SpooferTargets
         elsif self.ATTTargets.include? dst
             return DataSets::ATTTargets
+        elsif self.HubbleTargets.include? dst
+            return DataSets::HubbleTargets
         else
             return DataSets::Unknown 
         end
@@ -217,6 +225,8 @@ module FailureIsolation
         self.TargetBlacklist
         @ATTTargets = nil
         self.ATTTargets
+        @HubbleTargets = nil
+        self.HubbleTargets
         self.UpdateTargetSet()
     end
 
@@ -318,13 +328,15 @@ module DataSets
     SpooferTargets = :"PL/mlab nodes"
     Unknown = :"Unknown"
     ATTTargets = :"ATT"
+    HubbleTargets = :"Hubble Targets"
 
     # !!!!!!!!!!!!!!!
     #  to add a dataset, add an element to this array, and edit
     #  the path in FailureIsolation. Note that these are the Sets! not the
     #  symbols
     AllDataSets = [FailureIsolation.HarshaPoPs, FailureIsolation.BeyondHarshaPoPs,
-        FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets]
+        FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets,
+        FailureIsolation.HubbleTargets]
 
     def self.ToPath(dataset)
         case dataset
@@ -338,6 +350,8 @@ module DataSets
             return FailureIsolation::SpooferTargetsPath
         when ATTTargets
             return FailureIsolation::ATTTargetsPath
+        when HubbleTargets
+            return FailureIsolation::HubbleTargetsPath
         when Unknown
             return "/dev/null"
         else
