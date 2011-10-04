@@ -187,7 +187,7 @@ class FailureDispatcher
            # doesn't have a direction...
            forward_merged << MergedOutage.new(outages, MergingMethod::FORWARD)
        elsif !outages.find { |o| o.passed_filters }.nil? and forward_merged.empty? and reverse_merged.empty?
-            raise "Not merging properly! #{outages.inspect}"
+           raise "Not merging properly! #{outages.inspect}"
        end
        
        return forward_merged + reverse_merged
@@ -304,7 +304,6 @@ class FailureDispatcher
             # traceroutes to them... their paths must differ somehow
             # TODO: put me back in?:
             #
-            #
             #outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
             #                                                           outage.spoofed_revtr, outage.historical_revtr)
             #
@@ -320,7 +319,6 @@ class FailureDispatcher
             #end
         end
     end
-
 
     # TODO: I should figure out a better way to gather data, rather
     # than this longgg method

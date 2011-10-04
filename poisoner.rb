@@ -53,8 +53,45 @@ class Poisoner
         poison(src2direction2outage2failures, merged_outage, testing)
     end
 
+    def log_outages(src2direction2outage2failures)
+        # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
+        previous_outages = []
+        begin
+            previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
+        rescue
+        end
+
+        current_time = Time.new
+
+        src2direction2outage2failures.each do |src, direction2outage2failures|
+            direction2outage2failures.each do |direction, outage2failures|
+                outage2failures.each do |outage, failures|
+
+                    # see if there was already an entry with the same
+                    #   -  source, destination, and direction
+                    already_there = previous_outages.find do |time_src_dst_dir_failures| 
+                        time, prev_src, prev_dst, prev_direction, *prev_failures = time_src_dst_dir_failures
+                        # the source, dstin
+                        (prev_src == src && prev_dst == dst && prev_direction == prev_direction)
+                    end
+
+                    if already_there
+                        already_there[1] = current_time  
+                    else
+                        formatted_failures = failures.map { |h| "#{h.ip} #{h.asn}" }
+                        previous_outages << [current_time, current_time, src, outage.dst, outage.direction, formatted_failures].flatten
+                    end
+                end
+            end
+        end
+
+        File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f|  YAML.dump(previous_outages, f) }
+    end
+
     # pre: !suspected_failures.empty?
-    def poison(src2direction2outage2failures, outage, testing)
+    def poison(src2direction2outage2failures, merged_outage, testing)
+        log_outages(src2direction2outage2failures) # if !testing
+
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:

@@ -164,7 +164,8 @@ class FailureMonitor
             end
 
             failure_percentage = hash.size * 1.0 / @target_set_size
-            if failure_percentage > @@source_specific_problem_threshold
+            if (!FailureIsolation::PoisonerNames.include? node and failure_percentage > @@source_specific_problem_threshold) or
+                    (FailureIsolation::PoisonerNames.include? node and failure_percentage == 1.0)
                 @problems_at_the_source[node] = failure_percentage * 100
                 @logger.puts "Problem at the source: #{node}"
                 next

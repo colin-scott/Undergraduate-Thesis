@@ -14,6 +14,8 @@ module FailureIsolation
     # ====================================
     #         miscellaneous              #
     # ====================================
+    CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
+
     PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
     "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux"]
     

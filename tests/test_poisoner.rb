@@ -1,14 +1,13 @@
 #!/homes/network/revtr/ruby/bin/ruby
 $: << File.expand_path("../")
 
-require 'isolation_module'
-require 'drb'
-require 'failure_dispatcher'
+require 'direction'
 require 'outage'
+require 'hops'
 require 'poisoner'
-require 'outage_correlation'
 
 require 'ip_info'
+
 require 'utilities'
 Thread.abort_on_exception = true
 
@@ -25,8 +24,9 @@ outage2.direction = Direction.BOTH
 outage1.passed_filters = true
 outage2.passed_filters = true
 
-outage1.suspected_failures[Direction.REVERSE] = ["218.101.61.52"]
-outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", IpInfo.new)]
+ip_info = IpInfo.new
+outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", ip_info)]
+outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", ip_info)]
 
 merged_outage = MergedOutage.new([outage1, outage2])
 

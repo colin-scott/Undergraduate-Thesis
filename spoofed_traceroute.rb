@@ -95,7 +95,8 @@ module SpoofedTR
 
     # results is [[probes, reciever], [probes, receiever], ...] 
     def SpoofedTR::parse_path(results, id2dest, controller)
-        controller.log.debug "parse_path(), results #{results.inspect}"
+        controller.log.debug "parse_path(), results: #{results.inspect}"
+        controller.log.debug "parse_path(), id2dest: #{id2dest.inspect}"
 
         # DRb can't unmarshall hashes initialized with blocks...
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
@@ -112,6 +113,8 @@ module SpoofedTR
                 id = id.to_i
                 ttl = ttl.to_i
                 dest = id2dest[id]
+                next if ttl == 0 # get rid of extraneous hole punches
+                next if ttl.nil? # not sure why this would ever happen
                 dest2ttl2rtrs[dest] = {} unless dest2ttl2rtrs.include? dest
                 dest2ttl2rtrs[dest][ttl] = Set.new unless dest2ttl2rtrs[dest].include? ttl
                 dest2ttl2rtrs[dest][ttl].add target
@@ -145,7 +148,6 @@ module SpoofedTR
 
                     dest2ttl2rtrs[intended_target][ttl] = Set.new unless dest2ttl2rtrs[intended_target].include? ttl
                     dest2ttl2rtrs[intended_target][ttl] |= rtrs
-
                 end
             end
         end
@@ -158,30 +160,35 @@ module SpoofedTR
         max_iterations = dest2ttl2rtrs.size
         curr_iteration = 0
 
+        # turn sets into arrays
+        dest2ttl2rtrs = dest2ttl2rtrs.map_values { |ttl2rtrs| ttl2rtrs.map_values { |rtrs| rtrs.to_a.map { |h| h.strip } } }
+        controller.log.debug "parse_path(), dest2ttl2rtrs to arrays: #{dest2ttl2rtrs.inspect}"
+
         dest2ttl2rtrs.keys.each do |dest|
             curr_iteration += 1 
             raise "found the memory leak!" if curr_iteration > max_iterations
-
-            # get rid of extraneous hole punches
-            dest2ttl2rtrs[dest].delete(0)
-
-            # turn sets into arrays
-            dest2ttl2rtrs[dest].each do |ttl, rtrs|
-               dest2ttl2rtrs[dest][ttl] = rtrs.to_a.map { |h| h.strip }
-            end
-
+            
             # convert into [ttl, rtrs] pairs
             sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
+
             # get rid of redundant destination ttls at the end
-            #controller.log.debug "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
+            controller.log.debug "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
             target = dest.is_a?(Array) ? dest[1] : dest   # sometimes dest is really srcdst.... XXX
             while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? target and sortedttlrtrs[-2][1].include? target 
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end
 
+            controller.log.debug "parse_path(#{dest}): sortedttlrtrs after removing dest: #{sortedttlrtrs.inspect}"
+
             # NOW!!! IF there were a bunch of zeroes before the last hop, but
             # the last hop was responsive, we likely have a problem with our
             # tools (riot). So get rid of it!
+            controller.log.debug "parse path, sortedttlrtrs.size: #{sortedttlrtrs.size}"
+            if sortedttlrtrs.size > 2
+                controller.log.debug "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-1][0].to_i}"
+                controller.log.debug "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-2][0].to_i}"
+            end
+
             if sortedttlrtrs.size > 2 and (sortedttlrtrs[-1][0].to_i - sortedttlrtrs[-2][0].to_i) > 4
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end

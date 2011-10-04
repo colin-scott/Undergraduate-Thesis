@@ -3,13 +3,19 @@ $: << "../"
 
 require 'drb'
 require 'isolation_module'
+require 'failure_analyzer'
+require 'failure_dispatcher'
+
+uri = ARGV.shift
 
 controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
 registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
+dispatcher = FailureDispatcher.new
+
 i = 0
 
-vps = controller.hosts.clone
+vps = controller.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
 
 if !vps.empty?
     i = (i + 1) % vps.size
@@ -20,7 +26,7 @@ if !vps.empty?
     vps.delete(curr_vp)
 
     vps = (ARGV.empty?) ? vps : ARGV
-
-    dest2ttltargettuple = registrar.client_spoofed_traceroute(curr_vp, targets, vps, true)
-    puts dest2ttltargettuple.inspect
+    
+    dst2ttlrtrs= registrar.batch_spoofed_traceroute({[curr_vp, targets.first] => vps})
+    puts dst2ttlrtrs
 end

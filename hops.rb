@@ -297,7 +297,7 @@ end
 # normal traceroute, spoofed traceroute, historical traceroute
 class ForwardPath < Path
    def reached_dst_AS?(dst, ipInfo)
-       dst = dst.is_a?(Hop) ? dst.ip : dst
+       dst = dst.is_a?(Hop) ? dst.ip.strip : dst.strip
        return false if dst.nil?
        dst_as = ipInfo.getASN(dst)
        last_non_zero_hop = last_non_zero_ip
@@ -316,8 +316,9 @@ class ForwardPath < Path
    end
 
    def reached?(dst)
+        dst = dst.strip
         #$LOG.puts" reached?: #{@hops.inspect}"
-        !@hops.find { |hop| hop.ip == dst }.nil?
+        !@hops.find { |hop| hop.ip.strip == dst }.nil?
    end
 
    def ping_responsive_except_dst?(dst=nil)

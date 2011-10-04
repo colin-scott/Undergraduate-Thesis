@@ -1329,8 +1329,9 @@ optparse = OptionParser.new do |opts|
         options[:log_level] = l
     end
     options[:actual_test] = false
-    opts.on( '-a', '--[no-]test-real', "Whether this is a test and should NOT be considered the live controller (default=false)" ) do|n|
-          options[:actual_test] = n
+    opts.on( '-a', '--[no-]test-real', "Whether this is a test and should NOT be considered the live controller (default=false)" ) do
+          options[:actual_test] = true
+          options[:log_level] = Logger::ERROR
     end
 end
 
@@ -1372,13 +1373,20 @@ if options[:kill]
     }
 end
 
-controller_log = (options[:actual_test]) ? LoggerLog.new($stderr) : LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+if options[:actual_test]
+    controller_log = LoggerLog.new($stderr)
+    controller_log.debug("the controller log is working")
+else
+
+    controller_log = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')
+end
+
 controller_log.level = options[:log_level]
 
 c=Controller.new(options[:test],options[:config],controller_log,options[:vp_uri_list])
 
 # # We need the uri of the service to connect a client
-puts c.uri
+puts "controller uri: #{c.uri}"
 c.log "Version number #{$VERSION}"
 c.log("Controller started at #{c.uri}")
 uri_port=c.uri.chomp("\n").split("/").at(-1).split(":").at(1)
@@ -1390,6 +1398,8 @@ c.log("Controller started at #{uri_ip}")
 registrar=Registrar.new(c)
 registrar_drb=DRb.start_service nil, registrar
 registrar_uri=registrar_drb.uri
+puts  "registrar uri: #{registrar_uri}"
+
 Signal.trap("INT"){ 
     registrar_drb.stop_service
     c.shutdown(2) 
@@ -1441,7 +1451,6 @@ registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_port=registrar_uri.chomp("\n").split("/").at(-1).split(":").at(1)
 registrar_uri_ip="druby://#{my_ip}:#{registrar_uri_port}"
 c.log("Registrar started at #{registrar_uri_ip}")
-
 
 if not options[:test]
     `mkdir -p #{$DATADIR}/uris`
