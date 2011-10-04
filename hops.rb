@@ -14,9 +14,12 @@
 require 'forwardable'
 
 class Path
-   attr_accessor :hops
+   @@last_hop_sanity_check_distance = 5
+   attr_accessor :hops, :src, :dst
 
-   def initialize(init_hops=[])
+   def initialize(src, dst, init_hops=[])
+      @src = src
+      @dst = dst.strip
       begin 
         if init_hops.is_a?(Path)
             init_hops = init_hops.hops
@@ -29,6 +32,8 @@ class Path
       rescue Exception => e
           raise "Caught #{e}, init_hops was #{init_hops.inspect}"
       end
+
+      sanitize_hops
    end
 
    # delegate methods to @hops!!!
@@ -44,6 +49,33 @@ class Path
        :|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+
+   def sanitize_hops()
+       return if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl }
+       get_rid_of_wonky_last_hop
+       remove_redundant_dsts
+   end
+
+   def get_rid_of_wonky_last_hop()
+       # Get rid of wonky 40th hop with random IPs
+       return if @hops[-1].ip == @dst
+
+       # first case: large disparity between second to last and last ttl
+       if @hops.size >= 2 and (@hops[-1].ttl - @hops[-2].ttl) > @@last_hop_sanity_check_distance 
+            @hops = @hops[0..-2]
+       end
+
+       # second case: only hop is the forty-eth
+       if @hops[0].ttl == 40
+            @hops = @hops[0..-2]
+       end
+   end
+
+   def remove_redundant_dsts()
+        while @hops.size > 1 and @hops[-1].ip == @dst and @hops[-2].ip == @dst
+            @hops = @hops[0..-2]
+        end
+    end
 
    def find(&block)
        return nil unless valid?
@@ -608,10 +640,12 @@ end
 if __FILE__ == $0
     require 'yaml'
     test = [1,32,4]
-    r = HistoricalReversePath.new(test)
-    t = ForwardPath.new(test)
-    q = SpoofedReversePath.new(test)
-    u = Path.new(test)
+    src = "1.2.2.2"
+    dst = "1.2.2.2"
+    r = HistoricalReversePath.new(src, dst,  test)
+    t = ForwardPath.new(src, dst, test)
+    q = SpoofedReversePath.new(src, dst, test)
+    u = Path.new(src, dst, test)
 
     puts r.inspect
     puts q.inspect

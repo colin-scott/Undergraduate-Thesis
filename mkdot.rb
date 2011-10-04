@@ -48,9 +48,9 @@ class DotGenerator
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
         src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [], true)
-        tr = ForwardPath.new([src_hop] + tr)
-        spoofed_tr = ForwardPath.new([src_hop] + spoofed_tr)
-        historic_tr = ForwardPath.new([src_hop] + historic_tr)
+        tr = ForwardPath.new(src, dst, [src_hop] + tr)
+        spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
+        historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
 
         # Cluster -> dns names we have seen for the cluster
         node2names = Hash.new{|h,k| h[k] = []}

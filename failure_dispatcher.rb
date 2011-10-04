@@ -408,7 +408,7 @@ class FailureDispatcher
             outage.measurement_times << ["revtr", Time.new]
             outage.spoofed_revtr = issue_revtr(outage.src, outage.dst, outage.historical_tr.map { |hop| hop.ip })
         else
-            outage.spoofed_revtr = SpoofedReversePath.new
+            outage.spoofed_revtr = SpoofedReversePath.new(outage.src, outage.dst)
         end
 
         @logger.debug "spoofed_revtr issued"
@@ -489,7 +489,7 @@ class FailureDispatcher
         # on an array of hacky non-valid ReverseHop objects...
         path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid?
 
-        HistoricalReversePath.new(path)
+        HistoricalReversePath.new(src, dst, path)
     end
 
     def retrieve_historical_tr(src, dst)
@@ -505,7 +505,7 @@ class FailureDispatcher
         @logger.debug "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
         # XXX why is this a nested array?
-        [ForwardPath.new(historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
+        [ForwardPath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
             historical_trace_timestamp]
     end
 
@@ -565,10 +565,11 @@ class FailureDispatcher
     end
 
     def retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
+        src, dst = srcdst
         if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
-            path = ForwardPath.new
+            path = ForwardPath.new(src, dst)
         else
-            path = ForwardPath.new(srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
+            path = ForwardPath.new(src, dst, srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
                 SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
             end)
         end
@@ -585,9 +586,9 @@ class FailureDispatcher
 
         targets.each do |targ|
             if dest2ttlhoptuples.nil? || dest2ttlhoptuples[targ].nil?
-                targ2paths[targ] = ForwardPath.new
+                targ2paths[targ] = ForwardPath.new(src, targ)
             else
-                targ2paths[targ] = ForwardPath.new(dest2ttlhoptuples[targ].map {|ttlhop| ForwardHop.new(ttlhop, @ipInfo)})
+                targ2paths[targ] = ForwardPath.new(src, targ, dest2ttlhoptuples[targ].map {|ttlhop| ForwardHop.new(ttlhop, @ipInfo)})
             end
         end
 
@@ -603,22 +604,22 @@ class FailureDispatcher
                                                           @rtrSvc.get_reverse_paths([[src, dst]], [historical_hops])
         rescue DRb::DRbConnError => e
             connect_to_drb()
-            return SpoofedReversePath.new([:drb_connection_refused])
+            return SpoofedReversePath.new(src, dst, [:drb_connection_refused])
         rescue Exception, NoMethodError => e
             Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             connect_to_drb()
-            return SpoofedReversePath.new([:drb_exception])
+            return SpoofedReversePath.new(src, dst, [:drb_exception])
         rescue Timeout::Error
-            return SpoofedReversePath.new([:self_induced_timeout])
+            return SpoofedReversePath.new(src, dst, [:self_induced_timeout])
         end
 
         @logger.debug "isolate_outage(#{src}, #{dst}), symbol2srcdst2revtr: #{symbol2srcdst2revtr.inspect}"
 
-        return SpoofedReversePath.new([:unexpected_return_value, symbol2srcdst2revtr]) if symbol2srcdst2revtr.is_a?(Symbol)
+        return SpoofedReversePath.new(src, dst, [:unexpected_return_value, symbol2srcdst2revtr]) if symbol2srcdst2revtr.is_a?(Symbol)
         raise "issue_revtr returned an #{symbol2srcdst2revtr.class}: #{symbol2srcdst2revtr.inspect}!" if !symbol2srcdst2revtr.is_a?(Hash) and !symbol2srcdst2revtr.is_a?(DRb::DRbObject)
 
         if symbol2srcdst2revtr.nil? || symbol2srcdst2revtr.values.find { |hash| hash.include? [src,dst] }.nil?
-            return SpoofedReversePath.new([:nil_return_value])
+            return SpoofedReversePath.new(src, dst, [:nil_return_value])
         end
 
         revtr = [:daves_new_api_is_broken?]
@@ -647,7 +648,7 @@ class FailureDispatcher
             @logger.debug "isolate_outage(#{src}, #{dst}), spoofed_revtr: #{revtr.inspect}"
         end
 
-        return SpoofedReversePath.new(revtr)
+        return SpoofedReversePath.new(src, dst, revtr)
     end
 
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths

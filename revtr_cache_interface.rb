@@ -21,9 +21,7 @@ class RevtrCache
     end
 
     def get_cached_reverse_path(src, dst)
-      path = HistoricalReversePath.new
-      path.src = src
-      path.dst = dst
+      path = HistoricalReversePath.new(src, dst)
     
       src = Inet::aton(@db.hostname2ip[src])
       dst = Inet::aton(dst)
