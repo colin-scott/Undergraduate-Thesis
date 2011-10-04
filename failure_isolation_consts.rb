@@ -377,7 +377,11 @@ if $0 == __FILE__
     
     puts FailureIsolation.pl_pl_path_for_date(t)
 
-    FailureIsolation.ReadInDataSets
+    #FailureIsolation.ReadInDataSets
+
+    require 'yaml'
+    previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
+    puts previous_outages.inspect
 
     #a = FailureIsolation.ATTTargets
     #t = FailureIsolation.TargetSet

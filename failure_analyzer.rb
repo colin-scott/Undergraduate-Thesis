@@ -340,6 +340,7 @@ class FailureAnalyzer
 
         # should we get rid of this after correlation?
         reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
+        # reverse_path_helpless = false
 
         if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&

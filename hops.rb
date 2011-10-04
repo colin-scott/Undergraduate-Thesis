@@ -12,6 +12,7 @@
 # =============================================================================
 
 require 'forwardable'
+require 'utilities'
 
 class Path
    @@last_hop_sanity_check_distance = 5
@@ -24,13 +25,13 @@ class Path
         if init_hops.is_a?(Path)
             init_hops = init_hops.hops
         elsif !init_hops.is_a?(Array)
-          raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" if !init_hops.is_a?(Array)
+          raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" 
         end
 
         @hops = Array.new(init_hops)
         link_listify!
       rescue Exception => e
-          raise "Caught #{e}, init_hops was #{init_hops.inspect}"
+          raise "Caught #{e} #{e.backtrace}, init_hops was #{init_hops.inspect}"
       end
 
       sanitize_hops
@@ -52,6 +53,7 @@ class Path
 
    def sanitize_hops()
        return if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl }
+       return if @hops.empty?
        get_rid_of_wonky_last_hop
        remove_redundant_dsts
    end
@@ -125,7 +127,7 @@ class Path
 
    def contains_loop?()
        no_zeros = @hops.map { |hop| hop.ip }.find_all { |ip| ip != "0.0.0.0" }
-       adjacents_removed = Path.new
+       adjacents_removed = Path.new(@src, @dst)
 
        (0..(no_zeros.size-2)).each do |i|
           adjacents_removed << no_zeros[i] if no_zeros[i] != no_zeros[i+1]
@@ -180,6 +182,9 @@ end
 
 # fuckin' namespace collision with reverse_traceroute.rb
 class RevPath < Path
+   def initialize(src, dst, init_hops=[])
+        super(src, dst, init_hops)
+   end
    #def last_responsive_hop()
    #    self.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
    #end
@@ -267,8 +272,8 @@ end
 class HistoricalReversePath < RevPath
    attr_accessor :timestamp, :invalid_reason, :src, :dst, :valid
 
-   def initialize(init_hops=[])
-       super(init_hops)
+   def initialize(src, dst, init_hops=[])
+       super(src, dst, init_hops)
        @timestamp = 0 # measurement timestamp
        @valid = false # if false, then there was nothing found in the DB
        @invalid_reason = "unknown" # if valid==false, this will explain the current probe status
@@ -415,6 +420,10 @@ class Hop
             @prefix, @asn = ipInfo.getInfo(@ip)
             @formatted = ipInfo.format(@ip, @dns, @asn)
         end
+    end
+
+    def valid_ip
+        @ip.matches_ip?
     end
 
     # Alias resolution!
@@ -580,6 +589,7 @@ class ReverseHop < Hop
             if @ip !~ /\d+\.\d+\.\d+\.\d+/
                 @dns = @ip
                 @ip = Resolv.getaddress(@ip) 
+                @ttl = -1
             end
 
             # deal with the weird case where the DNS is not included in the output
@@ -639,9 +649,19 @@ end
 
 if __FILE__ == $0
     require 'yaml'
-    test = [1,32,4]
+    hop1 = Hop.new("1.2.3.4")
+    hop1.ttl = 1
+    hop2 = Hop.new("1.2.3.4")
+    hop2.ttl = 2
+    hop3 = Hop.new("1.2.3.4")
+    hop3.ttl = 3
+    hop40 = Hop.new("22.22.22.22")
+    hop40.ttl = 40
+
+    test = [hop1, hop2, hop3, hop40]
+
     src = "1.2.2.2"
-    dst = "1.2.2.2"
+    dst = "1.2.3.4"
     r = HistoricalReversePath.new(src, dst,  test)
     t = ForwardPath.new(src, dst, test)
     q = SpoofedReversePath.new(src, dst, test)

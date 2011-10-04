@@ -256,8 +256,7 @@ class Registrar
     end
 
     # returns hash
-    #   src -> [pingable dsts]
-    # precondition: all srcs and dsts already registered
+    #   src -> [pingable dsts] # precondition: all srcs and dsts already registered
     def all_pairs_ping(srcs, dsts)
         return Ping::all_pairs_ping(srcs,dsts,@controller)
     end

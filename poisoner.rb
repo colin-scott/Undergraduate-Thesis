@@ -59,7 +59,10 @@ class Poisoner
         begin
             previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
         rescue
+            @logger.warn "failed to load yaml file #{$!}"
         end
+
+        previous_outages = [] unless previous_outages
 
         current_time = Time.new
 
@@ -88,10 +91,9 @@ class Poisoner
         File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f|  YAML.dump(previous_outages, f) }
     end
 
-    # pre: !suspected_failures.empty?
+    # pre: all outages in src2direction2outage2failures are ready to be
+    # poisoned (not just random)
     def poison(src2direction2outage2failures, merged_outage, testing)
-        log_outages(src2direction2outage2failures) # if !testing
-
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:
@@ -123,6 +125,8 @@ class Poisoner
                 execute_poison(src, asn_to_poison, outage, testing)
             end
         end
+
+        log_outages(src2direction2outage2failures) # if !testing
     end
 
     def asns_to_poison(outage2failures)
