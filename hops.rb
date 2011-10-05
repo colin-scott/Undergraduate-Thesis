@@ -63,12 +63,12 @@ class Path
        return if @hops[-1].ip == @dst
 
        # first case: large disparity between second to last and last ttl
-       if @hops.size >= 2 and (@hops[-1].ttl - @hops[-2].ttl) > @@last_hop_sanity_check_distance 
+       if @hops.size >= 2 and (@hops[-1].ttl.to_i - @hops[-2].ttl.to_i) > @@last_hop_sanity_check_distance 
             @hops = @hops[0..-2]
        end
 
        # second case: only hop is the forty-eth
-       if @hops[0].ttl == 40
+       if @hops[0].ttl.to_i == 40
             @hops = @hops[0..-2]
        end
    end

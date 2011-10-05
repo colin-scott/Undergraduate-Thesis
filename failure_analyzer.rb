@@ -158,10 +158,12 @@ class FailureAnalyzer
     def identify_failure_old(outage)
         if !outage.historical_revtr.valid?
             ## let m be the first forward hop that does not yield a revtr to s
-            #tr_suspect = outage.tr.last_responsive_hop
-            #spooftr_suspect = outage.spoofed_tr.last_responsive_hop
-            #suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            #outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
+            tr_suspect = outage.tr.last_responsive_hop
+            spooftr_suspect = outage.spoofed_tr.last_responsive_hop
+            suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
+            outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
+
+            outage.complete_reverse_isolation = false
 
             # baaaaah. This is confusing and not all that helpful.
             #
@@ -177,6 +179,7 @@ class FailureAnalyzer
         else
             # TODO: more stuff with
             outage.suspected_failures[Direction.REVERSE] = [outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
+            outage.complete_reverse_isolation = true
         end # what if the spoofed revtr went through?
     end
 
@@ -339,8 +342,9 @@ class FailureAnalyzer
         last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
 
         # should we get rid of this after correlation?
-        reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
-        # reverse_path_helpless = false
+        #reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
+        # TODO: change me?
+        reverse_path_helpless = false
 
         if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
                 !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&

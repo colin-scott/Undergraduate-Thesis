@@ -6,7 +6,11 @@
   </head>
   <body>
   <p>
-  Poison opportunity! <%= @outage.direction %>
+  Poison opportunity! <%= @outage.direction %> 
+  <br />
+  <% if @outage.direction == Direction.REVERSE %>
+  (Isolation algorithm used historical revtr?: <%= @outage.complete_reverse_isolation %>)
+  <% end %>
   <ul type=none>
         <img src="<%= @outage.graph_url %>" alt="dot" />
         <a href="http://revtr.cs.washington.edu/isolation_graphs/legend.txt">legend</a>

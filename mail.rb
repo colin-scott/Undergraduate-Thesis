@@ -139,7 +139,7 @@ class Emailer < ActionMailer::Base
     def poison_notification(outage, testing)
         subject "Poison Opportunity Detected!"
         from "failures@cs.washington.edu"
-        recipients (testing) ? "cs@cs.washington.edu" : ["arvind@cs.washington.edu", "ethan@cs.washington.edu", "cs@cs.washington.edu", "choffnes@cs.washington.edu", "cunha@cs.washington.edu", "vytautas.valancius@gmail.com"]
+        recipients (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
         body :outage => outage
     end
 end

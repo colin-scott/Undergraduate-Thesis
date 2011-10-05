@@ -21,6 +21,8 @@ outage2.src = "UWAS.BGPMUX"
 outage1.direction = Direction.REVERSE
 outage2.direction = Direction.BOTH
 
+outage1.complete_reverse_isolation = true
+
 outage1.passed_filters = true
 outage2.passed_filters = true
 

@@ -100,7 +100,7 @@ class Outage
                                           :measurement_times, :passed_filters, 
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
                                           :measurements_reissued, :spliced_paths, :jpg_output, :graph_url, :responsive_targets,
-                                          :asn_to_poison
+                                          :asn_to_poison, :complete_reverse_isolation
 
   # re: symmetric
   #   tried to implement symmetry through polymorphism... but no behavior is
