@@ -59,6 +59,7 @@ class FailureDispatcher
 
         Thread.new do
             loop do
+                # TODO: put traces in the DB
                 @historical_trace_timestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
                 @node2target2trace = {}
                 node2target2trace.each do |node, target2trace|
@@ -117,6 +118,9 @@ class FailureDispatcher
         # ids
         # ================================================================================
        
+        # TODO: integrate Italo's icmpid fixes so that we don't have to issue
+        # globally like this
+        
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
         issue_pings_towards_srcs(srcdst2outage)
@@ -152,7 +156,7 @@ class FailureDispatcher
 
             if !testing
                 dst2outage_correlation.values.each do |outage_correlation|
-                    log_outage_correlation(outage_correlation) 
+                    log_outage_correlation(outage_correlation)
                 end
             end
 
@@ -241,6 +245,7 @@ class FailureDispatcher
 
         @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
 
+        # turn into a linked list ( I think? )
         outage.build
 
         if(!testing)
@@ -349,6 +354,7 @@ class FailureDispatcher
 
         @logger.debug "traceroutes issued"
 
+        # I see empty measurements from time to time
         if outage.tr.empty?
             @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
             restart_atd(outage.src)
@@ -427,6 +433,7 @@ class FailureDispatcher
 
         @logger.debug "historical pingability fetched"
 
+        # Issue ground truth measurements
         if outage.symmetric
             outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
             @logger.debug("destination's tr issued. valid?:#{outage.dst_tr.valid?}")
