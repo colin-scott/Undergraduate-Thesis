@@ -1,3 +1,4 @@
+#!/homes/network/revtr/ruby/bin/ruby
 require 'failure_dispatcher'
 require 'house_cleaner'
 require 'failure_isolation_consts'
@@ -260,7 +261,6 @@ class FailureMonitor
             failed_measurements,not_controllable,bad_srcs,possibly_bad_srcs,outdated]
     end
 
-
     def update_auxiliary_state(node2targetstate)
         current_time = Time.now
 
@@ -336,12 +336,21 @@ class FailureMonitor
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
+            nodes = observingnode2rounds.keys
 
-            if target2stillconnected[target].size >= @@vp_bound and  # (at least one VP has connectivity)
-                observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and # (don't issue from nodes that just started seeing the outage)
-                # observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and # (don't issue from nodes that have been experiencing the outage for a very long time)
-                !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and # at least one connected host has been consistently connected for at least 4 rounds
-                !observingnode2rounds.empty? # at least one observing node remains
+                # (at least one VP has connectivity)
+            if target2stillconnected[target].size >= @@vp_bound and  
+                # (don't issue from nodes that just started seeing the outage)
+                observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and 
+                # (don't issue from nodes that have been experiencing the outage for a very long time)
+                ## observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and 
+                #
+                # (at least one connected host has been consistently connected for at least 4 rounds)
+                !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and 
+                # (if a poisoner is observing, make sure at least on other non-poinonser is also observing)
+                (nodes.find { |n| FailureIsolation::PoisonerNames.include? n }) ? nodes.find { |n| !FailureIsolation::PoisonerNames.include? n } : true
+                # (at least one observing node remains)
+                !observingnode2rounds.empty? 
 
               # TODO: encpasulate VPs into objects, so the to_s automatically
               # yields the formatted string

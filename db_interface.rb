@@ -8,6 +8,7 @@
 #       DB yet)
 
 require 'mysql'
+require 'mysql_connection_manager'
 require 'socket'
 require 'utilities'
 require 'set'
@@ -19,10 +20,10 @@ class DatabaseInterface
         @logger = logger
 
         begin
-          @connection = Mysql.new(host, usr, pwd, database)
-        rescue Mysql::Error => e
-          @logger.puts "DB connection error " + host
-          throw e
+            @connection = MysqlConnectionManager.new(host, usr, pwd, database)
+        rescue Mysql::Error
+            @logger.puts "DB connection error " + host
+            throw e
         end
 
         @hostname2ip = hostname2ip

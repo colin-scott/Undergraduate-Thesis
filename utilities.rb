@@ -1,8 +1,11 @@
+#!/homes/network/revtr/ruby/bin/ruby
+
 require 'syslog'
 require 'date'
 require 'logger'
 require 'thread'
 require 'forwardable'
+require 'inline'
 
 # ||= so we don't redefine it
 $LOG ||= $stderr
@@ -14,7 +17,6 @@ class Method
         str = old_to_s
 
         # "#<Method: String#count>"
-        #
         return str.gsub(/#<Method: /, '').gsub(/>$/, '').split("#")[1]
     end
 end
@@ -59,9 +61,8 @@ class Set
     end
 end
 
-# TODO:
-#   very annoyed by "Array can't be converted into Set" and vice versa.
 class Array
+    # So that Sets play well with Arrays
     alias_method :old_or, :| unless self.instance_methods.include? :old_plus
     alias_method :old_plus, :+ unless self.instance_methods.include? :old_plus
     alias_method :old_minus, :- unless self.instance_methods.include? :old_minus
@@ -281,11 +282,11 @@ module ProbeController
   end
 
   def ProbeController::issue_to_controller(retries=1, &method)
-    self.issue_to_server( :controller, retries, &method)
+    self.issue_to_server(:controller, retries, &method)
   end
 
   def ProbeController::issue_to_adjacency_server(retries=1, &method)
-    self.issue_to_server( :adjacency_server, retries, &method)
+    self.issue_to_server(:adjacency_server, retries, &method)
   end
 
   def ProbeController::issue_to_vp_server(retries=1, &method)
@@ -307,33 +308,91 @@ module ProbeController
 end
 
 module Inet
-  $PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
+  # Let's make Ruby's bit fiddling reasonably fast!
+  inline(:C) do |builder|
+       builder.include "<sys/types.h>"
+       builder.include "<sys/socket.h>"
+       builder.include "<netinet/in.h>"
+       builder.include "<arpa/inet.h>"
 
-  def Inet::ntoa( intaddr )
-    ((intaddr >> 24) & 255).to_s + '.' + ((intaddr >> 16) & 255).to_s + '.'  + ((intaddr >> 8) & 255).to_s + '.' + (intaddr & 255).to_s 
+       builder.prefix %{
+
+       // 10.0.0.0/8
+       #define lower10 167772160
+       #define upper10 184549375
+       // 172.16.0.0/12
+       #define lower172 2886729728
+       #define upper172 2887778303
+       // 192.168.0.0/16
+       #define lower192 3232235520
+       #define upper192 3232301055
+       // 224.0.0.0/4
+       #define lowerMulti 3758096384
+       #define upperMulti 4026531839
+       // 127.0.0.0/16
+       #define lowerLoop 2130706432
+       #define upperLoop 2147483647
+       // 169.254.0.0/16 (DHCP)
+       #define lower169 2851995648
+       #define upper169 2852061183
+       // 0.0.0.0
+       #define zero 0
+       
+       }
+
+       builder.c_singleton %{
+
+       // can't call ntoa() directly
+       char *ntoa(unsigned int addr) {
+           struct in_addr in;
+           in.s_addr = addr;
+           return inet_ntoa(in);
+        }
+
+        }
+
+       builder.c_singleton %{
+
+       // can't call aton() directly
+       unsigned int aton(const char *addr) {
+           struct in_addr in;
+           inet_aton(addr, &in);
+           return in.s_addr;
+        }
+
+        }
+
+        builder.c_singleton %{
+       
+        int in_private_prefix(const char *addr) {
+            // can't call aton() apparently?
+            // so we'll just be redundant
+            struct in_addr in;
+            inet_aton(addr, &in);
+            unsigned int ip = in.s_addr;
+
+            if( (ip > lower10 && ip < upper10 ) || (ip > lower172 && ip < upper172)
+                            || (ip > lower192 && ip < upper192) ||
+                            (ip > lowerMulti && ip < upperMulti) ||
+                            (ip > lowerLoop && ip < upperLoop) ||
+                            (ip > lower169 && ip < lower169) ||
+                            (ip == zero)) {
+                return 1;
+            } else {
+                return 0;
+            }
+         }
+       }
   end
 
-  def Inet::aton(dotted)
-    raise "not a valid IP address #{dotted}" unless dotted.matches_ip?
-    ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
-    val=0
-    ints.each{|n| val=(val*256)+n}
-    return val
+  def self.in_private_prefix?(addr)
+      self.in_private_prefix(addr) == 1;
   end
 
   def Inet::prefix(ip,length)
     ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
     return ((ip>>(32-length))<<(32-length))
   end
-
-  def Inet::in_private_prefix?(ip)
-    ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
-    $PRIVATE_PREFIXES.each do |prefix|
-      return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
-    end
-    return false
-  end
-
 
   $blacklisted_prefixes=nil
   def Inet::in_blacklisted_prefix?(ip)
@@ -387,21 +446,22 @@ class TruncatedTraceFileException < RuntimeError
   end
 end
 # return an array of recordroutes, where each is [dst,hops array, rtt, ttl]
-# will throw truncatedtracefileexception for malformed files
+# will throw TruncatedTraceFileException for malformed files
 def convert_binary_recordroutes(data, print=false)
   offset=0
   recordroutes=[]
   #while not probes.eof?
   while not offset>=data.length
-    rr=data[offset,72].unpack("n3lfl2n9l2")
+    rr=data[offset,72].unpack("N3LfL2N9L2")
     offset += 72
     if rr.nil? or rr.include?(nil)
-      raise truncatedtracefileexception.new(recordroutes), "error reading header", caller
+      raise TruncatedTraceFileException.new(recordroutes), "Error reading header", caller
     end
-    dst=inet::ntoa(rr.at(0))
+    dst=Inet::ntoa(rr.at(0))
     rtt=rr.at(4)
     ttl=rr.at(5)
-    hops=rr[7..15].collect{|x| inet::ntoa(x)}
+    hops=rr[7..15].collect{|x| Inet::ntoa(x)}
+
     recordroutes << [dst,hops,rtt,ttl]
     if print
       $stdout.puts "#{dst} #{rtt} #{hops.join(" ")}"
@@ -409,31 +469,6 @@ def convert_binary_recordroutes(data, print=false)
   end
   return recordroutes
 end
-# return an array of recordroutes, where each is [dst,hops array, rtt, ttl]
-# will throw truncatedtracefileexception for malformed files
-def self.convert_binary_recordroutes(data, print=false)
-  offset=0
-  recordroutes=[]
-  #while not probes.eof?
-  while not offset>=data.length
-    rr=data[offset,72].unpack("n3lfl2n9l2")
-    offset += 72
-    if rr.nil? or rr.include?(nil)
-      raise truncatedtracefileexception.new(recordroutes), "error reading header", caller
-    end
-    dst=inet::ntoa(rr.at(0))
-    rtt=rr.at(4)
-    ttl=rr.at(5)
-    hops=rr[7..15].collect{|x| inet::ntoa(x)}
-    recordroutes << [dst,hops,rtt,ttl]
-    if print
-      $stdout.puts "#{dst} #{rtt} #{hops.join(" ")}"
-    end
-  end
-  return recordroutes
-end
-
-
 
 # take data, a string read in from an iplane-format binary trace.out file
 # return an array of traceroutes, where each is [dst,hops array, rtts array,
@@ -504,7 +539,6 @@ def convert_binary_traceroutes(data, print=false)
   return traceroutes
 end
 
-
 class UnionFind
   def initialize()
     @up=Hash.new("root")
@@ -573,7 +607,7 @@ class Hash
   # for when the keys hash to their own hash
   # create a new hash when necessary (default false)
   # and add the new k/v pair)
-  def append_custom_to_hash (key, intermediatekey, value )
+  def append_to_hash (key, intermediatekey, value )
     if not self.has_key?(key)
       self[key] = Hash.new(false)
     end
@@ -584,7 +618,7 @@ class Hash
   # create a new hash when necessary (default Array.new)
   # and append the new value
   # this may be broken?
-  def append2_custom_to_hash (key, intermediatekey, value )
+  def append2_to_hash (key, intermediatekey, value )
     if not self.has_key?(key)
       self[key] = Hash.new(Array.new)
     end
@@ -631,11 +665,14 @@ end
 # in the file
 $pl_ip2host = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
 $pl_host2ip = Hash.new do |h,k|
+   result = nil
    if (k.respond_to?(:downcase) && h.has_key?(k.downcase))
-      return h[k.downcase]
+      result =h[k.downcase]
    else 
        raise "Does not contain hostname: #{hostname}" 
    end
+
+   result
 end
 
 def loadPLHostnames
@@ -816,3 +853,11 @@ class LoggerLog < Log
     end
 end
 
+
+if $0 == __FILE__
+    puts Inet::prefix("1.2.3.4", 4)
+    puts Inet::ntoa(Inet::aton("1.2.3.4"))
+    puts Inet::in_private_prefix?("1.2.3.4")
+    puts Inet::in_private_prefix?("192.168.1.1")
+    puts Inet::in_private_prefix?("0.0.0.0")
+end

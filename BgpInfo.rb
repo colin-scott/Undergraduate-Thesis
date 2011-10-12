@@ -1,8 +1,7 @@
 #!/homes/network/revtr/ruby/bin/ruby
 
 # XXX why Dave's, and not mine?
-require 'utilities.rb'
-require 'rubygems'
+require_relative 'utilities.rb'
 require 'rpatricia'
 
 class BgpInfo
