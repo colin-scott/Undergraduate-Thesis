@@ -24,9 +24,6 @@ class FailureMonitor
         # TODO: handle these with optparse
         @@minutes_per_round = 2
         @@timestamp_bound = 605
-        @@upper_rounds_bound = 500
-        @@lower_rounds_bound = 4
-        @@vp_bound = 1
 
         # if a VP misses more than 10 measurements,swap it out
         @@failed_measurement_threshold = 10  
@@ -369,6 +366,7 @@ class FailureMonitor
             :no_vp_remains = no_vp_remains,
             :all_nodes_issued_measurements_recently => all_nodes_issued_measurements_recently
         }
+
 
         # TODO log the correlation
         filter_triggered = bool_vector.values.reduce(:|)
