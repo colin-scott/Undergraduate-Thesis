@@ -11,7 +11,7 @@ module FirstLevelFilters
 
     # (don't issue from nodes that have been experiencing the outage for a very long time)
     def no_vp_newly_observed?(observingnode2rounds)
-       observingnode2rounds.delete_if { |node, rounds| rounds >= UPPER_ROUNDS_BOUND }.size < 1 
+       observingnode2rounds.delete_if { |node, rounds| rounds >= UPPER_ROUNDS_BOUND }.size < VP_BOUND
     end
 
     # (don't issue from nodes that just started seeing the outage)
@@ -20,7 +20,7 @@ module FirstLevelFilters
     end
 
     # (at least one connected host has been consistently connected for at least 4 rounds)
-    def no_stable_connected_vp?(stillconnected, nodetarget2lastoutage)
+    def no_stable_connected_vp?(stillconnected, nodetarget2lastoutage, now)
        stillconnected.find { |node| (now - (nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > LOWER_ROUNDS_BOUND }.nil?
     end
 

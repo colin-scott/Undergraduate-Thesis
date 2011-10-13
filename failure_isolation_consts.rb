@@ -114,7 +114,7 @@ module FailureIsolation
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
-    FirstLevelFilterStats = "#{$DATADIR}/first_level_filters" 
+    FirstLevelFilterStats = "#{$DATADIR}/first_level_filters/filter_stats.bin" 
     SecondLevelFilterStats = "#{$DATADIR}/second_level_filters" 
 
     DotFiles = "#{$DATADIR}/dots"

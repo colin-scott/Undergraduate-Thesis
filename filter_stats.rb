@@ -1,23 +1,19 @@
 require 'thread'
 
 class FirstLevelFilterTracker
-    # TODO
-   attr_accessor :target
+   attr_accessor :target, :initial_observing, :initial_connected, :failure_reasons, :time
 
-   def initialize(target, initial_observing, initial_connected)
+   def initialize(target, initial_observing, initial_connected, failure_reasons, time)
         @target = target
         @initial_observing = initial_observing
         @initial_connected = initial_connected
-
-        @final_passed = []
-        @final_failed2reasons = {}
-
-        @start_time = Time.now
+        @failure_reasons = failure_reasons
+        @time = time
    end 
 
    # for threading
-   def complete?()
-      @final_passed.size + @final_failed2reasons.size == @initial_observing.size
+   def passed?()
+      @failure_reaons.values.reduce(:|)
    end
 end
 

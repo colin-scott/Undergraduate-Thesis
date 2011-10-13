@@ -329,6 +329,7 @@ class FailureMonitor
     end
 
     def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
+        now = Time.new
         nodes = observingnode2rounds.keys
 
         no_vp_has_connectivity = no_vp_has_connectivity?(stillconnected)
@@ -338,7 +339,7 @@ class FailureMonitor
 
         no_stable_unconnected_vp = no_stable_unconnected_vp?(observingnode2rounds)
 
-        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage)
+        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, now)
 
         no_non_poisoner = no_non_poisoner?(nodes)
 
@@ -347,12 +348,12 @@ class FailureMonitor
         # don't issue isolation measurements for targets which have
         # already been probed recently
         observingnode2rounds.each do |node, rounds|
-          if @node_target2lastisolationattempt.include? [node,target] and 
-                      (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
-              observingnode2rounds.delete node 
-          else
-              @node_target2lastisolationattempt[[node,target]] = @current_round
-          end
+            if @node_target2lastisolationattempt.include? [node,target] and 
+                        (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
+                observingnode2rounds.delete node 
+            else
+                @node_target2lastisolationattempt[[node,target]] = @current_round
+            end
         end
 
         all_nodes_issued_measurements_recently = observingnode2rounds.empty?
@@ -367,21 +368,20 @@ class FailureMonitor
             :all_nodes_issued_measurements_recently => all_nodes_issued_measurements_recently
         }
 
-
-        # TODO log the correlation
-        filter_triggered = bool_vector.values.reduce(:|)
-        return !filter_triggered
+        filter_tracker = FirstLevelFilterTracker.new(target, nodes, stillconnected, bool_vector, now)
+        return filter_tracker
     end
 
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
         dst2filter_tracker =  {}
-
-        now = Time.new
+        filter_stats = []
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-            next unless passes_first_level_filters?(target, observingnode2rounds, target2stillconnected[target])
+            filter_tracker = passes_first_level_filters?(target, observingnode2rounds, target2stillconnected[target])
+            filter_stats << filter_tracker
+            next unless filter_tracker.passed?
 
             # TODO: encpasulate VPs into objects, so the to_s automatically
             # yields the formatted string
@@ -401,12 +401,24 @@ class FailureMonitor
             end
         end
 
+        # log first level filter stats
+        log_filter_stats(filter_stats)
+        
         [srcdst2outage, dst2filter_tracker]
     end
 
-    def log_outage_detected(*args)
-        t = Time.new
-        File.open(FailureIsolation.OutageNotifications+"/#{args[0]}_#{t.year}#{t.month}#{t.day}#{t.hour}#{t.min}.yml", "w") { |f| YAML.dump(args, f) }
+    def log_filter_stats(filter_stats)
+        old_stats = []
+        begin 
+            old_stats = Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
+        rescue
+            $stderr.puts "Failed to load old isolation stats! #{$!}"
+            old_stats = []
+        end
+
+        old_stats += filter_stats
+        File.open(FailureIsolation::FirstLevelFilterStats, "w") { |f| f.write Marshal.dump(old_stats) }
     end
 end
+
 
