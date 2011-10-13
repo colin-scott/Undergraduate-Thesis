@@ -5,7 +5,7 @@ require 'failure_isolation_consts'
 require 'set'
 require 'yaml'
 require 'outage'
-require 'outage_correlation'
+require 'filter_stats'
 require 'utilities'
 require 'filters'
 
