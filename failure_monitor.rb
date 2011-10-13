@@ -14,7 +14,7 @@ require 'filters'
 class FailureMonitor
     include FirstLevelFilters
 
-    def initialize(dispatcher, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
+    def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
         @dispatcher = dispatcher
         @db = db
         @logger = logger
@@ -289,7 +289,7 @@ class FailureMonitor
         @not_sshable.delete node
     end
 
-    def classify_outages(node2targetstate)
+    def classify_outages(node2targetstate, testing=false)
         # target -> { node -> # rounds }
         target2observingnode2rounds = Hash.new { |hash,key| hash[key] = {} }
         # target -> [node1, node2, ...]
@@ -313,10 +313,15 @@ class FailureMonitor
                 
                all_targets.add target
 
-               if !@vps_2_targets_never_seen[node].include? target
-                   target2observingnode2rounds[target][node] = rounds
+               if @vps_2_targets_never_seen.include? node
+                    if !@vps_2_targets_never_seen[node].include? target
+                        target2observingnode2rounds[target][node] = rounds
+                    else 
+                        target2neverseen[target] << node
+                    end
                else 
-                   target2neverseen[target] << node
+                   @logger.warn "node #{node} not known by monitor.."
+                   target2observingnode2rounds[target][node] = rounds
                end
             end
         end
@@ -339,7 +344,7 @@ class FailureMonitor
 
         no_stable_unconnected_vp = no_stable_unconnected_vp?(observingnode2rounds)
 
-        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, now)
+        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, target, now)
 
         no_non_poisoner = no_non_poisoner?(nodes)
 
@@ -361,10 +366,10 @@ class FailureMonitor
         bool_vector = {
             :no_vp_has_connectivity => no_vp_has_connectivity,
             :no_vp_newly_observing => no_vp_newly_observing,
-            :no_stable_unconnected_vp = no_stable_unconnected_vp,
-            :no_stable_connected_vp = no_stable_connected_vp,
-            :no_non_poisoner = no_non_poisoner,
-            :no_vp_remains = no_vp_remains,
+            :no_stable_unconnected_vp => no_stable_unconnected_vp,
+            :no_stable_connected_vp => no_stable_connected_vp,
+            :no_non_poisoner => no_non_poisoner,
+            :no_vp_remains => no_vp_remains,
             :all_nodes_issued_measurements_recently => all_nodes_issued_measurements_recently
         }
 

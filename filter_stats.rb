@@ -13,7 +13,8 @@ class FirstLevelFilterTracker
 
    # for threading
    def passed?()
-      @failure_reaons.values.reduce(:|)
+       # if any are true, then a trigger went off
+       !@failure_reasons.values.reduce(:|)
    end
 end
 
@@ -35,6 +36,9 @@ class SecondLevelFilterTracker
 
    # for threading
    def complete?()
-      @final_passed.size + @final_failed2reasons.size == @initial_observing.size
+        @final_passed.size + @final_failed2reasons.size == @initial_observing.size
    end
 end
+
+# class alias, for backwards compatiblity
+OutageCorrelation = SecondLevelFilterTracker 

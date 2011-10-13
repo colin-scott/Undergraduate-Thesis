@@ -203,6 +203,10 @@ module LogIterator
         end
     end
 
+    def self.first_level_filter_stats()
+       Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
+    end
+
     def LogIterator::correlation_iterate(files=nil, debugging=false, &block)
         Dir.chdir FailureIsolation::SecondLevelFilterStats do
             files ||= Dir.glob("*yml").sort

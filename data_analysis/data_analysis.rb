@@ -90,6 +90,11 @@ end
 
 module Stats
    def self.print_average(name, count, total)
-       puts "#{name}: #{count} #{count*100.0/total}"
+       percent = count*100.0/total
+       rounded_percent = ("%.2f" % percent)
+       print "#{name}: ".ljust(30)
+       print "#{count}".ljust(30)
+       print " (#{rounded_percent}%)"
+       puts
    end 
 end

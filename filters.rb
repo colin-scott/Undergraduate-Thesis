@@ -20,7 +20,7 @@ module FirstLevelFilters
     end
 
     # (at least one connected host has been consistently connected for at least 4 rounds)
-    def no_stable_connected_vp?(stillconnected, nodetarget2lastoutage, now)
+    def no_stable_connected_vp?(stillconnected, nodetarget2lastoutage, target, now)
        stillconnected.find { |node| (now - (nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > LOWER_ROUNDS_BOUND }.nil?
     end
 
@@ -36,10 +36,12 @@ module FirstLevelFilters
     end
 end
 
+# TODO: move the failure_disaptcher vp registration check here
 module RegisterFilters
 
 end
 
+# TODO: move failure_analyzer#passes_filters? here
 module SecondLevelFilters
 
 end
