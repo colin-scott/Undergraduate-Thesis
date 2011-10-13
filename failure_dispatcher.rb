@@ -87,7 +87,7 @@ class FailureDispatcher
     end
 
     # precondition: sdtillconnected are able to reach dst
-    def isolate_outages(srcdst2outage, dst2outage_correlation, testing=false) # this testing flag is terrrrible
+    def isolate_outages(srcdst2outage, dst2filter_stats, testing=false) # this testing flag is terrrrible
         @have_retried_connection = false
 
         # first filter out any outages where no nodes are actually registered
@@ -144,7 +144,7 @@ class FailureDispatcher
                 outage_threads << Thread.new do
                     src,dst = srcdst
                     outage.measurement_times += deep_copy(measurement_times)
-                    process_srcdst_outage(outage, dst2outage_correlation[dst], testing)
+                    process_srcdst_outage(outage, dst2filter_stats[dst], testing)
                 end
             end
 
@@ -155,8 +155,8 @@ class FailureDispatcher
             @logger.debug "got past join"
 
             if !testing
-                dst2outage_correlation.values.each do |outage_correlation|
-                    log_outage_correlation(outage_correlation)
+                dst2filter_stats.values.each do |filter_stats|
+                    log_filter_stats(filter_stats)
                 end
             end
 
@@ -232,7 +232,7 @@ class FailureDispatcher
        dstsrc2outage
     end
 
-    def process_srcdst_outage(outage, outage_correlation, testing=false)
+    def process_srcdst_outage(outage, filter_stats, testing=false)
         @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}"
 
         gather_measurements(outage, testing)
@@ -253,7 +253,7 @@ class FailureDispatcher
         end
 
         if(outage.passed_filters)
-            outage_correlation.final_passed << outage.src
+            filter_stats.final_passed << outage.src
 
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
@@ -261,7 +261,7 @@ class FailureDispatcher
 
             outage.graph_url = generate_web_symlink(outage.jpg_output)
         else
-            outage_correlation.final_failed2reasons[outage.src] = reasons
+            filter_stats.final_failed2reasons[outage.src] = reasons
 
             @logger.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
@@ -842,11 +842,11 @@ class FailureDispatcher
         File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
-    def log_outage_correlation(outage_correlation)
+    def log_filter_stats(filter_stats)
         t = Time.new
-        outage_correlation.end_time = t
+        filter_stats.end_time = t
         t_str = t.strftime("%Y%m%d%H%M%S")
-        filename = "#{outage_correlation.target}_#{t_str}.yml"
-        File.open(FailureIsolation::OutageCorrelation+"/"+filename, "w") { |f| YAML.dump(outage_correlation, f) }
+        filename = "#{filter_stats.target}_#{t_str}.yml"
+        File.open(FailureIsolation::SecondLevelFilterStats+"/"+filename, "w") { |f| YAML.dump(filter_stats, f) }
     end
 end

@@ -114,7 +114,8 @@ module FailureIsolation
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
-    OutageCorrelation = "#{$DATADIR}/outage_correlation" 
+    FirstLevelFilterStats = "#{$DATADIR}/first_level_filters" 
+    SecondLevelFilterStats = "#{$DATADIR}/second_level_filters" 
 
     DotFiles = "#{$DATADIR}/dots"
 

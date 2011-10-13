@@ -204,7 +204,7 @@ module LogIterator
     end
 
     def LogIterator::correlation_iterate(files=nil, debugging=false, &block)
-        Dir.chdir FailureIsolation::OutageCorrelation do
+        Dir.chdir FailureIsolation::SecondLevelFilterStats do
             files ||= Dir.glob("*yml").sort
 
             total = files.size

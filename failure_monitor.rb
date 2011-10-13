@@ -7,10 +7,13 @@ require 'yaml'
 require 'outage'
 require 'outage_correlation'
 require 'utilities'
+require 'filters'
 
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
 class FailureMonitor
+    include FirstLevelFilters
+
     def initialize(dispatcher, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
         @dispatcher = dispatcher
         @db = db
@@ -106,9 +109,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2outage, dst2outage_correlation = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2outage, dst2filter_tracker = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(srcdst2outage, dst2outage_correlation)
+            @dispatcher.isolate_outages(srcdst2outage, dst2filter_tracker)
 
             @logger.puts "round #{@current_round} completed"
             @current_round += 1
@@ -328,63 +331,79 @@ class FailureMonitor
         [target2observingnode2rounds, target2neverseen, target2stillconnected]
     end
 
+    def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
+        nodes = observingnode2rounds.keys
+
+        no_vp_has_connectivity = no_vp_has_connectivity?(stillconnected)
+        
+        #no_vp_newly_observing = no_vp_newly_observing?(observingnode2rounds)
+        no_vp_newly_observing = false
+
+        no_stable_unconnected_vp = no_stable_unconnected_vp?(observingnode2rounds)
+
+        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage)
+
+        no_non_poisoner = no_non_poisoner?(nodes)
+
+        no_vp_remains = no_vp_remains?(observingnode2rounds)
+        
+        # don't issue isolation measurements for targets which have
+        # already been probed recently
+        observingnode2rounds.each do |node, rounds|
+          if @node_target2lastisolationattempt.include? [node,target] and 
+                      (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
+              observingnode2rounds.delete node 
+          else
+              @node_target2lastisolationattempt[[node,target]] = @current_round
+          end
+        end
+
+        all_nodes_issued_measurements_recently = observingnode2rounds.empty?
+
+        bool_vector = {
+            :no_vp_has_connectivity => no_vp_has_connectivity,
+            :no_vp_newly_observing => no_vp_newly_observing,
+            :no_stable_unconnected_vp = no_stable_unconnected_vp,
+            :no_stable_connected_vp = no_stable_connected_vp,
+            :no_non_poisoner = no_non_poisoner,
+            :no_vp_remains = no_vp_remains,
+            :all_nodes_issued_measurements_recently => all_nodes_issued_measurements_recently
+        }
+
+        # TODO log the correlation
+        filter_triggered = bool_vector.values.reduce(:|)
+        return !filter_triggered
+    end
+
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
-        dst2outage_correlation =  {}
+        dst2filter_tracker =  {}
 
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-            nodes = observingnode2rounds.keys
+            next unless passes_first_level_filters?(target, observingnode2rounds, target2stillconnected[target])
 
-                # (at least one VP has connectivity)
-            if target2stillconnected[target].size >= @@vp_bound and  
-                # (don't issue from nodes that just started seeing the outage)
-                observingnode2rounds.delete_if { |node, rounds| rounds < @@lower_rounds_bound }.size >= @@vp_bound and 
-                # (don't issue from nodes that have been experiencing the outage for a very long time)
-                ## observingnode2rounds.delete_if { |node, rounds| rounds >= @@upper_rounds_bound }.size >= 1 and 
-                #
-                # (at least one connected host has been consistently connected for at least 4 rounds)
-                !target2stillconnected[target].find { |node| (now - (@nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > @@lower_rounds_bound }.nil? and
-                # (if a poisoner is observing, make sure at least on other non-poinonser is also observing)
-                (nodes.find { |n| FailureIsolation::PoisonerNames.include? n }) ? nodes.find { |n| !FailureIsolation::PoisonerNames.include? n } : true and
-                # (at least one observing node remains)
-                !observingnode2rounds.empty? 
+            # TODO: encpasulate VPs into objects, so the to_s automatically
+            # yields the formatted string
+            #
+            # now convert still_connected to strings of the form
+            # "#{node} [#{time of last outage}"]"
+            formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
+            formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
+            formatted_never_seen = target2neverseen[target]
 
-              # TODO: encpasulate VPs into objects, so the to_s automatically
-              # yields the formatted string
-              # now convert still_connected to strings of the form
-              # "#{node} [#{time of last outage}"]"
-              formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
-              formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
-              formatted_never_seen = target2neverseen[target]
+            dst2filter_tracker[target] = SecondLevelFilterTracker.new(target, observingnode2rounds.keys, target2stillconnected[target])
 
-              # don't issue isolation measurements for targets which have
-              # already been probed recently
-              observingnode2rounds.each do |node, rounds|
-                if @node_target2lastisolationattempt.include? [node,target] and 
-                            (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
-                    observingnode2rounds.delete node 
-                else
-                    @node_target2lastisolationattempt[[node,target]] = @current_round
-                end
-              end
-
-              next if observingnode2rounds.empty?
-
-              dst2outage_correlation[target] = OutageCorrelation.new(target, observingnode2rounds.keys, target2stillconnected[target])
-
-              observingnode2rounds.keys.each do |src|
-                 # TODO: Multiplex on Symmetry here?
-                 srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
-                                                          formatted_connected, formatted_unconnected, formatted_never_seen)
-                 srcdst2outage[[src,target]].measurement_times << ["passed_first_lvl_filters", Time.new]
-              end
-           end
+            observingnode2rounds.keys.each do |src|
+               srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
+                                                        formatted_connected, formatted_unconnected, formatted_never_seen)
+               srcdst2outage[[src,target]].measurement_times << ["passed_first_lvl_filters", Time.new]
+            end
         end
 
-        [srcdst2outage, dst2outage_correlation]
+        [srcdst2outage, dst2filter_tracker]
     end
 
     def log_outage_detected(*args)
