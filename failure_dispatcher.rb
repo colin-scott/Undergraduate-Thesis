@@ -16,6 +16,7 @@ require 'mail'
 require 'outage'
 require 'utilities'
 require 'poisoner'
+require 'filters'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #

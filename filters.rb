@@ -44,11 +44,11 @@ module RegistrationFilters
     NO_RECEIVERS_REGISTERED = :no_receivers_registered
 
     def self.src_not_registered?(src, registered_vps)
-        !registered_vps.include? src
+        !(registered_vps.include?(src))
     end
 
-    def self.no_registered_receivers?(outage.receivers, registered_vps)
-        (recievers & registered_vps).empty?
+    def self.no_registered_receivers?(receivers, registered_vps)
+        (receivers & registered_vps).empty?
     end
 end
 
