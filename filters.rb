@@ -41,7 +41,7 @@ end
 # TODO: class methods or instance methods?
 module RegistrationFilters
     SRC_NOT_REGISTERED = :source_not_registered 
-    NO_RECEIVERS_REGISTERED = :no_receivers_registered
+    NO_REGISTERED_RECEIVERS = :no_receivers_registered
 
     def self.src_not_registered?(src, registered_vps)
         !(registered_vps.include?(src))

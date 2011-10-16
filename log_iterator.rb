@@ -207,6 +207,26 @@ module LogIterator
        Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
     end
 
+    def self.registration_filter_iterate(debugging=false)
+        Dir.chdir FailureIsolation::RegistrationFilterStats do
+            files ||= Dir.glob("*bin").sort
+
+            total = files.size
+            curr = 0
+            files.each do |file|
+                begin
+                    curr += 1
+                    $stderr.puts file if debugging
+                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
+                    yield Marshal.load(IO.read(file))
+                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
+                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                end
+            end
+
+        end
+    end
+
     def LogIterator::correlation_iterate(files=nil, debugging=false, &block)
         Dir.chdir FailureIsolation::SecondLevelFilterStats do
             files ||= Dir.glob("*yml").sort
@@ -225,6 +245,7 @@ module LogIterator
             end
         end
     end
+
 
     def LogIterator::replace_logs(dispatcher, &block)
         Dir.chdir FailureIsolation::Snapshot do
