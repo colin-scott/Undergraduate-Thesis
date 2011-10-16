@@ -95,19 +95,27 @@ class FailureDispatcher
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
         registered_vps = @controller.hosts.clone
+        filter_list = RegistrationFilterList.new(Time.now, registered_vps)
+
         srcdst2outage.each do |srcdst, outage|
-            if !registered_vps.include?(srcdst[0])
-               @logger.puts "source #{srcdst[0]} not registered."
-               srcdst2outage.delete srcdst
-               next
-            elsif (registered_vps & outage.receivers).empty?
-               @logger.puts "registered_vps & outage.receivers #{outage.receivers} empty"
-               srcdst2outage.delete srcdst
-               next
+            filter_tracker = RegistrationFilterTracker.new(outage)
+            if RegistrationFilters.src_not_registered?(srcdst[0], registered_vps)
+               filter_tracker.failure_reasons << RegistrationFilters::SRC_NOT_REGISTERED
+            end
+
+            if RegistrationFilters.no_registered_receivers?(outage.receivers, registered_vps)
+               filter_tracker.failure_reasons << RegistrationFilters::NO_REGISTERED_RECEIVERS
+            end
+
+            filter_list << filter_tracker
+
+            if !filter_tracker.passed?
+                srcdst2outage.delete srcdst
             end
         end
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
+        log_filter_list(filter_list)
 
         return if srcdst2outage.empty? # optimization
 
@@ -849,4 +857,9 @@ class FailureDispatcher
         filename = "#{filter_stats.target}_#{t_str}.yml"
         File.open(FailureIsolation::SecondLevelFilterStats+"/"+filename, "w") { |f| YAML.dump(filter_stats, f) }
     end
+
+    def log_filter_list(filter_list)
+        # XXX
+    end
+
 end

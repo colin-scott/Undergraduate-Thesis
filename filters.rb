@@ -35,11 +35,22 @@ module FirstLevelFilters
        observingnode2rounds.empty? 
     end
 end
+# Filters out nodes that aren't registered with the controller, 
+#
+# TODO: class methods or instance methods?
+module RegistrationFilters
+    SRC_NOT_REGISTERED = :source_not_registered 
+    NO_RECEIVERS_REGISTERED = :no_receivers_registered
 
-# TODO: move the failure_disaptcher vp registration check here
-module RegisterFilters
+    def self.src_not_registered?(src, registered_vps)
+        !registered_vps.include? src
+    end
 
+    def self.no_registered_receivers?(outage.receivers, registered_vps)
+        (recievers & registered_vps).empty?
+    end
 end
+
 
 # TODO: move failure_analyzer#passes_filters? here
 module SecondLevelFilters

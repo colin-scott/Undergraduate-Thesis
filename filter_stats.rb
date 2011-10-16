@@ -18,6 +18,30 @@ class FirstLevelFilterTracker
    end
 end
 
+class RegistrationFilterList
+    attr_accessor :time, :registered_vps, :register_filter_trackers
+
+    def initialize(time, registered_vps, register_filter_trackers=[])
+        @time = time
+        @registered_vps = registered_vps
+        @register_filter_trackers = register_filter_trackers
+    end
+end
+
+class RegistrationFilterTracker
+    attr_accessor :outage, :failure_reasons
+    
+    def initialize(outage, failure_reasons=[])
+        @outage = outage 
+        @failure_reasons = failure_reasons
+    end
+
+    def passed?()
+        @failure_reasons.empty?
+    end
+end
+
+
 # Which VPs initially passed filtering heuristics, and which passed the final set of filtering heuristics?
 # helps us correlate across outages, VPs
 class SecondLevelFilterTracker

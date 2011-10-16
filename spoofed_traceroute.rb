@@ -1,5 +1,6 @@
-# NOTE!
-# I suspect that the memory leak might be in this file...
+# TODO: re-write this whole thing:
+#   - Use hops.rb objects to encapsulate return results rather than [ttl, rtrs]
+#   - Make it much more readable
 
 require 'set'
 

@@ -1,3 +1,7 @@
+# TODO: re-write this whole thing:
+#   - Use hops.rb objects to encapsulate return results rather than hashes
+#   - Make it much more readable
+
 module Traceroute
     # dests is an array of destinations
     # return a set of targets that responded

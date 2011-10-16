@@ -1,3 +1,7 @@
+# TODO: re-write this whole thing:
+#   - Use hops.rb objects to encapsulate return results rather than hashes
+#   - Make it much more readable
+
 module SpoofedPing
     # have spoofers spoof pings as vp
     # dests is an array of destinations
