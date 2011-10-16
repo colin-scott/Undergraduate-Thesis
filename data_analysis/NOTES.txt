@@ -1,0 +1,6 @@
+All scripts iterate over a static snapshot (#{$DATADIR}/isolation_results_snapshot). 
+To update the snapshot, run ./snapshot_logs_later_than_date.rb.
+
+./count_total_outages.rb  # total outages, filtered, and directions
+
+

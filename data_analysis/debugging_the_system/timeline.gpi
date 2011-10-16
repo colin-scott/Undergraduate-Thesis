@@ -1,0 +1,15 @@
+set terminal postscript enhanced color "Helvetica" 24
+#set key width -4
+#set size ratio 0.5
+#set key box
+set grid
+set xdata time
+set timefmt "%Y.%m.%d"
+set xlabel "Week of the year" 0,0.35
+set ylabel "# of outages passing filters" 1.1,0
+set output "outage_timeline.eps"
+
+plot "total.txt" using 1:2  with lines lw 8  t "Total overall",\
+  "bidirectional.txt" using 1:2  with lines lw 8  t "Bidirectional outages",\
+  "forward.txt" using 1:2  with lines lw 8 t "Forward outages",\
+  "reverse.txt" using 1:2  with lines lw 8 t "Reverse path outages"
