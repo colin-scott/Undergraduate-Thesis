@@ -62,6 +62,7 @@ class MergedOutage
     def direction()
         return Direction.REVERSE unless @outages.find { |o| o.direction == Direction.REVERSE }.nil?
         return Direction.FORWARD unless @outages.find { |o| o.direction == Direction.FORWARD }.nil?
+        return Direction.FALSE_POSITIVE if @outages.find { |o| o.direction == Direction.BOTH }.nil?
         return Direction.BOTH
     end
 
