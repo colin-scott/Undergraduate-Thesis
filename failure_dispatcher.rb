@@ -96,6 +96,9 @@ class FailureDispatcher
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
         registered_vps = @controller.hosts.clone
+        if registered_vps.empty?
+            Emailer.deliver_isolation_exception("No VPs are registered with the controller!")
+        end
         filter_list = RegistrationFilterList.new(Time.now, registered_vps)
 
         srcdst2outage.each do |srcdst, outage|
