@@ -115,6 +115,7 @@ module FailureIsolation
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
     FirstLevelFilterStats = "#{$DATADIR}/first_level_filters/filter_stats.bin" 
+    RegistrationFilterStats = "#{$DATADIR}/registration_filters" 
     SecondLevelFilterStats = "#{$DATADIR}/second_level_filters" 
 
     DotFiles = "#{$DATADIR}/dots"

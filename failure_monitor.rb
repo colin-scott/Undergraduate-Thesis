@@ -334,6 +334,9 @@ class FailureMonitor
     end
 
     def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
+        # TODO: refactor this to look more like
+        # failure_dispatcher's registration filters. Much cleaner...
+        
         now = Time.new
         nodes = observingnode2rounds.keys
 

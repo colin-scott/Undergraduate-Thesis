@@ -35,6 +35,7 @@ module FirstLevelFilters
        observingnode2rounds.empty? 
     end
 end
+
 # Filters out nodes that aren't registered with the controller, 
 #
 # TODO: class methods or instance methods?

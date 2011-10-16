@@ -859,7 +859,7 @@ class FailureDispatcher
     end
 
     def log_filter_list(filter_list)
-        # XXX
+        filename = filter_list.time.strftime("%Y%m%d%H%M%S")
+        File.open(FailureIsolation::RegistrationFilterStats+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(filter_list)) }
     end
-
 end
