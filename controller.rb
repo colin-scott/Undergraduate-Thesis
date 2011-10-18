@@ -573,7 +573,6 @@ class Controller
     # it must operate without requiring any calls to the vp
     # if uri is set, will only unregister if the registered uri matches
     def unregister_host(hostname,uri=nil)
-
         uri,hostname=Controller::rename_uri_and_host(uri,hostname)
         open_fds=lsof.length
         unregistered=false
@@ -736,7 +735,6 @@ class Controller
 
     # return the set of VPs (hostnames) currently under quarantine
     def under_quarantine
-
         @quarantine_lock.synchronize{@under_quarantine.keys}
     end
      

@@ -28,7 +28,7 @@ LogIterator::registration_filter_iterate do |filter_list|
             num_passed += 1
         else
             tracker.failure_reasons.each do |reason|
-                reason2count[reason] += 1 if triggered
+                reason2count[reason] += 1
             end
         end
     end

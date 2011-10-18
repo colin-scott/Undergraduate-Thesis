@@ -1,5 +1,5 @@
 require 'failure_isolation_consts'
-                    require 'drb'
+require 'drb'
 require 'drb/acl'
 require 'thread'
 require 'ip_info'
@@ -87,6 +87,17 @@ class FailureDispatcher
         end
     end
 
+    def sanity_check_registered_vps
+        registered_vps = @controller.hosts.clone
+        if registered_vps.empty?
+            Emailer.deliver_isolation_exception("No VPs are registered with the controller!")
+        elsif Set.new(@controller.under_quarantine) == Set.new(registered_vps)
+            Emailer.deliver_isolation_exception("All VPs are quarentined!")
+        end
+
+        registered_vps
+    end
+
     # precondition: sdtillconnected are able to reach dst
     def isolate_outages(srcdst2outage, dst2filter_stats, testing=false) # this testing flag is terrrrible
         @have_retried_connection = false
@@ -95,10 +106,7 @@ class FailureDispatcher
         # with the controller
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
-        registered_vps = @controller.hosts.clone
-        if registered_vps.empty?
-            Emailer.deliver_isolation_exception("No VPs are registered with the controller!")
-        end
+        registered_vps = sanity_check_registered_vps
         filter_list = RegistrationFilterList.new(Time.now, registered_vps)
 
         srcdst2outage.each do |srcdst, outage|
