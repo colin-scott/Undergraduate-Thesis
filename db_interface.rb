@@ -179,7 +179,11 @@ class DatabaseInterface
         dst2states = Hash.new{|h,k| h[k] = Hash.new{|h1,k1| h1[k1] = 0}}
         results = query sql
         results.each_hash{|row|
-          dst2states[row["dst"]][row["state"]] = row["c"].to_i
+            state = row["state"]
+            # merge deadend into dst_not_reachable for cases where we continue
+            # after traceroute fails
+            if state == "deadend" then state = "dst_not_reachable" end
+            dst2states[row["dst"]][state] = row["c"].to_i
         }
         
         bad_dsts = []

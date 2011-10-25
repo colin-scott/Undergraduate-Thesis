@@ -59,7 +59,80 @@ module RegistrationFilters
 end
 
 
-# TODO: move failure_analyzer#passes_filters? here
 module SecondLevelFilters
+   def self.filter(outage, testing=false, file=nil, skip_hist_tr=false)
+        src = outage.src
+        dst = outage.dst 
+        tr = outage.tr
+        spoofed_tr = outage.spoofed_tr
+        ping_responsive = outage.ping_responsive
+        historical_tr = outage.historical_tr, 
+        historical_revtr = outage.historical_revtr
+        direction = outage.direction
+
+   end
+
+   def self.forward_measurements_empty?(tr, spoofed_tr)
+        # it's uninteresting if no measurements worked... probably the
+        # source has no route
+        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
+   end
+
+   def self.tr_reached_dst_AS?(dst, ip_info)
+        tr_reached_dst_AS = tr.reached_dst_AS?(dst, ip_info)
+   end
+
+   def self.destination_pingable?(ping_responsive, dst, tr)
+        # sometimes we oddly find that the destination is pingable from the
+        # source after isolation measurements have completed
+        destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
+   end
+
+
+   def self.no_historical_trace?(historical_tr, src, skip_hist_tr=false)
+        skip_hist_tr ||= FailureIsolation::PoisonerNames.include? src
+
+        no_historical_trace = !skip_hist_tr and historical_tr.empty?
+   end
+
+   def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=false)
+       no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
+
+       historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && historical_tr[-1].ip == "0.0.0.0"
+        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+   end
+
+
+   def self.no_pings_at_all?(ping_responsive)
+        no_pings_at_all = (ping_responsive.empty?)
+   end
+
+   def self.tr_reached_last_hop?(historical_tr, tr)
+        last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
+   end
+
+   def self.reverse_path_helpless?(direction, historical_revtr) 
+        # should we get rid of this after correlation?
+        #reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
+        # TODO: change me?
+        reverse_path_helpless = false
+   end
+
+
+
+        if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
+                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
+                !historical_trace_didnt_reach && !reverse_path_helpless)))
+
+            bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction.FALSE_POSITIVE, 
+                :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
+                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
+
+            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}#{(file.nil? ? "" : (", "+file)) }): #{bool_vector.inspect}"
+            return [false, bool_vector]
+        else
+            return [true, {}]
+        end
+    end
 
 end

@@ -56,6 +56,7 @@ class Path
        return if @hops.empty?
        get_rid_of_wonky_last_hop
        remove_redundant_dsts
+       get_rid_of_trailing_zeros
    end
 
    def get_rid_of_wonky_last_hop()
@@ -78,6 +79,12 @@ class Path
             @hops = @hops[0..-2]
         end
     end
+
+   def get_rid_of_trailing_zeros()
+        while !@hops.empty? and @hops[-1].ip == "0.0.0.0"
+            @hops = @hops[0..-2] 
+        end
+   end
 
    def find(&block)
        return nil unless valid?
@@ -299,6 +306,10 @@ class ReversePathSimple < Array
 end
 
 class SpoofedReversePath < RevPath
+    def initialize()
+        super
+    end
+
     def valid?()
         return @hops.size > 1 && !(@hops[0].is_a?(Symbol) || @hops[0].is_a?(String))
     end
@@ -333,6 +344,10 @@ end
 
 # normal traceroute, spoofed traceroute, historical traceroute
 class ForwardPath < Path
+   def initialize()
+       super
+   end
+
    def reached_dst_AS?(dst, ipInfo)
        dst = dst.is_a?(Hop) ? dst.ip.strip : dst.strip
        return false if dst.nil?
