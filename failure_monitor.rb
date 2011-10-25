@@ -116,6 +116,7 @@ class FailureMonitor
             clean_the_house if (@current_round % @@node_audit_period) == 0
 
             sleep_period = period - (Time.new - start)
+            @logger.info "Sleeping for #{sleep_period} seconds"
 
             sleep sleep_period if sleep_period > 0
         end
@@ -334,24 +335,30 @@ class FailureMonitor
     end
 
     def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
-        # TODO: refactor this to look more like
-        # failure_dispatcher's registration filters. Much cleaner...
-        
         now = Time.new
         nodes = observingnode2rounds.keys
 
-        no_vp_has_connectivity = no_vp_has_connectivity?(stillconnected)
-        
-        #no_vp_newly_observing = no_vp_newly_observing?(observingnode2rounds)
-        no_vp_newly_observing = false
+        filter_tracker = FirstLevelFilterTracker.new(target, nodes, stillconnected, now)
 
-        no_stable_unconnected_vp = no_stable_unconnected_vp?(observingnode2rounds)
+        if FirstLevelFilters.no_vp_has_connectivity?(stillconnected)
+            filter_tracker.failure_reasons << FirstLevelFilters::NO_VP_HAS_CONNECTIVITY
+        end
 
-        no_stable_connected_vp = no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, target, now)
+        if FirstLevelFilters.no_stable_unconnected_vp?(observingnode2rounds)
+            filter_tracker.failure_reasons << FirstLevelFilters::NO_STABLE_UNCONNECTED_VP
+        end
 
-        no_non_poisoner = no_non_poisoner?(nodes)
+        if FirstLevelFilters.no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, target, now)
+            filter_tracker.failure_reasons << FirstLevelFilters::NO_STABLE_CONNECTED_VP 
+        end
 
-        no_vp_remains = no_vp_remains?(observingnode2rounds)
+        if FirstLevelFilters.no_non_poisoner?(nodes)
+            filter_tracker.failure_reasons << FirstLevelFilters::NO_NON_POISONER
+        end
+
+        if FirstLevelFilters.no_vp_remains?(observingnode2rounds)
+            filter_tracker.failure_reasons << FirstLevelFilters::NO_VP_REMAINS
+        end
         
         # don't issue isolation measurements for targets which have
         # already been probed recently
@@ -364,19 +371,10 @@ class FailureMonitor
             end
         end
 
-        all_nodes_issued_measurements_recently = observingnode2rounds.empty?
+        if observingnode2rounds.empty?
+            filter_tracker.failure_reasons << FirstLevelFilters::ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY 
+        end
 
-        bool_vector = {
-            :no_vp_has_connectivity => no_vp_has_connectivity,
-            :no_vp_newly_observing => no_vp_newly_observing,
-            :no_stable_unconnected_vp => no_stable_unconnected_vp,
-            :no_stable_connected_vp => no_stable_connected_vp,
-            :no_non_poisoner => no_non_poisoner,
-            :no_vp_remains => no_vp_remains,
-            :all_nodes_issued_measurements_recently => all_nodes_issued_measurements_recently
-        }
-
-        filter_tracker = FirstLevelFilterTracker.new(target, nodes, stillconnected, bool_vector, now)
         return filter_tracker
     end
 

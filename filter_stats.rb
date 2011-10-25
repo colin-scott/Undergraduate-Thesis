@@ -2,20 +2,29 @@ require 'thread'
 require 'forwardable'
 
 class FirstLevelFilterTracker
-   attr_accessor :target, :initial_observing, :initial_connected, :failure_reasons, :time
+   attr_accessor :target, :initial_observing, :initial_connected, :time # :failure_reasons (below)
 
-   def initialize(target, initial_observing, initial_connected, failure_reasons, time)
+   def initialize(target, initial_observing, initial_connected, time)
         @target = target
         @initial_observing = initial_observing
         @initial_connected = initial_connected
-        @failure_reasons = failure_reasons
+        @failure_reasons = []
         @time = time
    end 
+
+   def failure_reasons
+       if @failure_reasons.is_a?(Hash)
+           # for backwards compatibility...
+           return @failure_reasons.keys
+       else
+           return @failure_reasons
+       end
+   end
 
    # for threading
    def passed?()
        # if any are true, then a trigger went off
-       !@failure_reasons.values.reduce(:|)
+       !failure_reasons().empty?
    end
 end
 

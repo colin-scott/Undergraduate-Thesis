@@ -23,9 +23,8 @@ require 'socket'
 require 'set'
 require 'resolv'
 
-# we use this for test pings
-$ZOOTER_IP="128.208.2.159"
-#$ZOOTER_IP="128.208.2.159".to_sym
+# we use OpenDNS (anycasted) for test pings
+$TEST_IP = "8.8.8.8"
 
 #$split_hash = Hash.new(0)
 #
@@ -145,13 +144,13 @@ class Registrar
         pings=[]
         uri= (vp.is_a?(String) ? vp : vp.uri)
         #         begin
-        #             Timeout::timeout(30, SockTimeout.new("#{uri} timed out after 30 seconds on a test ping to #{$ZOOTER_IP}.  Aborting reverse traceroute.")){
-        #                 pings=vp.ping([$ZOOTER_IP]).split("\n")
-        #                 raise EmptyPingError.new(host, "Test ping to #{$ZOOTER_IP} came back empty.  Aborting reverse traceroute.") if pings.nil? or pings.length==0
-        #                 if (pings.length==1 and pings[0].split(" ")[0]==$ZOOTER_IP)
+        #             Timeout::timeout(30, SockTimeout.new("#{uri} timed out after 30 seconds on a test ping to #{$TEST_IP}.  Aborting reverse traceroute.")){
+        #                 pings=vp.ping([$TEST_IP]).split("\n")
+        #                 raise EmptyPingError.new(host, "Test ping to #{$TEST_IP} came back empty.  Aborting reverse traceroute.") if pings.nil? or pings.length==0
+        #                 if (pings.length==1 and pings[0].split(" ")[0]==$TEST_IP)
         #                     @controller.log("Successful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}")
         #                 else
-        #                     raise BadPingError.new(host,pings, "Test ping to #{$ZOOTER_IP} failed.  Aborting reverse traceroute.")
+        #                     raise BadPingError.new(host,pings, "Test ping to #{$TEST_IP} failed.  Aborting reverse traceroute.")
         #                 end
         #             }
         #         rescue
@@ -608,7 +607,7 @@ class Controller
     # return nil if it works (isn't broken)
     # otherwise return the exception (does not raise it - returns it as the
     # return value)
-    def vp_broken?(vp, test_ip=$ZOOTER_IP)
+    def vp_broken?(vp, test_ip=$TEST_IP)
         begin
             Timeout::timeout(30, SockTimeout.new("#{vp.uri} timed out after 30 on a test ping")){
                 pings=vp.ping([test_ip]).split("\n")
@@ -665,23 +664,7 @@ class Controller
             #**** should i retest here?****#
             return
         end
-        
-        # HACK for riot VPs. Mux VPs aren't able to ping zooter... so we
-        # should ping something stable, but I can't find anything that's
-        # stable and reachable from all riot VPs. For example, the (e.g.
-        # ducttape) can only be reached from the VP at the respecitive Mux
-        # site.
-        if $POISONERS.include? name
-            log("Poisoner detected!")
-            new_vp=DRbObject.new nil, uri
-            @vp_lock.synchronize do
-                @hostname2vp[name]=new_vp
-                @hostname2uri[name]=uri
-            end
-            log("Registered #{name} as #{uri}: #{vp_count} total, #{open_fds} of #{self.ulimit} FDs")
-            return nil
-        end
-
+    
         except=true
         while retries>=0
             sleep(wait)
@@ -746,7 +729,6 @@ class Controller
     # so this threads out and therefor the thread should be able to handle its
     # own exceptions
     def quarantine(hostname,maxalert,exception=nil)
-
         Thread.new(hostname,exception){|my_hostname,except|
             @quarantine_lock.synchronize do
                 if @under_quarantine.include?(my_hostname)
@@ -767,15 +749,16 @@ class Controller
             rescue
                 reg_return=$!
             end
-            @quarantine_lock.synchronize do
-                @under_quarantine.delete(my_hostname)
-            end
+
             if reg_return
                 qf=QuarantineFailure.new(my_hostname,except,reg_return)
                 log(["Quarantining #{my_hostname} unsuccessful: #{except.class}", "EXCEPTION!  for #{my_hostname}:\n#{qf.to_s}\n#{qf.original_exception.backtrace.join("\n")}\n\nTest ping failure:\n#{qf.quarantine_exception.backtrace.join("\n")}"], [EMAIL,maxalert].max)
                 return qf
             else
                 log("Quarantining #{my_hostname} successful")
+                @quarantine_lock.synchronize do
+                    @under_quarantine.delete(my_hostname)
+                end
                 return nil
             end
         }
@@ -1387,7 +1370,7 @@ puts "controller uri: #{c.uri}"
 c.log "Version number #{$VERSION}"
 c.log("Controller started at #{c.uri}")
 uri_port=c.uri.chomp("\n").split("/").at(-1).split(":").at(1)
-my_ip= UDPSocket.open {|s| s.connect($ZOOTER_IP, 1); s.addr.last }
+my_ip= UDPSocket.open {|s| s.connect($TEST_IP, 1); s.addr.last }
 # can also do 
 #my_ip=`ifconfig  | grep 'inet addr:'| grep -v '127.0.0.1' |head -n1 | cut -d: -f2 | awk '{ print $1}'`.chomp("\n")
 uri_ip="druby://#{my_ip}:#{uri_port}"

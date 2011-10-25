@@ -9,7 +9,7 @@ require 'utilities'
 require 'db_interface'
 
 # Invariant:
-#    - Never monitor a site that already has a monitoring nodes (only the rest
+#    - Never monitor a site that already has a monitoring node (only the rest
 #           of the spoofer sites)
 class HouseCleaner
     def initialize(logger=LoggerLog.new($stderr), db = DatabaseInterface.new)
@@ -96,6 +96,7 @@ class HouseCleaner
     def find_substitutes_for_unresponsive_targets()
         dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
 
+        @log.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
         bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops
@@ -118,7 +119,7 @@ class HouseCleaner
 
         @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
 
-        #find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
+        find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
 
         # cloudfront is static
 

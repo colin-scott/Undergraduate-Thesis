@@ -12,7 +12,7 @@ if ARGV.empty?
     exit
 end
 
-time = Time.parse(ARGV.shift)
+time = Time.parse(ARGV.join ' ')
 
 num_passed = 0
 total = 0

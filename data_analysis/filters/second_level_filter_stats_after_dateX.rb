@@ -12,14 +12,14 @@ if ARGV.empty?
     exit
 end
 
-time = Time.parse(ARGV.shift)
+time_bound = Time.parse(ARGV.join ' ')
 
 num_passed = 0
 total = 0
 reason2count = Hash.new(0)
 
 LogIterator::correlation_iterate do |o, time|
-    next if time < time
+    next if time < time_bound
 
     total += o.initial_observing.size
     num_passed += o.final_passed.size

@@ -46,6 +46,8 @@ begin
    Signal.trap("KILL") { monitor.persist_state; exit }
 
    Signal.trap("USR1") do 
+       # TODO: when you reload modules, it looks like the old failure_monitor thread is
+       # still running!
        logger.puts "reloading modules.."
        load 'auxiliary_modules.rb'
 

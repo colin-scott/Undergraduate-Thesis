@@ -16,7 +16,7 @@ require 'failure_isolation_consts'
 
 # TODO: make all static sql queries class variables
 class DatabaseInterface
-    def initialize(logger=$stderr, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
+    def initialize(logger=LoggerLog.new($stderr), host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
         @logger = logger
 
         begin
@@ -186,18 +186,25 @@ class DatabaseInterface
         possibly_bad_dsts = []
         bad_dsts_ep = []
         possibly_bad_dsts_ep = []
-        dst2states.each{|dst,states2count|
+
+        dst2states.each do |dst,states2count|
           if states2count.length == 1 and states2count.include?("dst_not_reachable") and states2count["dst_not_reachable"] > 5
-            if endhosts.include?(dst.to_i) then bad_dsts_ep << Inet::ntoa(dst.to_i)
-                else bad_dsts << Inet::ntoa(dst.to_i) end
+            if endhosts.include?(dst.to_i)
+                bad_dsts_ep << Inet::ntoa(dst.to_i)
+            else
+                bad_dsts << Inet::ntoa(dst.to_i)
+            end
           elsif states2count.length > 1 and states2count.include?("dst_not_reachable")
             sum = states2count.values.inject( nil ) { |sum,x| sum ? sum+x : x }
             if sum > 5 and (states2count["reached"]+states2count["in_progress"])/(sum*1.0) < 0.5 
-                if endhosts.include?(dst.to_i) then possibly_bad_dsts_ep << Inet::ntoa(dst.to_i)
-                   else possibly_bad_dsts << Inet::ntoa(dst.to_i) end
-                 end
+              if endhosts.include?(dst.to_i)
+                  possibly_bad_dsts_ep << Inet::ntoa(dst.to_i)
+              else
+                  possibly_bad_dsts << Inet::ntoa(dst.to_i)
+              end
+            end
           end
-        }
+        end
 
         [bad_dsts,possibly_bad_dsts,bad_dsts_ep,possibly_bad_dsts_ep]
     end
@@ -233,4 +240,5 @@ if $0 == __FILE__
     db = DatabaseInterface.new
     # puts db.fetch_pingability(ARGV).inspect
     puts db.node_hostname("38.98.51.15")
+    puts db.check_target_probing_status(FailureIsolation.TargetSet)
 end
