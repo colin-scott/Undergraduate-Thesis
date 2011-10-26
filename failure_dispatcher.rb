@@ -259,12 +259,6 @@ class FailureDispatcher
 
         outage.file = get_uniq_filename(outage.src, outage.dst)
 
-        outage.passed_filters, reasons = @failure_analyzer.passes_filtering_heuristics?(outage.src, outage.dst, outage.tr, outage.spoofed_tr,
-                                                             outage.ping_responsive, outage.historical_tr, outage.historical_revtr, 
-                                                             outage.direction, testing)
-
-        @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}, passed_filters: #{outage.passed_filters}"
-
         # turn into a linked list ( I think? )
         outage.build
 
@@ -272,17 +266,13 @@ class FailureDispatcher
             log_srcdst_outage(outage)
         end
 
-        if(outage.passed_filters)
-            filter_stats.final_passed << outage.src
-
+        if(@failure_analyzer.passes_filtering_heuristics?(outage, filter_stats, testing))
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
                              outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
 
             outage.graph_url = generate_web_symlink(outage.jpg_output)
         else
-            filter_stats.final_failed2reasons[outage.src] = reasons
-
             @logger.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
 

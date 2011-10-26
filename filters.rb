@@ -11,6 +11,8 @@ module FirstLevelFilters
     NO_NON_POISONER = :no_non_poisoner
     NO_VP_REMAINS = :no_vp_remains
     ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY = :all_nodes_issued_measurements_recently
+
+    # TODO: add in a self.filter(), and have the caller call just that
     
     # (at least one VP has connectivity)
     def self.no_vp_has_connectivity?(stillconnected)
@@ -49,6 +51,8 @@ module RegistrationFilters
     SRC_NOT_REGISTERED = :source_not_registered 
     NO_REGISTERED_RECEIVERS = :no_receivers_registered
 
+    # TODO: add in a self.filter(), and have the caller call just that
+
     def self.src_not_registered?(src, registered_vps)
         !(registered_vps.include?(src))
     end
@@ -60,16 +64,49 @@ end
 
 
 module SecondLevelFilters
-   def self.filter(outage, testing=false, file=nil, skip_hist_tr=false)
-        src = outage.src
-        dst = outage.dst 
-        tr = outage.tr
-        spoofed_tr = outage.spoofed_tr
-        ping_responsive = outage.ping_responsive
-        historical_tr = outage.historical_tr, 
-        historical_revtr = outage.historical_revtr
-        direction = outage.direction
+   DEST_PINGABLE = :destination_pingable
+   BOTH_DIRECTIONS_WORKING = :direction
+   FWD_MEASUREMENTS_EMPTY = :forward_meas_empty
+   TR_REACHED = :tr_reach 
+   NO_HISTORICAL_TRACE = :no_hist 
+   NO_PINGS = :no_ping 
+   TR_REACHED_LAST_HOP = :tr_reached_last_hop 
+   HISTORICAL_TR_NOT_REACH = :historical_tr_not_reach
+   REVERSE_PATH_HELPLESS = :rev_path_helpess
 
+   def self.filter(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
+       # TODO: don't declare these variables like this... it's ugly
+       src = outage.src
+       dst = outage.dst 
+       tr = outage.tr
+       spoofed_tr = outage.spoofed_tr
+       ping_responsive = outage.ping_responsive
+       historical_tr = outage.historical_tr, 
+       historical_revtr = outage.historical_revtr
+       direction = outage.direction
+
+       # Keep it as a hash for backwards compatibility
+       failure_reasons = {}
+
+       failure_reasons[BOTH_DIRECTIONS_WORKING] = self.both_directions_working?(direction)
+       failure_reasons[FWD_MEASUREMENTS_EMPTY] = self.forward_measurements_empty?(tr, spoofed_tr)
+       failure_reasons[TR_REACHED] = self.tr_reached_dst_AS?(dst, ip_info)
+       failure_reasons[DEST_PINGABLE] = self.destination_pingable?(ping_responsive, dst, tr)
+       failure_reasons[NO_HISTORICAL_TRACE] = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
+       failure_reasons[HISTORICAL_TR_NOT_REACH] =  self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr)
+       failure_reasons[NO_PINGS] =  self.no_pings_at_all?(ping_responsive)
+       failure_reasons[TR_REACHED_LAST_HOP]  = self.tr_reached_last_hop?(historical_tr, tr)
+       failure_reasons[REVERSE_PATH_HELPLESS] = self.reverse_path_helpless?(direction, historical_revtr) 
+
+       filter_tracker.final_failed2reasons[src] = failure_reasons
+       if filter_tracker.src_passed?(src)
+          filter_tracker.final_passed << src 
+          outage.passed_filters = true
+       end
+   end
+
+   def self.both_directions_working?(direction)
+       direction == Direction.FALSE_POSITIVE
    end
 
    def self.forward_measurements_empty?(tr, spoofed_tr)
@@ -93,13 +130,15 @@ module SecondLevelFilters
         skip_hist_tr ||= FailureIsolation::PoisonerNames.include? src
 
         no_historical_trace = !skip_hist_tr and historical_tr.empty?
+        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
+
+        return no_historical_trace
    end
 
    def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=false)
        no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
 
        historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && historical_tr[-1].ip == "0.0.0.0"
-        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
    end
 
 
@@ -117,22 +156,4 @@ module SecondLevelFilters
         # TODO: change me?
         reverse_path_helpless = false
    end
-
-
-
-        if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
-                !historical_trace_didnt_reach && !reverse_path_helpless)))
-
-            bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction.FALSE_POSITIVE, 
-                :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
-                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
-
-            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}#{(file.nil? ? "" : (", "+file)) }): #{bool_vector.inspect}"
-            return [false, bool_vector]
-        else
-            return [true, {}]
-        end
-    end
-
 end

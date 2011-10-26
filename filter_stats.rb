@@ -81,6 +81,11 @@ class SecondLevelFilterTracker
         @start_time = Time.now
    end 
 
+   def src_passed?(src)
+       return false unless @final_failed2reasons.include? src
+       @final_failed2reasons[src].value_set.to_a.reduce(true, :&)
+   end
+
    # for threading
    def complete?()
         @final_passed.size + @final_failed2reasons.size == @initial_observing.size

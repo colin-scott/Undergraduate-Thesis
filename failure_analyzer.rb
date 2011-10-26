@@ -315,50 +315,9 @@ class FailureAnalyzer
         direction
     end
 
-    def passes_filtering_heuristics?(src, dst, tr, spoofed_tr, ping_responsive, historical_tr, 
-                                     historical_revtr, direction, testing, file=nil, skip_hist_tr=false)
-        if FailureIsolation::PoisonerNames.include? src
-            skip_hist_tr = true
-        end
-
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
-        forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
-
-        tr_reached_dst_AS = tr.reached_dst_AS?(dst, @ipInfo)
-
-        # sometimes we oddly find that the destination is pingable from the
-        # source after isolation measurements have completed
-        destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
-
-        no_historical_trace = !skip_hist_tr and historical_tr.empty?
-
-        historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && historical_tr[-1].ip == "0.0.0.0"
-
-        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
-
-        no_pings_at_all = (ping_responsive.empty?)
-
-        last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
-
-        # should we get rid of this after correlation?
-        #reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
-        # TODO: change me?
-        reverse_path_helpless = false
-
-        if(!(testing || (!destination_pingable && direction != Direction.FALSE_POSITIVE &&
-                !forward_measurements_empty && !tr_reached_dst_AS && !no_historical_trace && !no_pings_at_all && !last_hop &&
-                !historical_trace_didnt_reach && !reverse_path_helpless)))
-
-            bool_vector = { :destination_pingable => destination_pingable, :direction => direction == Direction.FALSE_POSITIVE, 
-                :forward_meas_empty => forward_measurements_empty, :tr_reach => tr_reached_dst_AS, :no_hist => no_historical_trace, :no_ping => no_pings_at_all,
-                :tr_reached_last_hop => last_hop, :historical_tr_not_reach => historical_trace_didnt_reach, :rev_path_helpess => reverse_path_helpless }
-
-            @logger.puts "FAILED FILTERING HEURISTICS (#{src}, #{dst}, #{Time.new}#{(file.nil? ? "" : (", "+file)) }): #{bool_vector.inspect}"
-            return [false, bool_vector]
-        else
-            return [true, {}]
-        end
+    def passes_filtering_heuristics?(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
+        SecondLevelFilters.filter(outage, filter_tracker, testing, file, skip_hist_tr) 
+        return outage.passed_filters
     end
 
     # TODO: get rid of Mock Hops!!!
