@@ -1,3 +1,4 @@
+require 'filter_stats'
 
 module FirstLevelFilters
     UPPER_ROUNDS_BOUND = 500
@@ -12,7 +13,34 @@ module FirstLevelFilters
     NO_VP_REMAINS = :no_vp_remains
     ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY = :all_nodes_issued_measurements_recently
 
-    # TODO: add in a self.filter(), and have the caller call just that
+    def self.filter(target, observingnode2rounds, stillconnected, nodetarget2lastoutage)
+        now = Time.new
+        nodes = observingnode2rounds.keys
+
+        filter_tracker = FirstLevelFilterTracker.new(target, nodes, stillconnected, now)
+
+        if self.no_vp_has_connectivity?(stillconnected)
+            filter_tracker.failure_reasons << NO_VP_HAS_CONNECTIVITY
+        end
+
+        if self.no_stable_unconnected_vp?(observingnode2rounds)
+            filter_tracker.failure_reasons << NO_STABLE_UNCONNECTED_VP
+        end
+
+        if self.no_stable_connected_vp?(stillconnected, nodetarget2lastoutage, target, now)
+            filter_tracker.failure_reasons << NO_STABLE_CONNECTED_VP 
+        end
+
+        if self.no_non_poisoner?(nodes)
+            filter_tracker.failure_reasons << NO_NON_POISONER
+        end
+
+        if self.no_vp_remains?(observingnode2rounds)
+            filter_tracker.failure_reasons << NO_VP_REMAINS
+        end
+        
+        return filter_tracker
+    end
     
     # (at least one VP has connectivity)
     def self.no_vp_has_connectivity?(stillconnected)
@@ -51,7 +79,28 @@ module RegistrationFilters
     SRC_NOT_REGISTERED = :source_not_registered 
     NO_REGISTERED_RECEIVERS = :no_receivers_registered
 
-    # TODO: add in a self.filter(), and have the caller call just that
+    def self.filter!(srcdst2outage, receivers, registered_vps)
+        filter_list = RegistrationFilterList.new(Time.now, registered_vps)
+
+        srcdst2outage.each do |srcdst, outage|
+            filter_tracker = RegistrationFilterTracker.new(outage)
+            if RegistrationFilters.src_not_registered?(srcdst[0], registered_vps)
+               filter_tracker.failure_reasons << SRC_NOT_REGISTERED
+            end
+
+            if RegistrationFilters.no_registered_receivers?(outage.receivers, registered_vps)
+               filter_tracker.failure_reasons << NO_REGISTERED_RECEIVERS
+            end
+
+            filter_list << filter_tracker
+
+            if !filter_tracker.passed?
+                srcdst2outage.delete srcdst
+            end
+        end
+        
+        return filter_list
+    end
 
     def self.src_not_registered?(src, registered_vps)
         !(registered_vps.include?(src))

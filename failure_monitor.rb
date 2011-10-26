@@ -335,31 +335,9 @@ class FailureMonitor
     end
 
     def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
-        now = Time.new
-        nodes = observingnode2rounds.keys
+        filter_tracker = FirstLevelFilters.filter(target, observingnode2rounds, stillconnected, @nodetarget2lastoutage)
 
-        filter_tracker = FirstLevelFilterTracker.new(target, nodes, stillconnected, now)
-
-        if FirstLevelFilters.no_vp_has_connectivity?(stillconnected)
-            filter_tracker.failure_reasons << FirstLevelFilters::NO_VP_HAS_CONNECTIVITY
-        end
-
-        if FirstLevelFilters.no_stable_unconnected_vp?(observingnode2rounds)
-            filter_tracker.failure_reasons << FirstLevelFilters::NO_STABLE_UNCONNECTED_VP
-        end
-
-        if FirstLevelFilters.no_stable_connected_vp?(stillconnected, @nodetarget2lastoutage, target, now)
-            filter_tracker.failure_reasons << FirstLevelFilters::NO_STABLE_CONNECTED_VP 
-        end
-
-        if FirstLevelFilters.no_non_poisoner?(nodes)
-            filter_tracker.failure_reasons << FirstLevelFilters::NO_NON_POISONER
-        end
-
-        if FirstLevelFilters.no_vp_remains?(observingnode2rounds)
-            filter_tracker.failure_reasons << FirstLevelFilters::NO_VP_REMAINS
-        end
-        
+        # TODO: move this into FirstLevelFilters?
         # don't issue isolation measurements for targets which have
         # already been probed recently
         observingnode2rounds.each do |node, rounds|
@@ -372,7 +350,7 @@ class FailureMonitor
         end
 
         if observingnode2rounds.empty?
-            filter_tracker.failure_reasons << FirstLevelFilters::ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY 
+            filter_tracker.failure_reasons << ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY 
         end
 
         return filter_tracker
