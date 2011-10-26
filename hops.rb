@@ -68,9 +68,16 @@ class Path
             @hops = @hops[0..-2]
        end
 
-       # second case: only hop is the forty-eth
-       if @hops[0].ttl.to_i == 40
+       # third case: ttls actually make sense, but there is still a long
+       # string of 0.0.0.0s
+       if @hops.size >= @@last_hop_sanity_check_distance + 1 and @hops[-1].ip != "0.0.0.0" and @hops[-(@@last_hop_sanity_check_distance+1), @@last_hop_sanity_check_distance].map { |h| h.ip } == ["0.0.0.0"] * @@last_hop_sanity_check_distance 
             @hops = @hops[0..-2]
+       end
+
+       # second case: only hop is the forty-eth
+       #   (ASSUMES no intermediate 0.0.0.0s...)
+       if @hops[0].ttl.to_i == 40
+           @hops = @hops[0..-2]
        end
    end
 
@@ -306,14 +313,6 @@ class ReversePathSimple < Array
 end
 
 class SpoofedReversePath < RevPath
-    def initialize()
-        super
-    end
-
-    def valid?()
-        return @hops.size > 1 && !(@hops[0].is_a?(Symbol) || @hops[0].is_a?(String))
-    end
-
     # not that many sym assumptions?
     def successful?()
         return false if @hops.size < 2
@@ -344,10 +343,6 @@ end
 
 # normal traceroute, spoofed traceroute, historical traceroute
 class ForwardPath < Path
-   def initialize()
-       super
-   end
-
    def reached_dst_AS?(dst, ipInfo)
        dst = dst.is_a?(Hop) ? dst.ip.strip : dst.strip
        return false if dst.nil?
