@@ -1,4 +1,7 @@
+#!/homes/network/revtr/ruby/bin/ruby
+
 require 'filter_stats'
+require 'failure_isolation_consts'
 
 module FirstLevelFilters
     UPPER_ROUNDS_BOUND = 500
@@ -86,7 +89,7 @@ module RegistrationFilters
     SRC_NOT_REGISTERED = :source_not_registered 
     NO_REGISTERED_RECEIVERS = :no_receivers_registered
 
-    def self.filter!(srcdst2outage, receivers, registered_vps)
+    def self.filter!(srcdst2outage, registered_vps)
         filter_list = RegistrationFilterList.new(Time.now, registered_vps)
 
         srcdst2outage.each do |srcdst, outage|
@@ -130,14 +133,14 @@ module SecondLevelFilters
    HISTORICAL_TR_NOT_REACH = :historical_tr_not_reach
    REVERSE_PATH_HELPLESS = :rev_path_helpess
 
-   def self.filter(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
+   def self.filter(outage, filter_tracker, ip_info, testing=false, file=nil, skip_hist_tr=false)
        # TODO: don't declare these variables like this... it's ugly
        src = outage.src
        dst = outage.dst 
        tr = outage.tr
        spoofed_tr = outage.spoofed_tr
        ping_responsive = outage.ping_responsive
-       historical_tr = outage.historical_tr, 
+       historical_tr = outage.historical_tr 
        historical_revtr = outage.historical_revtr
        direction = outage.direction
 
@@ -146,9 +149,9 @@ module SecondLevelFilters
 
        failure_reasons[BOTH_DIRECTIONS_WORKING] = self.both_directions_working?(direction)
        failure_reasons[FWD_MEASUREMENTS_EMPTY] = self.forward_measurements_empty?(tr, spoofed_tr)
-       failure_reasons[TR_REACHED] = self.tr_reached_dst_AS?(dst, ip_info)
+       failure_reasons[TR_REACHED] = self.tr_reached_dst_AS?(dst, tr, ip_info)
        failure_reasons[DEST_PINGABLE] = self.destination_pingable?(ping_responsive, dst, tr)
-       failure_reasons[NO_HISTORICAL_TRACE] = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
+       failure_reasons[NO_HISTORICAL_TRACE] = self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr)
        failure_reasons[HISTORICAL_TR_NOT_REACH] =  self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr)
        failure_reasons[NO_PINGS] =  self.no_pings_at_all?(ping_responsive)
        failure_reasons[TR_REACHED_LAST_HOP]  = self.tr_reached_last_hop?(historical_tr, tr)
@@ -171,7 +174,7 @@ module SecondLevelFilters
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
    end
 
-   def self.tr_reached_dst_AS?(dst, ip_info)
+   def self.tr_reached_dst_AS?(dst, tr, ip_info)
         tr_reached_dst_AS = tr.reached_dst_AS?(dst, ip_info)
    end
 
@@ -181,12 +184,10 @@ module SecondLevelFilters
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
    end
 
-
-   def self.no_historical_trace?(historical_tr, src, skip_hist_tr=false)
+   def self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr=false)
         skip_hist_tr ||= FailureIsolation::PoisonerNames.include? src
 
         no_historical_trace = !skip_hist_tr and historical_tr.empty?
-        @logger.puts "no historical trace! #{src} #{dst}" if no_historical_trace
 
         return no_historical_trace
    end
@@ -194,9 +195,9 @@ module SecondLevelFilters
    def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=false)
        no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
 
-       historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && historical_tr[-1].ip == "0.0.0.0"
+       $stderr.puts "WTF? [-1] is nil, but not empty?" if historical_tr[-1].nil? and !historical_tr.empty?
+       historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && !historical_tr[-1].nil? and historical_tr[-1].ip == "0.0.0.0"
    end
-
 
    def self.no_pings_at_all?(ping_responsive)
         no_pings_at_all = (ping_responsive.empty?)
@@ -212,4 +213,10 @@ module SecondLevelFilters
         # TODO: change me?
         reverse_path_helpless = false
    end
+end
+
+if __FILE__==  $0
+    require 'hops'
+
+    SecondLevelFilters.historical_trace_didnt_reach?(ForwardPath.new("poo", "face"), "poo")
 end

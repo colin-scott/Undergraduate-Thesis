@@ -16,9 +16,13 @@ require 'utilities'
 
 class Path
    @@last_hop_sanity_check_distance = 5
-   attr_accessor :hops, :src, :dst
+   attr_accessor :hops, :src, :dst, :invalid_reason
 
    def initialize(src, dst, init_hops=[])
+      # FOR BACKWARDS COMPATABILITY: init_hops[0] will be a symbol if invalid, so take it out
+      # to get rid of valid? problems, but the caller still signals invalidity
+      # with init_hops[0]
+      
       @src = src
       @dst = dst.strip
       begin 
@@ -28,8 +32,13 @@ class Path
           raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" 
         end
 
-        @hops = Array.new(init_hops)
-        link_listify!
+        if !init_hops.empty? and init_hops[0].is_a?(Symbol)
+            @invalid_reason = init_hops.join ' '
+            @hops = []
+        else
+            @hops = Array.new(init_hops)
+        end
+        # link_listify!
       rescue Exception => e
           raise "Caught #{e} #{e.backtrace}, init_hops was #{init_hops.inspect}"
       end
@@ -52,6 +61,7 @@ class Path
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
    def sanitize_hops()
+       # TODO: don't return... raise!
        return if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl }
        return if @hops.empty?
        get_rid_of_wonky_last_hop
@@ -70,7 +80,9 @@ class Path
 
        # third case: ttls actually make sense, but there is still a long
        # string of 0.0.0.0s
-       if @hops.size >= @@last_hop_sanity_check_distance + 1 and @hops[-1].ip != "0.0.0.0" and @hops[-(@@last_hop_sanity_check_distance+1), @@last_hop_sanity_check_distance].map { |h| h.ip } == ["0.0.0.0"] * @@last_hop_sanity_check_distance 
+       if @hops.size >= @@last_hop_sanity_check_distance + 1 and @hops[-1].ip != "0.0.0.0" and
+                @hops[-(@@last_hop_sanity_check_distance+1), @@last_hop_sanity_check_distance]\
+                     .map { |h| h.ip } == ["0.0.0.0"] * @@last_hop_sanity_check_distance 
             @hops = @hops[0..-2]
        end
 
@@ -136,7 +148,7 @@ class Path
 
    # overriden if necessary
    def valid?()
-       return true
+       return @invalid_reason.nil?
    end
 
    def contains_loop?()
@@ -284,7 +296,7 @@ class RevPath < Path
 end
 
 class HistoricalReversePath < RevPath
-   attr_accessor :timestamp, :invalid_reason, :src, :dst, :valid
+   attr_accessor :timestamp, :src, :dst, :valid
 
    def initialize(src, dst, init_hops=[])
        super(src, dst, init_hops)
@@ -391,7 +403,7 @@ class ForwardPath < Path
    end
 
    def valid?()
-      return @hops.size > 1 || (@hops.size == 1 && !@hops[0].is_a?(MockHop))
+      return !@invalid_reason && !@hops.empty? && !@hops[0].is_a?(MockHop)
    end
 end
 

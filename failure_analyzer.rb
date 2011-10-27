@@ -316,7 +316,7 @@ class FailureAnalyzer
     end
 
     def passes_filtering_heuristics?(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
-        SecondLevelFilters.filter(outage, filter_tracker, testing, file, skip_hist_tr) 
+        SecondLevelFilters.filter(outage, filter_tracker, @ipInfo, testing, file, skip_hist_tr) 
         return outage.passed_filters
     end
 
@@ -400,7 +400,6 @@ class FailureAnalyzer
             #elsif last_unresponsive.find_subsequent { |hop| hop.no_longer_pingable? }
             #    return :no_clear_reachability_horizon
         end
-
     end
 
     def pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
@@ -432,7 +431,6 @@ class FailureAnalyzer
 
         pingable_targets
     end
-
 end
 
 if $0 == __FILE__

@@ -83,7 +83,7 @@ class SecondLevelFilterTracker
 
    def src_passed?(src)
        return false unless @final_failed2reasons.include? src
-       @final_failed2reasons[src].value_set.to_a.reduce(true, :&)
+       @final_failed2reasons[src].values.reduce(true, :&)
    end
 
    # for threading

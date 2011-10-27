@@ -108,7 +108,7 @@ class FailureDispatcher
         @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
         registered_vps = sanity_check_registered_vps
-        filter_list = RegistrationFilters.filter!(srcdst2outage, receivers, registered_vps)
+        filter_list = RegistrationFilters.filter!(srcdst2outage, registered_vps)
         log_filter_list(filter_list)
 
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
@@ -440,7 +440,7 @@ class FailureDispatcher
 
     # TODO: move me into a VP object
     def restart_atd(vp)
-        system "ssh uw_revtr2@#{vp} killall atd; sleep 1; sudo /sbin/service atd start > /dev/null 2>&1"
+        system "ssh uw_revtr2@#{vp} 'killall atd; sleep 1; sudo /sbin/service atd start > /dev/null 2>&1'"
     end
 
     def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,

@@ -95,36 +95,56 @@
         <hr />
         <center>Normal forward traceroute</center>
         <ul type=none>
-            <% outage.normal_forward_path.each do |hop| %>
-                <li><%= hop %></li>
+            <% if outage.normal_forward_path.valid? %>
+                <% outage.normal_forward_path.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            <% else %>
+                <li><%= outage.normal_forward_path.invalid_reason %></li>
             <% end %>
         </ul>
         <hr />
         <center>Spoofed forward traceroute</center>
         <ul type=none>
-            <% outage.spoofed_forward_path.each do |hop| %>
-                <li><%= (hop or "huh?") %></li>
+            <% if outage.spoofed_forward_path.valid? %>
+                <% outage.spoofed_forward_path.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            <% else %>
+                <li><%= outage.spoofed_forward_path.invalid_reason %></li>
             <% end %>
         </ul>
         <hr />
         <center>Historical forward traceroute (Issued: <%= outage.historical_fpath_timestamp %>)</center>
         <ul type=none>
-            <% outage.historical_forward_path.each do |hop| %>
-                <li><%= hop %></li>
+            <% if outage.historical_forward_path.valid? %>
+                <% outage.historical_forward_path.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            <% else %>
+                <li><%= outage.historical_forward_path.invalid_reason %></li>
             <% end %>
         </ul>
         <hr />
         <center>Spoofed reverse traceroute</center>
         <ul type=none>
-            <% outage.spoofed_revtr.each do |hop| %>
-                <li><%= hop %></li>
+            <% if outage.spoofed_revtr.valid? %>
+                <% outage.spoofed_revtr.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            <% else %>
+                <li><%= outage.spoofed_revtr.invalid_reason %></li>
             <% end %>
         </ul>
         <hr />
         <center>Historical reverse traceroute</center>
         <ul type=none>
-            <% outage.historical_revtr.each do |hop| %>
-                <li><%= hop %></li>
+             <% if outage.historical_revtr.valid? %>
+                <% outage.historical_revtr.each do |hop| %>
+                    <li><%= hop %></li>
+                <% end %>
+            <% else %>
+                <li><%= outage.historical_revtr.invalid_reason %></li>
             <% end %>
         </ul>
         <hr />
@@ -188,8 +208,12 @@
             <% outage.upstream_reverse_paths.each do |target,trace| %>
             <ul type=none>
                 <li> Target: <%= target %></li>
-                <% trace.each do |hop| %>
-                    <li><%= hop %></li>
+                <% if trace.valid? %>
+                    <% trace.each do |hop| %>
+                        <li><%= hop %></li>
+                    <% end %>
+                <% else %>
+                    <li><%= trace.invalid_reason %></li>
                 <% end %>
             </ul>
             <hr />
