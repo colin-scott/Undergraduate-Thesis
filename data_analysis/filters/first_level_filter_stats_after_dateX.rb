@@ -36,10 +36,14 @@ failed.each do |t|
     end
 end
 
-puts "total: #{total}"
+puts "===================================================="
+puts "Outages since #{time}:"
+puts
+Stats.print_average("total", total, total)
 Stats.print_average("total passed", total_passed, total)
-puts "filter trigger counts:"
 
+puts
+puts "filter trigger counts:"
 reason2count.each do |reason, count|
     puts "  #{reason} #{count}"
 end

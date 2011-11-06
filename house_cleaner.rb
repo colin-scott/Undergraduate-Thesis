@@ -96,7 +96,7 @@ class HouseCleaner
     def find_substitutes_for_unresponsive_targets()
         dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
 
-        @log.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
+        @logger.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
         bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops

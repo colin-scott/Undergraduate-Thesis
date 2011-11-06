@@ -31,11 +31,15 @@ LogIterator::correlation_iterate do |o, time|
     end
 end
 
-puts "total: #{total}"
+puts "=============================="
+puts
+puts "Outage since #{time_bound}"
+Stats.print_average("total", total, total)
 Stats.print_average("num_passed", num_passed, total)
 num_failed = total - num_passed
 Stats.print_average("num_failed", num_failed, total)
 
+puts 
 puts "filter trigger counts (% of failed):"
 reason2count.each do |reason, count|
     print "  "
