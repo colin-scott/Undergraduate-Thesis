@@ -17,6 +17,7 @@ require 'outage'
 require 'utilities'
 require 'poisoner'
 require 'filters'
+require 'pstore'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -199,7 +200,7 @@ class FailureDispatcher
            raise "Not merging properly! #{outages.inspect}"
        end
        
-       return forward_merged + reverse_merged
+       return forward_merged + reverse_merge
     end
 
     # return a hash
@@ -828,24 +829,37 @@ class FailureDispatcher
 
     # see outage.rb
     def log_srcdst_outage(outage)
+        # TODO: use pstore instead of individual files
         filename = outage.file
         File.open(FailureIsolation::IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     def log_merged_outage(outage)
+        # TODO: use pstore instead of individual files
         filename = outage.file
         File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     def log_filter_stats(filter_stats)
         t = Time.new
+        # We keep a PStore for each day, since PStore reads all data into
+        # memory (which clearly will not scale over time...). Would like to use
+        # Tokyo Cabinet (handles this transparently), but support won't
+        # install it on the networks cluster for us.
+        today_str = t.strftime("%Y.%m.%d")
         filter_stats.end_time = t
-        t_str = t.strftime("%Y%m%d%H%M%S")
-        filename = "#{filter_stats.target}_#{t_str}.yml"
-        File.open(FailureIsolation::SecondLevelFilterStats+"/"+filename, "w") { |f| YAML.dump(filter_stats, f) }
+        store = PStore.new(FailureIsolation::SecondLevelFilterStats+"/"+today_str)
+        store.transaction do
+          # We assign a unique id for each of today's filter stat objects
+          # For now, we use t+target
+          filter_stats.each do |stat|
+            store["#{t.to_i}#{stat.target}"] = stat
+          end
+        end
     end
 
     def log_filter_list(filter_list)
+        # TODO: use pstore instead of individual files
         filename = filter_list.time.strftime("%Y%m%d%H%M%S")
         File.open(FailureIsolation::RegistrationFilterStats+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(filter_list)) }
     end

@@ -1,13 +1,4 @@
-require 'thread'
-require 'forwardable'
-
-class FirstLevelFilterTracker
-   attr_accessor :target, :initial_observing, :initial_connected, :time # :failure_reasons (below)
-
-   def initialize(target, initial_observing, initial_connected, time)
-        @target = target
-        @initial_observing = initial_observing
-        @initial_connected = initial_connected
+require 'thread' require 'forwardable' class FirstLevelFilterTracker attr_accessor :target, :initial_observing, :initial_connected, :time # :failure_reasons (below) def initialize(target, initial_observing, initial_connected, time) @target = target @initial_observing = initial_observing @initial_connected = initial_connected
         @failure_reasons = []
         @time = time
    end 

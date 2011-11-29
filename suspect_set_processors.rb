@@ -167,7 +167,7 @@ class Pruner
             if hops_on_traces.nil? or hops_on_traces.empty?
                 @logger.warn "no hops on traces to site: #{site}"
             else
-                @logger.info "found intersecting hops on traces to site: #{site}"
+                @logger.debug "found intersecting hops on traces to site: #{site}"
             end
 
             to_remove += hops_on_traces
@@ -205,7 +205,7 @@ class Pruner
             @logger.warn "#{responsive_targets.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
         else
-            @logger.info "issued pings sucessfully!"
+            @logger.debug "issued pings sucessfully!"
         end
 
         return responsive_targets

@@ -392,6 +392,7 @@ class FailureMonitor
     end
 
     def log_filter_stats(filter_stats)
+        # TODO: use pstore
         old_stats = []
         begin 
             old_stats = Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
