@@ -115,8 +115,8 @@ class DotGenerator
         # filtering should happen at a higher level
         add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
 
-        upstream_reverse_paths.each do |target, revtr|
-            add_path(revtr, :aux_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        upstream_reverse_paths.each do |target, up_revtr|
+            add_path(up_revtr, :aux_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
         end
 
         node2names.each_pair do |node,ips|

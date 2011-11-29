@@ -164,7 +164,7 @@ class Pruner
             site = FailureIsolation.Host2Site[o.src]
             @logger.warn "intersecting_traces_to_src, site nil! #{o.src}" if site.nil?
             hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(@db, site) unless site.nil?
-            if hops_on_traces.empty?
+            if hops_on_traces.nil? or hops_on_traces.empty?
                 @logger.warn "no hops on traces to site: #{site}"
             else
                 @logger.info "found intersecting hops on traces to site: #{site}"

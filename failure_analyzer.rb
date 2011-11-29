@@ -426,7 +426,7 @@ class FailureAnalyzer
 
         historical_tr.reverse.each do |hop|
             break if hop.asn != dst_as
-            pingable_targets += hop.reverse_path.all_hops_adjacent_to_dst_as.find_all { |hop| hop.ping_responsive } unless hop.reverse_path.nil? or !hop.reverse_path.valid?
+            pingable_targets += hop.reverse_path.all_hops_adjacent_to_dst_as.find_all { |h| h.ping_responsive } unless hop.reverse_path.nil? or !hop.reverse_path.valid?
         end
 
         pingable_targets

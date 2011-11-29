@@ -19,6 +19,7 @@ total = 0
 reason2count = Hash.new(0)
 
 LogIterator::correlation_iterate do |o, time|
+    print "."
     next if time < time_bound
 
     total += o.initial_observing.size
