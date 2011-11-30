@@ -841,6 +841,8 @@ class FailureDispatcher
     end
 
     def log_filter_stats(filter_stats)
+        # Each filter_stats is a single SecondLevelFilterStats object
+        # TODO: refactor this to take all filter stats for the current round?
         t = Time.new
         # We keep a PStore for each day, since PStore reads all data into
         # memory (which clearly will not scale over time...). Would like to use
@@ -852,9 +854,7 @@ class FailureDispatcher
         store.transaction do
           # We assign a unique id for each of today's filter stat objects
           # For now, we use t+target
-          filter_stats.each do |stat|
-            store["#{t.to_i}#{stat.target}"] = stat
-          end
+          store["#{t.to_i}#{filter_stats.target}"] = filter_stats
         end
     end
 
