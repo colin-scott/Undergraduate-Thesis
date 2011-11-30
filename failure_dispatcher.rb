@@ -18,6 +18,7 @@ require 'utilities'
 require 'poisoner'
 require 'filters'
 require 'pstore'
+require 'timeout'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -156,9 +157,14 @@ class FailureDispatcher
 
             # XXX Should I really be joining here if there are going to be
             # more measurements issued for MergedOutage?
-            outage_threads.each { |thread| thread.join }
-
-            @logger.debug "got past join"
+            #
+            begin
+                timeout(FailureIsolation::DefaultPeriodSeconds) do 
+                    outage_threads.each { |thread| thread.join }
+                end
+            rescue Timeout::Error
+                Emailer.deliver_isolation_exception("measurement thread join timed out after #{FailureIsolation::DefaultPeriodSeconds}")
+            end
 
             if !testing
                 dst2filter_stats.values.each do |filter_stats|
