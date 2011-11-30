@@ -206,7 +206,7 @@ class FailureDispatcher
            raise "Not merging properly! #{outages.inspect}"
        end
        
-       return forward_merged + reverse_merge
+       return forward_merged + reverse_merged
     end
 
     # return a hash

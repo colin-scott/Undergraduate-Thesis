@@ -18,9 +18,8 @@ num_passed = 0
 total = 0
 reason2count = Hash.new(0)
 
-LogIterator::correlation_iterate do |o, time|
-    print "."
-    next if time < time_bound
+LogIterator::second_lvl_filter_iterate(time_bound) do |o|
+    next if o.start_time < time_bound # not strictly necessary...
 
     total += o.initial_observing.size
     num_passed += o.final_passed.size

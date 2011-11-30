@@ -13,6 +13,7 @@ require 'outage'
 require 'direction'
 require 'failure_isolation_consts'
 require 'time'
+require 'pstore'
 
 # REV4 is :the only one that matters! everything else has been converted!
 
@@ -227,25 +228,25 @@ module LogIterator
         end
     end
 
-    def LogIterator::correlation_iterate(files=nil, debugging=false, &block)
+    def LogIterator::second_lvl_filter_iterate(start_date=nil, debugging=false, &block)
         Dir.chdir FailureIsolation::SecondLevelFilterStats do
-            files ||= Dir.glob("*yml").sort
-
+            start_date_str = start_date.strftime("%Y.%m.%d")
+            files = Dir.glob("*").sort.find_all { |file| file >= start_date_str }
             total = files.size
-            curr = 0
             files.each do |file|
-                begin
-                    curr += 1
-                    $stderr.puts file if debugging
-                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
-                    yield YAML.load_file(file), self.parse_correlation_time(file)
-                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
-                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                $stderr.puts "Processing #{file}"
+
+                stats = []
+                store = PStore.new(file)
+                store.transaction do
+                    store.roots.each do |key|
+                        stats << store[key]
+                    end
                 end
+                stats.each { |stat| yield stat }
             end
         end
     end
-
 
     def LogIterator::replace_logs(dispatcher, &block)
         Dir.chdir FailureIsolation::Snapshot do
