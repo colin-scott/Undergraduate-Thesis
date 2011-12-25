@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 require 'file_lock'
 Lock::acquire_lock("check_up_and_start_lock.txt")

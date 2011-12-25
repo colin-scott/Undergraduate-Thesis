@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 require '../spooftr_config'
 require 'mail'

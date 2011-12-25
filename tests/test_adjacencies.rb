@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 # #! /usr/bin/ruby
 configfn="/homes/network/ethan/timestamp/reverse_traceroute/reverse_traceroute/config_zooter.rb"

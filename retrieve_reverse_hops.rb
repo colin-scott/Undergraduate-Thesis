@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 # We harvest forward hops (for checking pingability) from toil. 
 # We also want to know historical pingability for reverse hops.

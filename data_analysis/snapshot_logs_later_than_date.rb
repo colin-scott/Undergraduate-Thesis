@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 
 # Given a date, copy all logs later than date to the snapshot directory for

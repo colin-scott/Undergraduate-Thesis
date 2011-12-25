@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 # if i get no rr responses, mark that destination as bad and don't probe more?
 # if i learn RR reverse hops r1-r2-r3, it currently won't use r2-r3 if i reach
 # r2 from something other than r1

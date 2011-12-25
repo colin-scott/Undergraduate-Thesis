@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 # TODO:
 #    * This code is shite. Refactor just about everything. esp. add_path()

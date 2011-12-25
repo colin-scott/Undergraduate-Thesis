@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 # These modules encapsulate the code for outage correlation.
 #
 # Initializers populate the suspect set.
