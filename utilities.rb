@@ -5,6 +5,7 @@ require 'date'
 require 'logger'
 require 'thread'
 require 'forwardable'
+
 if RUBY_PLATFORM != 'java'
   require 'inline'
 

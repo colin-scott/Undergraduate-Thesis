@@ -1,4 +1,4 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 #require 'config_website'
 require '../spooftr_config'
