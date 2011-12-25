@@ -1,7 +1,6 @@
-#!/homes/network/revtr/ruby/bin/ruby
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-#$: << "."
-#$stderr.puts $:.inspect
+$: << "./"
 require_relative 'utilities'
 
 #  Is controller_log used?
