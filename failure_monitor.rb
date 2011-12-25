@@ -12,8 +12,6 @@ require 'filters'
 # responsible for pulling state from ping monitors, classifying outages, and
 # dispatching interesting outages to FailureDispatcher
 class FailureMonitor
-    include FirstLevelFilters
-
     def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
         @dispatcher = dispatcher
         @db = db
@@ -68,7 +66,7 @@ class FailureMonitor
 
         # so that we don't probe the hell out of failed routers
         # target -> time
-        @node_target2lastisolationattempt = {}
+        @nodetarget2lastisolationattempt = {}
 
         # minimum time in between successive isolation measurements sent from
         # a source to a destination
@@ -106,9 +104,9 @@ class FailureMonitor
 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2outage, dst2filter_tracker = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2outage, srcdst2filtertracker = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
-            @dispatcher.isolate_outages(srcdst2outage, dst2filter_tracker)
+            @dispatcher.isolate_outages(srcdst2outage, srcdst2filtertracker)
 
             @logger.puts "round #{@current_round} completed"
             @current_round += 1
@@ -192,7 +190,7 @@ class FailureMonitor
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
         if (FailureIsolation.AllNodes - FailureIsolation.NodeBlacklist).empty?
-            Emailer.deliver_isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}")
+            Emailer.isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}")
             return
         end
         
@@ -201,7 +199,7 @@ class FailureMonitor
 
         @logger.debug "finished finding substitites for vps"
 
-        Emailer.deliver_faulty_node_report(outdated,
+        Emailer.faulty_node_report(outdated,
                                            source_problems,
                                            not_sshable,
                                            not_controllable,
@@ -219,7 +217,7 @@ class FailureMonitor
                 @house_cleaner.find_substitutes_for_unresponsive_targets()
         @logger.debug "finished finding substitutes for targets"
 
-        Emailer.deliver_isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+        Emailer.isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
          
         @house_cleaner.swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets) 
     end
@@ -334,39 +332,40 @@ class FailureMonitor
         [target2observingnode2rounds, target2neverseen, target2stillconnected]
     end
 
-    def passes_first_level_filters?(target, observingnode2rounds, stillconnected)
-        filter_tracker = FirstLevelFilters.filter(target, observingnode2rounds, stillconnected, @nodetarget2lastoutage)
+    def apply_first_lvl_filters(target2observingnode2rounds, target2neverseen, target2stillconnected)
+        # Note that this method modifies target2observingnode2rounds --
+        # namely, it deletes all observing nodes that have recently issued
+        # measurements for the target 
+        now = Time.new
+        srcdst2filtertracker = {}
 
-        # TODO: move this into FirstLevelFilters?
-        # don't issue isolation measurements for targets which have
-        # already been probed recently
-        observingnode2rounds.each do |node, rounds|
-            if @node_target2lastisolationattempt.include? [node,target] and 
-                        (@current_round - @node_target2lastisolationattempt[[node,target]] <= @@isolation_interval)
-                observingnode2rounds.delete node 
-            else
-                @node_target2lastisolationattempt[[node,target]] = @current_round
+        target2observingnode2rounds.each do |target, observingnode2rounds|
+            stillconnected = target2stillconnected[target]
+            neverseen = target2neverseen[target]
+
+            filter_trackers_for_target = []
+
+            observingnode2rounds.each do |node, rounds|
+                filter_tracker = FilterTracker.new(node, target, stillconnected, now)
+                srcdst2filtertracker[[node,target]] = filter_tracker
+                filter_trackers_for_target << filter_tracker
             end
-        end
 
-        if observingnode2rounds.empty?
-            filter_tracker.failure_reasons << ALL_NODES_ISSUED_MEASUREMENTS_RECENTLY 
+            FirstLevelFilters.filter!(target, filter_trackers_for_target, observingnode2rounds, neverseen, stillconnected,
+                                      @nodetarget2lastoutage, @nodetarget2lastisolationattempt, @current_round, @@isolation_interval)
         end
-
-        return filter_tracker
+        
+        return srcdst2filtertracker
     end
 
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
-        dst2filter_tracker =  {}
-        filter_stats = []
+        srcdst2filtertracker = apply_first_lvl_filters(target2observingnode2rounds, target2neverseen, target2stillconnected)
+
+        now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-            filter_tracker = passes_first_level_filters?(target, observingnode2rounds, target2stillconnected[target])
-            filter_stats << filter_tracker
-            next unless filter_tracker.passed?
-
             # TODO: encpasulate VPs into objects, so the to_s automatically
             # yields the formatted string
             #
@@ -376,33 +375,19 @@ class FailureMonitor
             formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
             formatted_never_seen = target2neverseen[target]
 
-            dst2filter_tracker[target] = SecondLevelFilterTracker.new(target, observingnode2rounds.keys, target2stillconnected[target])
-
             observingnode2rounds.keys.each do |src|
-               srcdst2outage[[src,target]] = Outage.new(src, target, target2stillconnected[target],
-                                                        formatted_connected, formatted_unconnected, formatted_never_seen)
-               srcdst2outage[[src,target]].measurement_times << ["passed_first_lvl_filters", Time.new]
+               srcdst = [src, target]
+               filter_tracker = srcdst2filtertracker[srcdst]
+
+               if filter_tracker.passed?
+                  srcdst2outage[srcdst] = Outage.new(src, target, target2stillconnected[target],
+                                                           formatted_connected, formatted_unconnected, formatted_never_seen)
+                  srcdst2outage[srcdst].measurement_times << ["passed_first_lvl_filters", now]
+               end
             end
         end
 
-        # log first level filter stats
-        log_filter_stats(filter_stats)
-        
-        [srcdst2outage, dst2filter_tracker]
-    end
-
-    def log_filter_stats(filter_stats)
-        # TODO: use pstore
-        old_stats = []
-        begin 
-            old_stats = Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
-        rescue
-            $stderr.puts "Failed to load old isolation stats! #{$!}"
-            old_stats = []
-        end
-
-        old_stats += filter_stats
-        File.open(FailureIsolation::FirstLevelFilterStats, "w") { |f| f.write Marshal.dump(old_stats) }
+        [srcdst2outage, srcdst2filtertracker]
     end
 end
 

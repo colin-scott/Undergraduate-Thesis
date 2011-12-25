@@ -4,7 +4,9 @@ require 'failure_isolation_consts'
 require 'action_mailer'
 
 ActionMailer::Base.delivery_method = :sendmail
-ActionMailer::Base.template_root = "#{$REV_TR_TOOL_DIR}/templates"
+#ActionMailer::Base.template_root = "#{$REV_TR_TOOL_DIR}/templates"
+ActionMailer::Base.prepend_view_path("#{$REV_TR_TOOL_DIR}/templates")
+#$TEMPLATE_PATH = "#{$REV_TR_TOOL_DIR}/templates"
 ActionMailer::Base.raise_delivery_errors = true
 
 class Emailer < ActionMailer::Base
@@ -151,5 +153,5 @@ def email_and_die
     $stderr.puts bt
     emails = "Luckily, the critical error didn't affect any users."
     if ($requests.is_a?(Array) && $requests.length > 0) then emails = "The following requests (by log ID) were affected: " + $requests.collect { |req| req.log.id.to_s + " (" + req.email + ")" }.join(", ") end
-    Emailer.deliver_critical_error($0, error, bt, emails)
+    Emailer.critical_error($0, error, bt, emails)
 end

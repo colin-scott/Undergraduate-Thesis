@@ -204,41 +204,21 @@ module LogIterator
         end
     end
 
-    def self.first_level_filter_stats()
-       Marshal.load(IO.read(FailureIsolation::FirstLevelFilterStats))
-    end
-
-    def self.registration_filter_iterate(debugging=false)
-        Dir.chdir FailureIsolation::RegistrationFilterStats do
-            files ||= Dir.glob("*bin").sort
-
-            total = files.size
-            curr = 0
-            files.each do |file|
-                begin
-                    curr += 1
-                    $stderr.puts file if debugging
-                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
-                    yield Marshal.load(IO.read(file))
-                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
-                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
-                end
+    def LogIterator::filter_tracker_iterate(start_date=nil, debugging=false, &block)
+        Dir.chdir FailureIsolation::FilterStats do
+            files = Dir.glob("*").sort
+            if !start_date.nil?
+                start_date_str = start_date.strftime("%Y.%m.%d")
+                files.delete_if { |file| file < start_date_str }
             end
 
-        end
-    end
-
-    def LogIterator::second_lvl_filter_iterate(start_date=nil, debugging=false, &block)
-        Dir.chdir FailureIsolation::SecondLevelFilterStats do
-            start_date_str = start_date.strftime("%Y.%m.%d")
-            files = Dir.glob("*").sort.find_all { |file| file >= start_date_str }
             total = files.size
             files.each do |file|
                 $stderr.puts "Processing #{file}"
 
                 stats = []
                 store = PStore.new(file)
-                store.transaction do
+                store.transaction(true) do
                     store.roots.each do |key|
                         stats << store[key]
                     end

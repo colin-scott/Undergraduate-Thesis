@@ -1,5 +1,5 @@
-#!/homes/network/revtr/ruby/bin/ruby
-
+#!/homes/network/revtr/ruby-upgrade/bin/ruby
+$: << "./"
 # Main isolation process. Allocates several objects: 
 #    - Failure Monitor (pulls ping logs, identifies partial outages)
 #    - Failure Dispatcher (handed outages, issues isolation measurements, and
@@ -81,8 +81,8 @@ begin
 
    monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
 rescue Exception => e
-   Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
-   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("<br />")}"
+   Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
+   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
    throw e
 end

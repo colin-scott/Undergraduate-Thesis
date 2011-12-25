@@ -1,8 +1,12 @@
-TODO: 
-  - make a utilitiy object to pass around rather than a (db, logger, etc.)
-    pair
+Updated Dec. 1st, 2011
+===
+- Fix pptasks ping in suspect_set_processors. HYPOTHESIS: merging outages in
+  up to three ways simulaneously => concurrent + redundant pings to the same
+  nodes
+- Fix poisoner logging
+- Implement unpoison
 
-
+===
 There have been some bizzare cases where the source doesn't get any replies
 back from normal tr or non-revtr pings...
 To look into it, run:

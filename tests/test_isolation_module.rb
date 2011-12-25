@@ -20,14 +20,15 @@ if ARGV.empty?
     target = "132.252.152.193"
     srcdst = [src, target]
     outage = Outage.new(src, target, receivers, [], [], [])
-    outage_correlation = OutageCorrelation.new(target, [src], receivers)
-    dispatcher.isolate_outages({srcdst => outage},{target => outage_correlation}, true)
+    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
+    dispatcher.isolate_outages({srcdst => outage},{srcdst => filter_tracker}, true)
 else
     src = ARGV.shift
     dst = ARGV.shift
     srcdst = [src, dst]
-    dispatcher.isolate_outages({ srcdst => ARGV.map { |str| str.gsub(/,$/, '')  }},
-                               {srcdst => []}, {srcdst => []}, true)
+    outage = Outage.new(src, target, receivers, [], [], [])
+    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
+    dispatcher.isolate_outages({srcdst => outage},{srcdst => failure_tracker}, true)
 end
 
 sleep

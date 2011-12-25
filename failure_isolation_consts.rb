@@ -114,9 +114,7 @@ module FailureIsolation
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
-    FirstLevelFilterStats = "#{$DATADIR}/first_level_filters/filter_stats.bin" 
-    RegistrationFilterStats = "#{$DATADIR}/registration_filters" 
-    SecondLevelFilterStats = "#{$DATADIR}/second_level_filters" 
+    FilterStatsPath = "#{$DATADIR}/filter_stats"
 
     DotFiles = "#{$DATADIR}/dots"
 
@@ -295,7 +293,7 @@ module FailureIsolation
     # =========================
     
     # More than actually needed
-    NumTopPoPs = 200
+    NumTopPoPs = 400
 
     CoreRtrsPerPoP = 1
     EdgeRtrsPerPoP = 2

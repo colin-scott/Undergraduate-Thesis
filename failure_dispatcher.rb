@@ -36,6 +36,7 @@ class FailureDispatcher
         acl=ACL.new(%w[deny all
 					allow *.cs.washington.edu
 					allow localhost
+                    allow 128.208.2.*
 					allow 127.0.0.1
 					])
 
@@ -83,7 +84,7 @@ class FailureDispatcher
                     @rtrSvc = DRbObject.new nil, uri
                     @rtrSvc.respond_to?(:anything?)
                 rescue DRb::DRbConnError
-                    Emailer.deliver_isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu")
+                    Emailer.isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu")
                 end 
             end
         end
@@ -92,16 +93,16 @@ class FailureDispatcher
     def sanity_check_registered_vps
         registered_vps = @controller.hosts.clone
         if registered_vps.empty?
-            Emailer.deliver_isolation_exception("No VPs are registered with the controller!")
+            Emailer.isolation_exception("No VPs are registered with the controller!")
         elsif Set.new(@controller.under_quarantine) == Set.new(registered_vps)
-            Emailer.deliver_isolation_exception("All VPs are quarentined!")
+            Emailer.isolation_exception("All VPs are quarentined!")
         end
 
         registered_vps
     end
 
     # precondition: sdtillconnected are able to reach dst
-    def isolate_outages(srcdst2outage, dst2filter_stats, testing=false) # this testing flag is terrrrible
+    def isolate_outages(srcdst2outage, srcdst2filter_tracker, testing=false) # this testing flag is terrrrible
         @have_retried_connection = false
 
         # first filter out any outages where no nodes are actually registered
@@ -110,14 +111,17 @@ class FailureDispatcher
         @logger.puts "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
         registered_vps = sanity_check_registered_vps
-        filter_list = RegistrationFilters.filter!(srcdst2outage, registered_vps)
-        log_filter_list(filter_list)
+        # Note: filter! removes srcdst2outages where the registration filters
+        # did not pass
+        RegistrationFilters.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps)
 
-        @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
+        @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
         return if srcdst2outage.empty? # optimization
 
+        now = Time.new
+        srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.measurement_start_time = now }
         measurement_times = []
 
         # ================================================================================
@@ -150,26 +154,27 @@ class FailureDispatcher
             srcdst2outage.each do |srcdst, outage|
                 outage_threads << Thread.new do
                     src,dst = srcdst
+                    filter_tracker = srcdst2filter_tracker[srcdst]
                     outage.measurement_times += deep_copy(measurement_times)
-                    process_srcdst_outage(outage, dst2filter_stats[dst], testing)
+                    process_srcdst_outage(outage, filter_tracker, testing)
                 end
             end
 
             # XXX Should I really be joining here if there are going to be
             # more measurements issued for MergedOutage?
-            #
-            begin
-                timeout(FailureIsolation::DefaultPeriodSeconds) do 
-                    outage_threads.each { |thread| thread.join }
-                end
-            rescue Timeout::Error
-                Emailer.deliver_isolation_exception("measurement thread join timed out after #{FailureIsolation::DefaultPeriodSeconds}")
-            end
+            t = Time.new
+
+            outage_threads.each { |thread| thread.join }
+
+            t_prime = Time.new
+            @logger.info("Took #{t_prime} - #{t} seconds to join on measurement threads")
+            # TODO: use a thread pool to keep # threads constant
+            @logger.info("Total threads in the system after join: #{Thread.list.size}")
+
+            srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
             if !testing
-                dst2filter_stats.values.each do |filter_stats|
-                    log_filter_stats(filter_stats)
-                end
+                log_filter_trackers(srcdst2filter_tracker)
             end
 
             merged_outages = merge_outages(srcdst2outage.values, testing)
@@ -244,7 +249,7 @@ class FailureDispatcher
        dstsrc2outage
     end
 
-    def process_srcdst_outage(outage, filter_stats, testing=false)
+    def process_srcdst_outage(outage, filter_tracker, testing=false)
         @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}"
 
         gather_measurements(outage, testing)
@@ -258,7 +263,7 @@ class FailureDispatcher
             log_srcdst_outage(outage)
         end
 
-        if(@failure_analyzer.passes_filtering_heuristics?(outage, filter_stats, testing))
+        if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker, testing)
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
                              outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
@@ -285,8 +290,8 @@ class FailureDispatcher
         @poisoner.check_poisonability(merged_outage, testing)
         
         # at least one of the inside outages passed filters
-        if(merged_outage.is_interesting?)
-            Emailer.deliver_isolation_results(merged_outage, testing)
+        if(merged_outage.is_interesting? or testing)
+            Emailer.isolation_results(merged_outage, testing)
             @logger.info "Attempted to email isolation results #{Time.now}"
         end
     end
@@ -615,7 +620,7 @@ class FailureDispatcher
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_connection_refused])
         rescue Exception, NoMethodError => e
-            Emailer.deliver_isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
+            Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_exception])
         rescue Timeout::Error
@@ -846,27 +851,21 @@ class FailureDispatcher
         File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
-    def log_filter_stats(filter_stats)
-        # Each filter_stats is a single SecondLevelFilterStats object
-        # TODO: refactor this to take all filter stats for the current round?
+    def log_filter_trackers(srcdst2filter_tracker)
         t = Time.new
+
         # We keep a PStore for each day, since PStore reads all data into
         # memory (which clearly will not scale over time...). Would like to use
         # Tokyo Cabinet (handles this transparently), but support won't
         # install it on the networks cluster for us.
         today_str = t.strftime("%Y.%m.%d")
-        filter_stats.end_time = t
-        store = PStore.new(FailureIsolation::SecondLevelFilterStats+"/"+today_str)
+        store = PStore.new(FailureIsolation::FilterStatsPath+"/"+today_str)
         store.transaction do
           # We assign a unique id for each of today's filter stat objects
-          # For now, we use t+target
-          store["#{t.to_i}#{filter_stats.target}"] = filter_stats
+          # For now, we use t+src+dst
+          srcdst2filter_tracker.each do |srcdst, filter_tracker|
+            store["#{t.to_i}#{srcdst}"] = filter_tracker
+          end
         end
-    end
-
-    def log_filter_list(filter_list)
-        # TODO: use pstore instead of individual files
-        filename = filter_list.time.strftime("%Y%m%d%H%M%S")
-        File.open(FailureIsolation::RegistrationFilterStats+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(filter_list)) }
     end
 end

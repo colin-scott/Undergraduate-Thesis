@@ -202,7 +202,7 @@ class Pruner
         end
 
         if !suspect_set.empty? and responsive_targets.empty?
-            @logger.warn "#{responsive_targets.inspect} was empty?!" 
+            @logger.warn "responsive targets #{responsive_targets.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
         else
             @logger.debug "issued pings sucessfully!"

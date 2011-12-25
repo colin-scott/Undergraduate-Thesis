@@ -381,6 +381,7 @@ class Controller
         acl=ACL.new(%w[deny all
                     allow *.cs.washington.edu
                     allow localhost
+                    allow 128.208.2.*
                     allow 127.0.0.1
                     ] )
         @drb=DRb.start_service nil, self, acl

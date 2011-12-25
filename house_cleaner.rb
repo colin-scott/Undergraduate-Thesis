@@ -25,6 +25,7 @@ class HouseCleaner
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
         @logger.debug "generating top pops..."
+        @logger.debug FailureIsolation::HarshaPoPsPath
         system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
 
         sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym } 
@@ -61,6 +62,17 @@ class HouseCleaner
         currently_used_pops = Set.new(FailureIsolation.HarshaPoPs.map { |ip| FailureIsolation.IPToPoPMapping[ip] })
 
         sorted_replacement_pops = sorted_pops.find_all { |pop| !currently_used_pops.include? pop }
+
+            begin
+        File.open(FailureIsolation::HarshaPoPsPath, "w+"){|f| 
+            pop2corertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
+        }
+        File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+"){|f| 
+            pop2edgertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
+        }
+        rescue
+            @logger.puts "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}"
+        end
 
         [sorted_replacement_pops, pop2corertrs, pop2edgertrs]
     end
@@ -336,7 +348,7 @@ class HouseCleaner
 end
 
 if $0 == __FILE__
-    sorted_pops, sortedpopcore, sortedpopedge = generate_top_pops(false)
+    sorted_pops, sortedpopcore, sortedpopedge = HouseCleaner.new.generate_top_pops(false)
     $stderr.puts sortedpopcore.inspect
     $stderr.puts sortedpopedge.inspect
 end

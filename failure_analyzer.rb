@@ -316,7 +316,7 @@ class FailureAnalyzer
     end
 
     def passes_filtering_heuristics?(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
-        SecondLevelFilters.filter(outage, filter_tracker, @ipInfo, testing, file, skip_hist_tr) 
+        SecondLevelFilters.filter!(outage, filter_tracker, @ipInfo, testing, file, skip_hist_tr) 
         return outage.passed_filters
     end
 

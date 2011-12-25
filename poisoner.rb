@@ -142,7 +142,7 @@ class Poisoner
 
     def execute_poison(src, asn, outage, testing)
         @logger.debug "Attempting to send poison notification email #{src} #{asn}"
-        Emailer.deliver_poison_notification(outage, testing)
+        Emailer.poison_notification(outage, testing)
 
         # log event. On riot, I think
         # poison

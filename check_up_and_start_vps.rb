@@ -308,8 +308,8 @@ begin
     }
     
     # Email us in a batch 
-    #Emailer.deliver_check_up_vps_issue(badSudo, "sudo") if badSudo.length > 0
-    #Emailer.deliver_check_up_vps_issue(badAt - badSudo, "at") if (badAt - badSudo).length > 0
-    #Emailer.deliver_check_up_vps_issue(badRuby - badSudo, "ruby") if (badRuby - badSudo).length > 0
+    #Emailer.check_up_vps_issue(badSudo, "sudo") if badSudo.length > 0
+    #Emailer.check_up_vps_issue(badAt - badSudo, "at") if (badAt - badSudo).length > 0
+    #Emailer.check_up_vps_issue(badRuby - badSudo, "ruby") if (badRuby - badSudo).length > 0
     
 end

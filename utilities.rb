@@ -5,10 +5,12 @@ require 'date'
 require 'logger'
 require 'thread'
 require 'forwardable'
-require 'inline'
+if RUBY_PLATFORM != 'java'
+  require 'inline'
 
 # ||= so we don't redefine it
 $LOG ||= $stderr
+
 
 class Method
     alias_method :old_to_s, :to_s unless self.instance_methods.include? :old_to_s
@@ -195,6 +197,7 @@ class String
         return self =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/
     end
 end
+end
 
 module ProbeController
 
@@ -263,14 +266,14 @@ module ProbeController
         #$LOG.puts "Call was: #{method.to_ruby}"
       end
       return results
-    rescue DRb::DRbConnError,DRb::DRbBadURI
+    rescue DRb::DRbConnError,DRb::DRbBadURI,TypeError
       $server_info[server_info][:server]=nil
       $server_info[server_info][:uri]=nil
       failed_connections += 1
       if(retries == -1) then #if retries is -1, then puts the error but don't raise an exception. 
         $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s], $DRB_CONNECT_ERROR)
       elsif failed_connections<=retries
-        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s], $DRB_CONNECT_RETRY)
+        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s+"\n"+$!.backtrace.join("\n")], $DRB_CONNECT_RETRY)
         sleep 10
         retry
       else
@@ -307,7 +310,9 @@ module ProbeController
   end
 end
 
+$inline_inet_broken = true
 module Inet
+  if RUBY_PLATFORM != 'java' and !$inline_inet_broken  
   # Let's make Ruby's bit fiddling reasonably fast!
   inline(:C) do |builder|
        builder.include "<sys/types.h>"
@@ -392,6 +397,36 @@ module Inet
   def Inet::prefix(ip,length)
     ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
     return ((ip>>(32-length))<<(32-length))
+  end
+  else
+    $PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
+  
+    def Inet::ntoa( intaddr )
+      ((intaddr >> 24) & 255).to_s + '.' + ((intaddr >> 16) & 255).to_s + '.'  + ((intaddr >> 8) & 255).to_s + '.' + (intaddr & 255).to_s 
+    end
+  
+    def Inet::aton(dotted)
+      if /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?$/.match(dotted)==nil then return 0 end
+      ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
+      val=0
+      ints.each{|n| val=(val*256)+n}
+      return val
+    end
+  
+    def Inet::prefix(ip,length)
+      ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
+      return ((ip>>(32-length))<<(32-length))
+    end
+  
+    def Inet::in_private_prefix?(ip)
+      ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
+      $PRIVATE_PREFIXES.each do |prefix|
+        return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
+      end
+      return false
+    end
+
+     
   end
 
   $blacklisted_prefixes=nil
@@ -575,6 +610,7 @@ class UnionFind
   end
 end
 
+if RUBY_PLATFORM != 'java'
 class Array
   # convert to a hash
   # if given a param, assigns that value to everything
@@ -637,7 +673,7 @@ class Hash
     end
   end
 end
-
+end
 #$ip2cluster = Hash.new{ |h,k| h.has_key?(k) ? h[k] : ( h.has_key?(k.split(".")[0..2].join(".") + ".0/24") h[k.split(".")[0..2].join(".") + ".0/24"] : k.split(".")[0..2].join(".") + ".0/24") }
 $ip2cluster = Hash.new{ |h,k| h.has_key?(k) ? h[k] : k }
 $cluster2ips = Hash.new(Array.new)
@@ -663,16 +699,18 @@ end
 # if the $PL_HOSTNAMES_W_IPS includes double entries for these, we map from
 # all IPs to the hostname, but we map from the hostname only to the first IP
 # in the file
-$pl_ip2host = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
-$pl_host2ip = Hash.new do |h,k|
+if $pl_ip2host.nil? then $pl_ip2host = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k } end
+if $pl_host2ip.nil? then 
+  $pl_host2ip = Hash.new do |h,k|
    result = nil
    if (k.respond_to?(:downcase) && h.has_key?(k.downcase))
       result =h[k.downcase]
-   else 
-       raise "Does not contain hostname: #{hostname}" 
+#   else 
+#       raise "Does not contain hostname: #{k}" 
    end
 
    result
+end
 end
 
 def loadPLHostnames
@@ -689,7 +727,9 @@ end
 
 # mappings from PL hostname to site; can be used to check if 2 are at the same
 # site in order to exclude probes from the target site, say
-$pl_host2site = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+if $pl_ip2host.nil? or $pl_host2site.nil? then
+  $pl_host2site = Hash.new{ |h,k| (k.respond_to?(:downcase) && h.has_key?(k.downcase)) ? h[k.downcase] : k }
+end
 
 def loadPLSites
   File.open( $PL_HOSTNAMES_W_SITES.chomp("\n"),"r"){|f|
@@ -851,6 +891,87 @@ class LoggerLog < Log
       
           @myLog.info date+ " " +p
     end
+end
+
+def load_cache_svcs()
+  if $server_info.nil? then $server_info = Hash.new{|h,k| h[k] = {}} end
+  $server_info["cache_rr"]={}
+  $server_info["cache_rr"][:uripath]="/homes/network/revtr/www/vps/failure_isolation/cache_service.txt"
+  uri =`cat ~revtr/www/vps/failure_isolation/cache_service.txt 2>/dev/null`
+  $server_info["cache_rr"][:uri] = uri
+  $LOG.puts "Connecting to #{uri}"
+  cache = DRbObject.new nil, uri
+  $server_info["cache_rr"][:server] = cache
+
+  cache_rr_svcs = []
+    
+
+  if File.exists? "/homes/network/revtr/www/vps/failure_isolation/cache_rr1_service.txt" then
+    1.upto(16).each{|i|
+      if File.exists? "/homes/network/revtr/www/vps/failure_isolation/cache_rr#{i}_service.txt" then
+        $server_info["cache_rr_#{i}"]={}
+        $server_info["cache_rr_#{i}"][:uripath]="/homes/network/revtr/www/vps/failure_isolation/cache_rr#{i}_service.txt"
+        uri =`cat #{$server_info["cache_rr_#{i}"][:uripath]} 2>/dev/null`
+        $server_info["cache_rr_#{i}"][:uri] = uri
+        $LOG.puts "Connecting to #{uri} (cache_rr #{i})"
+        cache = DRbObject.new nil, uri
+        $server_info["cache_rr_#{i}"][:server] = cache
+
+        cache_rr_svcs << "cache_rr_#{i}"
+      end
+    }
+  else
+    cache_rr_svcs << cache
+  end
+
+  $LOG.puts "Extending monitor mixin"
+  cache_rr_svcs.extend(MonitorMixin)
+  cache_rr_svcs
+
+end 
+
+module CacheService
+  def CacheService::issue_to_cache(server_info, retries=1, &method)
+
+    failed_connections=0
+    begin
+      if $server_info[server_info][:server].nil?
+        if $server_info[server_info][:uri].nil?
+          $server_info[server_info][:uri]=`cat #{$server_info[server_info][:uripath]} 2>/dev/null`
+          if $server_info[server_info][:uri].strip == "" then retries +=1 end
+        end
+        $LOG.puts "Connecting to #{server_info.to_s} #{$server_info[server_info][:uri]}"
+        $server_info[server_info][:server] = DRbObject.new nil, $server_info[server_info][:uri]
+      end
+      if($TIMING) then
+        timer = Time.now
+      end
+      results=method.call($server_info[server_info][:server])
+      if($TIMING) then
+        $LOG.puts "TIMING: call to #{server_info.to_s} took #{Time.now - timer} seconds"
+        #$LOG.puts "Call was: #{method.to_ruby}"
+      end
+      #$server_info[server_info][:server]=nil
+      return results
+    rescue DRb::DRbConnError,DRb::DRbBadURI, TypeError
+      $server_info[server_info][:server]=nil
+      $server_info[server_info][:uri]=nil
+      failed_connections += 1
+      if(retries == -1) then #if retries is -1, then puts the error but don't raise an exception.
+        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s])
+      elsif failed_connections<=retries
+        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s+$!.backtrace.join("\n")])
+        sleep 10
+        retry
+      else
+        $LOG.puts(["#{server_info.to_s} refused connection, failing", "EXCEPTION! #{server_info.to_s} refused connection, failing: " + $!.to_s +
+          "\n" + $!.backtrace.join("\n")])
+        raise DRb::DRbConnError, $!.message,$!.backtrace
+      end
+    end
+
+  end
+
 end
 
 
