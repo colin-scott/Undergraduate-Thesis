@@ -205,7 +205,7 @@ module LogIterator
     end
 
     def LogIterator::filter_tracker_iterate(start_date=nil, debugging=false, &block)
-        Dir.chdir FailureIsolation::FilterStats do
+        Dir.chdir FailureIsolation::FilterStatsPath do
             files = Dir.glob("*").sort
             if !start_date.nil?
                 start_date_str = start_date.strftime("%Y.%m.%d")
