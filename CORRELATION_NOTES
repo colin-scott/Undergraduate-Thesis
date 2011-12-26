@@ -1,0 +1,22 @@
+Architecture:
+Correlation architecture:
+   - Thread out on each (src,dst) pair for speed purposes
+   - Join on all threads (after emails have been sent out), regardless of
+     whether outages passed filters
+   - Have a merging module that takes all joined threads and decideds which to
+     merge
+
+
+Pruning architecture:
+   - For reverse path failures, 
+
+
+Updates:
+   - Reverse path isolation run for bidirectional outages as well. We'll see
+     if the results differ later on
+   - TRs dumped to DB
+   - Simple initialization/pruning set up. Made it easy to add more
+     suspect set initializers and pruners (just pass a block)
+   - Threading architecture set up
+   - Blocked on Ethan's PL-PL traceroutes, so I think I might start working on
+     operator verification (setting up a website, etc.)
