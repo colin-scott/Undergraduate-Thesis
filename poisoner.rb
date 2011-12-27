@@ -1,3 +1,6 @@
+
+# In charge of initiating BGP Poisonings and logging poisoning results
+
 require 'failure_isolation_consts'
 require 'drb'
 require 'drb/acl'
@@ -17,6 +20,7 @@ require 'outage'
 require 'utilities'
 require 'direction'
 
+# In charge of initiating BGP Poisonings and logging poisoning results
 class Poisoner
     def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr))
         @failure_analyzer = failure_analyzer
@@ -24,11 +28,16 @@ class Poisoner
         @ip_info = ip_info
         @logger = logger
 
-        # TODO: threshold for outage duration!
-        
-        # TODO: what about a border router?
+        # TODO: threshold for outage duration! Don't want to poison outages
+        # that will likely resolve themselves before poisoning is effective.
+        # TODO: what about border routers? Which AS to poison?
     end
 
+    # Check whether the merged_outage is worth poisoning. If so, poison!
+    # "worth" is defined by:
+    #   - source is a BGP Mux node
+    #   - outage is reverse or bidirectional
+    #   - outage passed filters
     def check_poisonability(merged_outage, testing=false)
         src2direction2outage2failures = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = Hash.new { |h2,k2| h2[k2] = [] } } }
 
@@ -38,7 +47,7 @@ class Poisoner
 
             if o.direction == Direction.REVERSE
                 # only base results on the old isolation algorithm!
-                #   at least until Arvind and I work out the correlation one
+                # TODO: at least until Arvind and I work out the correlation one
                 
                 if !o.suspected_failures[Direction.REVERSE].nil? and !o.suspected_failures[Direction.REVERSE].empty?
                     # POISON!!!!!!!!
@@ -53,6 +62,8 @@ class Poisoner
         poison(src2direction2outage2failures, merged_outage, testing)
     end
 
+    # Choose the ASN to poison from the chosen outaeg, and execute a poisoning
+    #
     # pre: all outages in src2direction2outage2failures are ready to be
     # poisoned (not just random)
     def poison(src2direction2outage2failures, merged_outage, testing)
@@ -91,6 +102,8 @@ class Poisoner
         log_outages(src2direction2outage2failures) # if !testing
     end
 
+    # helper method. Given a merged_outage, return:
+    #  [ the ASN to poison, the outage within the merged outage that was chosen]
     def asns_to_poison(outage2failures)
         outage2asns = outage2failures.map_values { |failures| failures.map  { |hop| hop.is_a?(String) ? @ip_info.getASN(hop) : hop.asn } }
         asns_to_poison = outage2asns.value_set.delete(nil).to_a
@@ -102,6 +115,9 @@ class Poisoner
         [asn_to_poison, outage]
     end
 
+    # Log the results of the poisoning
+    #
+    # TODO: this is broken!
     def log_outages(src2direction2outage2failures)
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
@@ -140,6 +156,7 @@ class Poisoner
         File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f|  YAML.dump(previous_outages, f) }
     end
 
+    # ssh to riot and execute the poisoning
     def execute_poison(src, asn, outage, testing)
         @logger.debug "Attempting to send poison notification email #{src} #{asn}"
         Emailer.poison_notification(outage, testing)

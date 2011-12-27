@@ -1,5 +1,13 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# There are three levels of filters: 
+#   - based on ping state: instable and non-complete outages 
+#   - based on VP registration: outages where the relevant VPs aren't registered with the controller
+#   - based on isolation measurements: outages which have resolved themselves,
+#        or aren't otherwise interesting
+#
+# This file bundles all of the filters into one place for ease of maintanence
+
 require 'filter_stats'
 require 'failure_isolation_consts'
 require 'set'
@@ -32,10 +40,14 @@ module Filters
 end
 
 module FirstLevelFilters
+    # Minimum rounds a VP has observed ping loss
     LOWER_ROUNDS_BOUND = 4
+    # Maximum rounds a VP has observed ping loss
     UPPER_ROUNDS_BOUND = 500
+    # Minimum number of VPs observing the outage
     VP_BOUND = 1
 
+    # Filter names
     NO_VP_HAS_CONNECTIVITY = :no_vp_has_connectivity
     NO_VP_RECENTLY_OBSERVING = :no_vp_recently_observing
     NO_STABLE_UNCONNECTED_VP = :no_stable_unconnected_vp
@@ -57,6 +69,7 @@ module FirstLevelFilters
         ISSUED_MEASUREMENTS_RECENTLY
     ])
 
+    # Run all first level filters. Mutates filter_trackers
     def self.filter!(target, filter_trackers, observingnode2rounds, neverseen, stillconnected,
                      nodetarget2lastoutage, nodetarget2lastisolationattempt, 
                      current_round, isolation_interval)
@@ -124,18 +137,24 @@ module FirstLevelFilters
         stillconnected.find { |node| (now - (nodetarget2lastoutage[[node, target]] or Time.at(0))) / 60 > LOWER_ROUNDS_BOUND }.nil?
     end
 
+    # BGP Mux nodes are a bit wonky -- they observe far more outages than the
+    # other nodes. Make sure that the outage is legitimiate by ensuring that
+    # at least one non BGP Mux node is observing
     def self.no_non_poisoner_observing?(nodes)
         nodes.find { |n| !FailureIsolation::PoisonerNames.include? n }
     end
 
+    # BGP Mux nodes are a bit wonky -- they observe far more outages than the
+    # other nodes. Make sure that the outage is legitimiate by ensuring that
+    # at least one non BGP Mux receiver has connectivity with the dest
     def self.no_non_poisoner_connected?(stillconnected)
         stillconnected.find { |n| !FailureIsolation::PoisonerNames.include? n } 
     end
 
+    # Figure out whether any of the observing sources have recently issued
+    # measurements for this target. If they have, exclude them. 
     def self.check_recent_measurements(target, observingnode2rounds, nodetarget2lastisolationattempt,
                                        current_round, isolation_interval)
-        # Figure out whether any of the observing sources have recently issued
-        # measurements for this target. If they have, exclude them. 
         affected_sources = Set.new
 
         # don't issue isolation measurements for targets which have
@@ -156,14 +175,18 @@ end
 
 # Filters out nodes that aren't registered with the controller, 
 module RegistrationFilters
+    # Filter names
     SRC_NOT_REGISTERED = :source_not_registered 
     NO_REGISTERED_RECEIVERS = :no_receivers_registered
 
+    # The set of all filters this module can trigger
     TRIGGERS = Set.new([
         SRC_NOT_REGISTERED,
         NO_REGISTERED_RECEIVERS
     ])
 
+    # Run all registration level filters. Mutates srcdst2filter_tracker and
+    # srcdst2outage (removes outages which didn't pass
     def self.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps)
         now = Time.new
 
@@ -172,7 +195,7 @@ module RegistrationFilters
             filter_tracker.registration_filter_time = now
             filter_tracker.registered_vps = registered_vps
 
-            # Every outage object with the same target (dest) will have the same
+            # Note: every outage object with the same target (dest) will have the same
             # set of receivers (connected nodes)
             if RegistrationFilters.no_registered_receivers?(outage.receivers, registered_vps)
                 filter_tracker.failure_reasons << NO_REGISTERED_RECEIVERS
@@ -186,17 +209,20 @@ module RegistrationFilters
         end
     end
 
+    # Can't run isolation if the source is not responding to the controller!
     def self.src_not_registered?(src, registered_vps)
         !(registered_vps.include?(src))
     end
 
+    # Can't send spoofed probes if no conected nodes are responding to the controller!
     def self.no_registered_receivers?(receivers, registered_vps)
         (receivers & registered_vps).empty?
     end
 end
 
-
+# Filters applied after measurements have been gathered
 module SecondLevelFilters
+   # Filter names
    DEST_PINGABLE = :destination_pingable
    BOTH_DIRECTIONS_WORKING = :direction
    FWD_MEASUREMENTS_EMPTY = :forward_meas_empty
@@ -207,6 +233,7 @@ module SecondLevelFilters
    HISTORICAL_TR_NOT_REACH = :historical_tr_not_reach
    REVERSE_PATH_HELPLESS = :rev_path_helpess
 
+   # The set of all filters this module can trigger
    TRIGGERS = Set.new([
         DEST_PINGABLE,
         BOTH_DIRECTIONS_WORKING,
@@ -219,6 +246,8 @@ module SecondLevelFilters
         REVERSE_PATH_HELPLESS
    ])
 
+   # Run all second level filters. Mutates filter_tracker, and sets
+   # outage.passed_filters
    def self.filter!(outage, filter_tracker, ip_info, testing=false, file=nil, skip_hist_tr=false)
        # TODO: don't declare these variables like this... it's ugly
        src = outage.src
@@ -243,27 +272,34 @@ module SecondLevelFilters
        outage.passed_filters = filter_tracker.passed?
    end
 
+   # Outage may have resolved itself during measurement
    def self.both_directions_working?(direction)
        direction == Direction.FALSE_POSITIVE
    end
 
+   # it's uninteresting if no measurements from the VP worked... probably the
+   # source has no route
    def self.forward_measurements_empty?(tr, spoofed_tr)
-        # it's uninteresting if no measurements worked... probably the
-        # source has no route
         forward_measurements_empty = (tr.size <= 1 && spoofed_tr.size <= 1)
    end
 
+   # Similiar to Hubble, if the traceroute from the source reached the
+   # destination AS, we exclude the outage
    def self.tr_reached_dst_AS?(dst, tr, ip_info)
         tr_reached_dst_AS = tr.reached_dst_AS?(dst, ip_info)
    end
 
+   # Outage may have resolved itself during measurement
    def self.destination_pingable?(ping_responsive, dst, tr)
         # sometimes we oddly find that the destination is pingable from the
         # source after isolation measurements have completed
         destination_pingable = ping_responsive.include?(dst) || tr.reached?(dst)
    end
 
+   # We're flying blind without a historical traceroute. These should always
+   # be present for functioning nodes anyway
    def self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr=false)
+        # Hack: BGP Mux nodes didn't have historical traces
         skip_hist_tr ||= FailureIsolation::PoisonerNames.include? src
 
         no_historical_trace = !skip_hist_tr and historical_tr.empty?
@@ -271,6 +307,9 @@ module SecondLevelFilters
         return no_historical_trace
    end
 
+   # VP /never/ reached the destination in the past! Note that historical
+   # traces will always be chosen from the most recent trace that reached, and
+   # only will result in a non-reaching trace if no historical trace reached.
    def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=false)
        no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
 
@@ -278,18 +317,23 @@ module SecondLevelFilters
        historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && !historical_tr[-1].nil? and historical_tr[-1].ip == "0.0.0.0"
    end
 
+   # it's uninteresting if no measurements from the VP worked... probably the
+   # source has no route
    def self.no_pings_at_all?(ping_responsive)
         no_pings_at_all = (ping_responsive.empty?)
    end
 
+   # TODO: this filter may be redundant with self.tr_reached_dst_AS?
    def self.tr_reached_last_hop?(historical_tr, tr)
         last_hop = (historical_tr.size > 1 && historical_tr[-2].ip == tr.last_non_zero_ip)
    end
 
+   # For reverse path outages, we can't isolate with the old isolation
+   # algorithm without a historical reverse path
    def self.reverse_path_helpless?(direction, historical_revtr) 
-        # should we get rid of this after correlation?
+        # TODO: should we get rid of this after the correlation algorithm is
+        # implemented?
         #reverse_path_helpless = (direction == Direction.REVERSE && !historical_revtr.valid?)
-        # TODO: change me?
         reverse_path_helpless = false
    end
 end

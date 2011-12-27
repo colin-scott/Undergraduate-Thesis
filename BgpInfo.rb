@@ -1,4 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+#
+# Keeps an in-memory Trie of origin_as_mapping's IP address information
+# For example, retrieve ASNs or prefixes for a given IP
 
 # XXX why Dave's, and not mine?
 require_relative 'utilities.rb'

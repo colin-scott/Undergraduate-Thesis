@@ -1,11 +1,16 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
-#
+
+# Two classes:
+#   - Outage: encapsulates all measurement + analytic data for a single (src, dst) outage.
+#   - MergedOutage: encapsulates all measurement + analytic data for a set of merged (src, dst) outages.
+
 require 'hops'
 require 'set'
 require 'failure_analyzer'
 require 'failure_isolation_consts'
 require 'log_iterator'
 
+# What heuristic was used to merge the Outages 
 module MergingMethod
     REVERSE = :one_src_multiple_dsts
     FORWARD = :multiple_srcs_one_dst
@@ -20,6 +25,7 @@ class MergedOutage
 
    alias :log_name :file
 
+   # Behave as an array of Outages by delegating to @outages
    extend Forwardable
    def_delegators :@outages,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
        :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
@@ -40,7 +46,7 @@ class MergedOutage
         @merging_method = merging_method
     end
 
-    # for backwards commpatibliitu
+    # Convert @pruner2incount_removed to just pruner2removed
     def pruner2removed()
         if @pruner2removed.nil? and !@pruner2incount_removed.nil?
             return @pruner2incount_removed.map_values { |v| v[1] }
@@ -51,14 +57,19 @@ class MergedOutage
         end
     end
 
+    # Did at least one (src, dst) outage pass filters?
     def is_interesting?()
         return !@outages.find { |outage| outage.passed_filters }.nil?
     end
 
+    # Return all outages where the destination was under our control
     def symmetric_outages()
         @outages.find_all { |outage| outage.symmetric }
     end
 
+    # Sloppy notion of "direction" for aggregate outages. If at least one
+    # reverse: reverse. Else if at least one forward: forward. Else if no
+    # bidirectional: false positive. Else bidirectional.
     def direction()
         return Direction.REVERSE unless @outages.find { |o| o.direction == Direction.REVERSE }.nil?
         return Direction.FORWARD unless @outages.find { |o| o.direction == Direction.FORWARD }.nil?
@@ -66,47 +77,60 @@ class MergedOutage
         return Direction.BOTH
     end
 
+    # Return the unique datasets (input lists) the destinations were taken from
     def datasets()
         return @outages.map { |o| o.dataset }.uniq
     end
 
+    # Return the unique sources
     def sources()
         return @outages.map { |o| o.src }.uniq
     end
 
+    # Return the unique destinations
     def destinations()
         return @outages.map { |o| o.dst }.uniq
     end
 
+    # Return the time measurements were initiated
     def time()
         return @outages.first.time
     end
 end
 
+# Encapsulate all measurement + analytic data for a single (src, dst) outage.
+#
 # TODO: builder pattern?
 # TODO: convert all old SymmetricOutage objects to Outage.symmetric = true
 class Outage
-  # !! suspected_failures is now not even a part of Outage objects -- part of
+  # Note: suspected_failures is now not even a part of Outage objects -- part of
   # MergedOutage objects...
+  #
   #    suspected_failures was a hash { :direction => [suspected_failure1, suspected_failure2...] }
   #              hash to account for bidirectional outages
+ 
   attr_accessor :file, :src, :dst, :dataset, :direction, :connected, :formatted_connected,
                                           :formatted_unconnected, :formatted_never_seen, :pings_towards_src,
                                           :tr, :spoofed_tr,
                                           :dst_tr, :dst_spoofed_tr, :src_ip, :dst_hostname,
                                           :historical_tr, :historical_trace_timestamp,
                                           :spoofed_revtr, :historical_revtr,
-                                          :suspected_failure, :suspected_failures, :as_hops_from_dst, :as_hops_from_src, 
+                                          # Deprecated
+                                          :suspected_failure,
+                                          # Deprecated
+                                          :suspected_failures,
+                                          :as_hops_from_dst, :as_hops_from_src, 
                                           :alternate_paths, :measured_working_direction, :path_changed,
                                           :measurement_times, :passed_filters, 
+                                          # miscellaneous measurements +
+                                          # analytics
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
                                           :measurements_reissued, :spliced_paths, :jpg_output, :graph_url, :responsive_targets,
-                                          :asn_to_poison, :complete_reverse_isolation
+                                          :asn_to_poison,
+                                          # Whether the historical revtr was
+                                          # valid for reverse outages
+                                          :complete_reverse_isolation
 
-  # re: symmetric
-  #   tried to implement symmetry through polymorphism... but no behavior is
-  #   changed... only whether additional fields are nil or not
-  
   alias :revtr :spoofed_revtr
   alias :spoofers :connected 
   alias :spoofers_w_connectivity :connected 
@@ -177,6 +201,7 @@ class Outage
         end
    
         if @tr.nil? or @spoofed_tr.nil? or @historical_tr.nil? or @spoofed_revtr.nil? or @historical_revtr.nil?
+            # Shouldn't happen
             $stderr.puts file
         end
 
@@ -186,19 +211,23 @@ class Outage
         #link_listify!
    end
 
+   # Deprecated
    def dst_as()
    end
 
+   # Return the time measurements were initiated for this outage
    def time
         @time = LogIterator::parse_time(@file, @measurement_times) if @time.nil?
-        @time = false if @time.nil? # XXX hmmmm
+        @time = false if @time.nil? # TODO: need a better way to distinguish nil from "not able to parse time"
         @time
    end
 
+   # Deprecated
    def historical_revtr
        @historical_revtr
    end
 
+   # Return all ping responsive hops for this outage
    def ping_responsive
        ping_responsive = Set.new
 
@@ -214,7 +243,11 @@ class Outage
        ping_responsive
    end
 
-   # XXX do I want functionality within the class???
+   # Return whether the spoofed traceroute follows the same path as the normal
+   # traceroute. Shouldn't happen, unless paths changed between the time the
+   # normal traceroute and spoofed traceroute were issued.
+   #
+   # TODO: do we really want this functionality within the Outage class?
    def paths_diverge?
         spoofed_tr_loop = @spoofed_tr.contains_loop?()
         tr_loop = @tr.contains_loop?()
@@ -232,23 +265,24 @@ class Outage
         return spoofed_tr_loop || tr_loop || divergence
    end
 
-   # XXX do I want functionality within the class???
+   # Return whether the suspected failure is on an AS boundary
+   #
+   # TODO: do we really want this functionality within the Outage class?
    def anyone_on_as_boundary?()
        return false if @suspected_failure.nil?
 
        [@tr, @spoofed_tr, @historical_tr, @spoofed_revtr].each do |path|
            same_hop = path.find { |hop| !hop.is_a?(MockHop) && hop.cluster == @suspected_failure.cluster }
            if !same_hop.nil? && same_hop.on_as_boundary?
-               #puts same_hop.asn
-               #puts same_hop.previous.asn
-               #puts same_hop.next.asn
-               return same_hop.on_as_boundary?
+               return true
            end
        end
 
        return false
    end
 
+   # Compute the measurement durations between each measurement timestamp
+   #
    # given an array of the form:
    #   [[measurement_type, time], ...]
    # Transform it into:
@@ -260,7 +294,7 @@ class Outage
        end
    end
 
-   # get actual duration
+   # get actual duration of all measurements
    def get_measurement_duration
        duration = 0
        0.upto(@measurement_times.size - 2) do |i|
@@ -275,6 +309,8 @@ class Outage
         link_listify!
    end
 
+   # Link Listify all of the enapsulated paths
+   #
    # silly YAML doesn't call our constructor directly... so we have to do this
    # by hand
    def link_listify!
@@ -300,36 +336,7 @@ end
 # DEPRECATED
 # Special case of Outage, so subclass
 class SymmetricOutage < Outage
-    def initialize(*args)
-        # always the 11th and 12th argument. 
-        # Oh god, what a hack...
-        #
-        #log_name, src, dst, dataset, direction, formatted_connected, 
-        #                                  formatted_unconnected, pings_towards_src,
-        #                                  tr, spoofed_tr,
-        #                                  dst_tr, dst_spoofed_tr,
-        #                                  historical_tr, historical_trace_timestamp,
-        #                                  spoofed_revtr, historical_revtr,
-        #                                  suspected_failure, as_hops_from_dst, as_hops_from_src, 
-        #                                  alternate_paths, measured_working_direction, path_changed,
-        #                                  measurement_times, passed_filters, additional_traceroutes
-        
-        @dst_tr = args.delete_at(10)
-        @dst_spoofed_tr = args.delete_at(10)
-        
-        super(*args)
-    end
 end
 
 if $0 == __FILE__
-    SymmetricOutage.new("", "", "", "", "", [], 
-                                          [], [],
-                                          Path.new, Path.new,
-                                          Path.new, Path.new,
-                                          Path.new, nil,
-                                          Path.new, Path.new,
-                                          nil, 0, 0, 
-                                          [], false, [],
-                                          [], false, {}, {})
-
 end

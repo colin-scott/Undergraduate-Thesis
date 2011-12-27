@@ -1,5 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
-# These modules encapsulate the code for outage correlation.
+#
+# These modules encapsulate the code for Arvind + Colin's "correlation"
+# algorithm.
 #
 # Initializers populate the suspect set.
 # 
@@ -80,7 +82,7 @@ class Initializer
     #
     # So we do need a date field in the DB...
     #
-    # XXX Basically redundant code with next method..
+    # TODO: Basically redundant code with next method..
     def historical_revtrs_dst2vps(merged_outage)
         symmetric_outages = merged_outage.symmetric_outages
         return [] if symmetric_outages.empty?
@@ -154,7 +156,9 @@ class Pruner
     #    return []
     #end
 
-    # second half of path splices
+    # second half of path splices (hops on PL-PL traces to the source, issued
+    # by Ethan's PL-PL system)
+    #
     #  TODO: ensure that traces are sufficiently recent (issued after outage
     #  began...)
     def intersecting_traces_to_src(suspect_set, merged_outage)
@@ -176,18 +180,27 @@ class Pruner
         return to_remove
     end
 
+    # All hops seen on normal traceroutes from the sources (obviously
+    # reachable)
     def trace_hops_src_to_dst(suspect_set, merged_outage)
         # we have some set of preexisting pings.
         trace_hops = merged_outage.map { |o| o.tr }.find_all { |trace| trace.valid? }\
             .map { |trace| trace.hops.map { |hop| hop.ip } }.flatten.to_set.to_a
     end
 
+    # All hops which were pingable before the suspect set processing began
     def pings_issued_before_suspect_set_processing(suspect_set, merged_outage)
-          # TODO: is responsive_targets ip addresses?
+        # TODO: is responsive_targets ip addresses or hops?
         ping_responsive_hops = merged_outage.map { |o| o.responsive_targets.to_a }.flatten.to_set.to_a
     end
 
+    # After all other measurements have been leveraged to prune suspects, issue pings from the
+    # source to the remaining suspects.
+    #
     # we want this method to be executed last...
+    #
+    # NOTE: we've been seeing an issue where VPs will consistently return
+    # empty ping results. Could be related to the controller, not sure...
     def pings_from_source(suspect_set, merged_outage)
         # now issue more pings!
         srcs = merged_outage.map { |o| o.src }.uniq
@@ -214,12 +227,14 @@ class Pruner
     # private methods won't be picked up by the failure_analyzer
     private
     
+    # The controller keeps returning null results, so we instead use
+    # pptasks directly... cp aliasprobe to a different directory?
     # TODO: move me somewhere else.
     def issue_pings_with_pptasks(sources, targets)
         # RACE CONDITION ON /TMP/SOURCES! 
         id = Thread.current.__id__
 
-        # XXX DOESN'T WORK FOR RIOT NODES!
+        # XXX: DOESN'T WORK FOR RIOT NODES!
         File.open("/tmp/sources#{id}", "w") { |f| f.puts sources.join "\n" } 
         File.open("/tmp/targets#{id}", "w") { |f| f.puts targets.join "\n" } 
 

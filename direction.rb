@@ -1,8 +1,11 @@
 
+# "Enum" for Directions, e.g. Direction::FORWARD
+
 class Direction
     # make initializer public during class loading (to deal with load ' ' calls)
     public_class_method :new
 
+    # Private ctor
     def initialize(symbol)
         @symbol = symbol
     end
@@ -58,7 +61,7 @@ class Direction
     alias == eql?
 end
 
-# some logs still have the old symbols to represent direction
+# some isolation logs still have the old symbols to represent direction
 module BackwardsCompatibleDirection
     FORWARD = "forward path"
     REVERSE = "reverse path"

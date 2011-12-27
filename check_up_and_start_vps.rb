@@ -1,4 +1,9 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+#
+# Find common issues with PL VPs and attempt to fix them
+#
+# @author: Ashoat
+# modified by Colin
 
 require 'file_lock'
 Lock::acquire_lock("check_up_and_start_lock.txt")

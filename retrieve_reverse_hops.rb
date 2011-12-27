@@ -1,9 +1,18 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Simply append reverse hops onto the previous_week.txt
+# file.
+
+# Background:
+#
 # We harvest forward hops (for checking pingability) from toil. 
+#
 # We also want to know historical pingability for reverse hops.
+#
 # This is a hack... this is executed from toil, /after/
+#
 # ~/colin/ping_monitoring/cloudfront_montoring/data_w_traceroutes/hand_forward_hops_to_dave.sh
+#
 # has been executed. We simply append reverse hops onto the previous_week.txt
 # file.
 

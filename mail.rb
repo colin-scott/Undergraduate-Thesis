@@ -1,5 +1,9 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# AcionMailer module for sending various emails to the failures@ mailing list. 
+# Copied directly from the reverse traceroute system (originally written by
+# Ashoat)
+
 require 'failure_isolation_consts'
 require 'action_mailer'
 

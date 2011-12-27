@@ -1,3 +1,4 @@
+
 module Lock
     # ensure only one monitor process is running at any one time
     def self.acquire_lock(lock_file)

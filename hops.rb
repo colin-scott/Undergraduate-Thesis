@@ -1,6 +1,10 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-# last_responsive will be 
+# Classes for encapsulating measurements and convenience data analysis methods
+# on the measurement data.
+
+
+# Note that for all classes below,  last_responsive will be:
 #    * "N/A" if not in the database
 #    * false if not historically pingable
 #    * A Time object if historically pingable
@@ -14,6 +18,7 @@
 require 'forwardable'
 require 'utilities'
 
+# Generic Path class
 class Path
    @@last_hop_sanity_check_distance = 5
    attr_accessor :hops, :src, :dst, :invalid_reason
@@ -38,7 +43,7 @@ class Path
         else
             @hops = Array.new(init_hops)
         end
-        # link_listify!
+        # TODO: link_listify!() ?
       rescue Exception => e
           raise "Caught #{e} #{e.backtrace}, init_hops was #{init_hops.inspect}"
       end
@@ -60,6 +65,7 @@ class Path
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
+   # Make sure the measuremed path is reasonable
    def sanitize_hops()
        # TODO: don't return... raise!
        return if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl }
@@ -69,6 +75,8 @@ class Path
        get_rid_of_trailing_zeros
    end
 
+   # Often for BGP Mux nodes, the last hop (TTL=40) will be total garbage. TODO: this santiziation should
+   # perhaps be performed at the measurement issuer
    def get_rid_of_wonky_last_hop()
        # Get rid of wonky 40th hop with random IPs
        return if @hops[-1].ip == @dst
@@ -93,64 +101,80 @@ class Path
        end
    end
 
+   # Sometimes the destination appears many times in a sequence at the end of
+   # the path
    def remove_redundant_dsts()
         while @hops.size > 1 and @hops[-1].ip == @dst and @hops[-2].ip == @dst
             @hops = @hops[0..-2]
         end
     end
 
+   # A long line of 0.0.0.0s at the end is not helpful
    def get_rid_of_trailing_zeros()
         while !@hops.empty? and @hops[-1].ip == "0.0.0.0"
             @hops = @hops[0..-2] 
         end
    end
 
+   # We used to have a valid? flag, which made .find() calls crash. TODO: 
+   # maintain failure reasons separately from @hops so that this isn't
+   # necessary
    def find(&block)
        return nil unless valid?
        @hops.find(&block)
    end
 
+   # Does the path traverse the given ASN?
    def passes_through_as?(asn)
       !@hops.find { |hop| hop.asn == asn }.nil?
    end
 
+   # Return an ordered list of ASNs this path passes through
    def compressed_as_path()
        # .uniq assumes no AS loops
        # TODO: do I need the find_all?
        as_path().find_all { |asn| !asn.nil? }.uniq 
    end
 
+   # Return an ordered list of ASN mappings for each hop this path passes through
    def as_path()
        @hops.map { |hop| hop.asn }
    end
 
+   # Return an ordered list of prefixes for each hop this path passes through
    # we take an ip_info for the logged hops without prefixes
    def prefix_path(ip_info=nil)
        #                get rid of MockHops or invalid Hops
        @hops.find_all { |hop| hop.is_a?(Hop) }.map { |hop| (ip_info) ? ip_info.getPrefix(hop.ip) : hop.prefix }
    end
 
+   # Return an ordered list of prefixes this pass traverses
    def compressed_prefix_path
        prefix_path().find_all { |prefix| !prefix.nil? }.uniq
    end
 
+   # Return a path with no intermediate 0.0.0.0s
    def without_zeros()
        @hops.find_all { |hop| hop.ip != "0.0.0.0" }
    end
 
+   # Return the # of hops along this path which do not show up in RIPE feeds
    def num_not_advertised
        @hops.find_all { |hop| hop.prefix.nil? }.size
    end
 
+   # Return the number of hops which are not ping responsive
    def num_non_responsive
        @hops.find_all { |hop| !hop.ping_responsive }.size
    end
 
-   # overriden if necessary
+   # Are the contents of this path sane?
+   # overriden by subclasses if necessary
    def valid?()
        return @invalid_reason.nil?
    end
 
+   # Does this path contain a loop?
    def contains_loop?()
        no_zeros = @hops.map { |hop| hop.ip }.find_all { |ip| ip != "0.0.0.0" }
        adjacents_removed = Path.new(@src, @dst)
@@ -163,6 +187,7 @@ class Path
        return adjacents_removed.uniq.size != adjacents_removed.size
    end
 
+   # Return the first router along this path inside of the given ASN
    def ingress_router_to_as(as)
       for hop in self
         # is hop.asn is assigned?
@@ -175,6 +200,8 @@ class Path
        @hops.map { |h| h.to_s }.inspect
    end
 
+   # Turn @hops into a doubly linked list to allow for traversal given only a
+   # reference to a Hop. 
    def link_listify!
        return if !valid?
        (0...@hops.size).each do |i| 
@@ -183,6 +210,7 @@ class Path
        end
    end
 
+   # Do the two paths share a a common subsequence at the beginning?
    def self.share_common_path_prefix?(path1, path2)
       # trs and spooftrs sometimes differ in length. We look at the common
       [path1.size, path2.size].min.times do |i|
@@ -206,11 +234,12 @@ class Path
    end
 end
 
-# fuckin' namespace collision with reverse_traceroute.rb
+# rawr, namespace collision with reverse_traceroute.rb
 class RevPath < Path
    def initialize(src, dst, init_hops=[])
         super(src, dst, init_hops)
    end
+
    #def last_responsive_hop()
    #    self.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
    #end
@@ -220,6 +249,8 @@ class RevPath < Path
        super
    end
 
+   # Are all hops ping responsive (or not historically pingable) except the
+   # destionation?
    def ping_responsive_except_dst?(dst)
        return false if @hops.empty?
 
@@ -231,6 +262,7 @@ class RevPath < Path
        return true
    end
 
+   # Return the number of hops that were inferred from symmetry assumptions
    def num_sym_assumptions()
       count = 0
       for hop in @hops
@@ -239,6 +271,7 @@ class RevPath < Path
       count
    end
 
+   # Return the longest consecutive sequence of symmetry assumptions
    def longest_sym_sequence()
       count = 0
       max = 0
@@ -285,11 +318,12 @@ class RevPath < Path
         adjacent_hops
    end
 
+   # Return first non-zero hop
    def first_hop()
         @hops.find { |hop| !hop.ip.nil? && hop.ip != "0.0.0.0" }
    end
 
-   # did we back off?
+   # did we back off of the destination?
    def measured_from_destination?(dst)
         first_hop().ip == dst
    end
@@ -307,6 +341,8 @@ class HistoricalReversePath < RevPath
        @dst = "" # ditto
    end
 
+   # We used to put failure reasons into the @hops themselves. TODO: store
+   # failre reasons separately
    def valid?
        return (@valid || !@hops.find { |hop| hop.valid_ip }.nil?) && !@hops.empty?
    end
@@ -320,12 +356,13 @@ class HistoricalReversePath < RevPath
    end
 end
 
-# some of the classes in the logs are from the old ReversePathSimple
+# some of the classes in the logs are from the old ReversePathSimple. This is
+# purely for backwards compatibility
 class ReversePathSimple < Array
 end
 
 class SpoofedReversePath < RevPath
-    # not that many sym assumptions?
+    # not too many sym assumptions?
     def successful?()
         return false if @hops.size < 2
 
@@ -353,8 +390,9 @@ class SpoofedReversePath < RevPath
     end
 end
 
-# normal traceroute, spoofed traceroute, historical traceroute
+# Encapsulates: normal traceroute, spoofed traceroute, and historical traceroute
 class ForwardPath < Path
+   # Is the last hop within the destination's AS?
    def reached_dst_AS?(dst, ipInfo)
        dst = dst.is_a?(Hop) ? dst.ip.strip : dst.strip
        return false if dst.nil?
@@ -374,12 +412,15 @@ class ForwardPath < Path
         return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
    end
 
+   # Did the measurement reach the given destination?
    def reached?(dst)
         dst = dst.strip
         #$LOG.puts" reached?: #{@hops.inspect}"
         !@hops.find { |hop| hop.ip.strip == dst }.nil?
    end
 
+   # Are all hops ping responsive (or not historically pingable) except the
+   # destionation?
    def ping_responsive_except_dst?(dst=nil)
        return false if @hops.empty?
 
@@ -407,6 +448,8 @@ class ForwardPath < Path
    end
 end
 
+# Used for verifiying that alternate paths are viable. See
+# FailureAnalyzer.splice_paths
 class SplicedPath
     attr_accessor :src, :dst, :ingress, :trace, :revtr
     def initialize(src, dst, ingress, trace, revtr)
@@ -422,6 +465,7 @@ end
 #                            Hops                                            #
 # =============================================================================
 
+# Generic class for a single hop along a path
 class Hop
     attr_accessor :ip, :prefix, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :formatted, :reachable_from_other_vps, :next, :previous
 
@@ -444,11 +488,12 @@ class Hop
         end
     end
 
+    # Does @ip look like an IP address?
     def valid_ip
         @ip.matches_ip?
     end
 
-    # Alias resolution!
+    # Alias resolution! Lazily evaluated
     def cluster()
         @cluster ||= $ip2cluster[@ip]
         @cluster
@@ -458,6 +503,7 @@ class Hop
         @ttl <=> other.ttl
     end
 
+    # Which of the two hops is closer to the dest?
     def self.later(tr_suspect, spooftr_suspect)
         if tr_suspect.nil?
             return spooftr_suspect
@@ -477,6 +523,7 @@ class Hop
         return !@ping_responsive && @reachable_from_other_vps
     end
 
+    # Is this hop a (veritable) border router?
     def on_as_boundary?
         if !@previous.nil? && @previous.asn != @asn && @previous.ip != "0.0.0.0"
             return @previous.asn
@@ -489,7 +536,8 @@ class Hop
         return false
     end
 
-    # TODO: we have clustering now!
+    # Did this hop appear directly adjacent to the given IP?
+    # TODO: use alias clustering, which is even better!
     def adjacent?(ip)
        return true if @ip == ip
        return true if !@next.nil? and @next.ip == ip
@@ -522,10 +570,10 @@ class Hop
     end
 end
 
-# wait a minute... we could just instantiate a Hop object...
+# Used to be used for DOT graph generation, but no longer necessary
+# TODO: just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
-
-# what a pain
+# We added these fields after mkdot was written?
 class MockHop
     attr_accessor :next, :previous
 end

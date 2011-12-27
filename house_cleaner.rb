@@ -1,5 +1,9 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Serves two functions: 
+#   - Identify and replace faulty VPs
+#   - Identify and replace unresponsive targets
+
 require 'failure_isolation_consts'
 require 'set'
 require 'mysql'
@@ -17,6 +21,78 @@ class HouseCleaner
         @db = db
     end
 
+    # ================================================= #                                                                                                                                 
+    # Methods for cleaning up unresponsive targets      #
+    # ================================================= #                                                                                                                                 
+    
+    # Top-level method for cleaning up unresponsive targets.
+    #
+    # Returns [dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops]
+    def find_substitutes_for_unresponsive_targets()
+        dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
+
+        @logger.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
+        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
+
+        # TODO: do something with bad_hops
+        @logger.debug "bad_hops: #{bad_hops}"
+        @logger.debug "bad_targets: #{bad_targets}"
+        
+        dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
+
+        bad_targets.each do |target|
+            @logger.debug ". #{target} identifying"
+            # identify which dataset it came from
+            dataset = FailureIsolation.get_dataset(target) 
+            if dataset == DataSets::Unknown
+                @logger.warn "unknown target #{target}" 
+                next
+            end
+
+            dataset2unresponsive_targets[dataset] << target
+        end
+
+        @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
+
+        find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
+
+        # cloudfront is static
+
+        find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
+
+        [dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops]
+    end
+
+    # -----   Harsha's PoPs ---------
+    
+    # Top level method for computing Top PoPs and replacing unresponsive
+    # routers
+    def find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
+        sorted_replacement_pops, pop2corertrs, pop2edgertrs = generate_top_pops
+
+        # (see utilities.rb for .categorize())
+        core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
+                                        .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+
+        dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
+                                                                             FailureIsolation::CoreRtrsPerPoP,
+                                                                             pop2corertrs, sorted_replacement_pops)
+        @logger.debug "Harsha PoPs substituted"
+        
+        # (see utilities.rb for .categorize())
+        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+
+        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
+                                                                                   FailureIsolation::EdgeRtrsPerPoP,
+                                                                                   pop2edgertrs, sorted_replacement_pops)
+
+        @logger.debug "Edge PoPs substituted"
+    end
+
+    # Generate the most highly connected PoPs on the Internet according to iPlane data, 
+    # and choose i. routers within those PoPs and ii. edge routers which
+    # appear on at least on path that traverses that PoP
+    #
     # returns a tuple
     #   First, sorted pop #s by degree
     #   Second, pop2corertrs
@@ -76,7 +152,10 @@ class HouseCleaner
 
         [sorted_replacement_pops, pop2corertrs, pop2edgertrs]
     end
+    
 
+    # For all top PoPs that had targets pruned from them, find replacements
+    # routers in or behind the same PoP
     def refill_pops(pop2unresponsivetargets, num_rtrs_per_pop, pop2replacements, sorted_replacement_pops)
         chosen_replacements = []
         pop2unresponsivetargets.each do |pop, unresponsivetargets|
@@ -105,63 +184,10 @@ class HouseCleaner
         chosen_replacements
     end
 
-    def find_substitutes_for_unresponsive_targets()
-        dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
+    # -----  PL sites for ground-truth  ---------
 
-        @logger.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
-        bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
-
-        # TODO: do something with bad_hops
-        @logger.debug "bad_hops: #{bad_hops}"
-        @logger.debug "bad_targets: #{bad_targets}"
-        
-        dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
-
-        bad_targets.each do |target|
-            @logger.debug ". #{target} identifying"
-            # identify which dataset it came from
-            dataset = FailureIsolation.get_dataset(target) 
-            if dataset == DataSets::Unknown
-                @logger.warn "unknown target #{target}" 
-                next
-            end
-
-            dataset2unresponsive_targets[dataset] << target
-        end
-
-        @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
-
-        find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
-
-        # cloudfront is static
-
-        find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
-
-        [dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops]
-    end
-
-    def find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
-        sorted_replacement_pops, pop2corertrs, pop2edgertrs = generate_top_pops
-
-        # (see utilities.rb for .categorize())
-        core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
-                                        .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
-
-        dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
-                                                                             FailureIsolation::CoreRtrsPerPoP,
-                                                                             pop2corertrs, sorted_replacement_pops)
-        @logger.debug "Harsha PoPs substituted"
-        
-        # (see utilities.rb for .categorize())
-        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
-
-        dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
-                                                                                   FailureIsolation::EdgeRtrsPerPoP,
-                                                                                   pop2edgertrs, sorted_replacement_pops)
-
-        @logger.debug "Edge PoPs substituted"
-    end
-
+    # Identify destinations we control that are either unresponsive to ping
+    # or consistently fail to return (ground-truth) measurement results.
     def find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
         # should only be probing one per site
         unresponsive_spoofers = dataset2unresponsive_targets[DataSets::SpooferTargets] 
@@ -170,24 +196,9 @@ class HouseCleaner
 
         dataset2substitute_targets[DataSets::SpooferTargets] = site2chosen_node_ip_tuple.values.map { |tuple| tuple[1] }
     end
-
-    # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
-    def update_pl_pl_meta_data(site2chosen_node_ip_tuple)
-        # We include both monitoring nodes and spoofer targets
-        site2node_ip_tuple = {}
-        FailureIsolation.CurrentNodes.each do |spoofer|
-            site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, @db.hostname2ip[spoofer]]
-        end
-
-        site2node_ip_tuple.merge!(site2chosen_node_ip_tuple)
-
-        output = File.open(FailureIsolation::SpooferTargetsMetaDataPath, "w")
-        site2node_ip_tuple.each do |site, node_ip|
-            output.puts "#{node_ip.join ' '} #{site}"
-        end
-        output.close
-    end
-     
+ 
+    # Find PL sites that do not have a ping monitor in place, and monitor them
+    # for ground truth data
     def choose_one_spoofer_target_per_site(bad_targets_ips)
         raise "not ips! #{bad_targets_ips.find { |ip| !ip.matches_ip? }}" if bad_targets_ips.find { |ip| !ip.matches_ip? }
 
@@ -243,14 +254,27 @@ class HouseCleaner
         site2chosen_node_ip_tuple
     end
 
-    def update_data_set(dataset, substitute_targets, bad_targets)
-        path = DataSets::ToPath(dataset)
+    # Keep metadata for Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
+    def update_pl_pl_meta_data(site2chosen_node_ip_tuple)
+        # We include both monitoring nodes and spoofer targets
+        site2node_ip_tuple = {}
+        FailureIsolation.CurrentNodes.each do |spoofer|
+            site2node_ip_tuple[FailureIsolation.Host2Site[spoofer]] = [spoofer, @db.hostname2ip[spoofer]]
+        end
 
-        old_targets = Set.new IO.read(path).split("\n")
-        new_targets = (old_targets - bad_targets.to_set + substitute_targets.to_set)
-        File.open(path, "w") { |f| f.puts new_targets.to_a.join "\n" }
+        site2node_ip_tuple.merge!(site2chosen_node_ip_tuple)
+
+        output = File.open(FailureIsolation::SpooferTargetsMetaDataPath, "w")
+        site2node_ip_tuple.each do |site, node_ip|
+            output.puts "#{node_ip.join ' '} #{site}"
+        end
+        output.close
     end
-
+    
+    # ----- Updating dataset info on disk ---------
+   
+    # After substituting targets, update the dataset files
+    #
     # TODO: separate this into two methods: remove, and substitute
     # precondition: bad_targets are a subset of the current datasets
     def swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets)
@@ -274,6 +298,26 @@ class HouseCleaner
         # need to push out new target list to VPs!
     end
 
+    # Write out updated the updated datasets to disk
+    def update_data_set(dataset, substitute_targets, bad_targets)
+        path = DataSets::ToPath(dataset)
+
+        old_targets = Set.new IO.read(path).split("\n")
+        new_targets = (old_targets - bad_targets.to_set + substitute_targets.to_set)
+        File.open(path, "w") { |f| f.puts new_targets.to_a.join "\n" }
+    end
+
+    # Write out blacklisted targets to disk
+    def update_target_blacklist(blacklist)
+        File.open(FailureIsolation::TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
+    end
+
+    # ================================================= #                                                                                                                                 
+    # Methods for cleaning up faulty VPs                #
+    # ================================================= #                                                                                                                                 
+
+    # Top level method for swapping out faulty nodes 
+    #
     # TODO: grab subtitute nodes from the database, not the static file
     # TODO: make the blacklist site-specific, not host-specific
     def swap_out_faulty_nodes(faulty_nodes)
@@ -326,6 +370,8 @@ class HouseCleaner
         end
     end
 
+    # read in old VP list, and add new nodes to it
+    # TODO: who invokes this method?
     def add_nodes(nodes)
         current_nodes = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n"))
         current_nodes |= nodes
@@ -333,17 +379,15 @@ class HouseCleaner
         update_current_nodes(current_nodes)
     end
 
+    # Write out new VP list to disk
     def update_current_nodes(current_nodes)
         File.open(FailureIsolation::CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
         system "scp #{FailureIsolation::CurrentNodesPath} cs@toil:#{FailureIsolation::ToilNodesPath}"
     end
 
+    # Write out new blacklisted VPs to disk
     def update_blacklist(blacklist)
         File.open(FailureIsolation::NodeBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
-    end
-
-    def update_target_blacklist(blacklist)
-        File.open(FailureIsolation::TargetBlacklistPath, "w") { |f| f.puts blacklist.to_a.join("\n") }
     end
 end
 

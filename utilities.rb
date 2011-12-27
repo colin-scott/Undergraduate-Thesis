@@ -1,5 +1,8 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Utilities methods, along with custom defined Monkey Wrenching to built-in
+# classes
+
 require 'syslog'
 require 'date'
 require 'logger'
@@ -12,10 +15,10 @@ if RUBY_PLATFORM != 'java'
 # ||= so we don't redefine it
 $LOG ||= $stderr
 
-
 class Method
     alias_method :old_to_s, :to_s unless self.instance_methods.include? :old_to_s
 
+    # Make the Method.to_s human readable
     def to_s
         str = old_to_s
 
@@ -25,12 +28,14 @@ class Method
 end
 
 class Object
+   # Ruby doesn't support deep copy out-of-the-box.
    def deep_copy( object )
      Marshal.load( Marshal.dump( object ) )
    end
 end
 
 class Hash
+    # Keep the keys the same, but apply a map function to all the values
     def map_values()
         new_hash = {} 
         self.each do |k,v|
@@ -39,12 +44,15 @@ class Hash
         new_hash
     end
 
+    # Slightly different than .values(): assumes all values are lists, and
+    # reduces the lists into a single set
     def value_set()
         values = self.values
         values.each { |elt| raise "not a list! #{elt}" if !elt.is_a?(Array) and !elt.is_a?(Set) }
         return self.values.reduce(Set.new) { |sum,nex| sum | nex }
     end
 
+    # Return a hash from value -> [key1, key2, ...] that map to that value
     def value2keys
         h = Hash.new { |h,k| h[k] = [] }
         self.each do |k,v|
@@ -55,10 +63,12 @@ class Hash
 end
 
 class Set
+    # Return a string, exactly like Array#join
     def join(sep=$,)
         self.to_a.join(sep)
     end
 
+    # Iterate over values, exactly like Array#each
     def each()
        self.to_a.each { |elt| yield elt }
     end
@@ -91,6 +101,11 @@ class Array
         old_or(other.to_a)
     end
 
+    # Turn an Array of pairs (e.g. [[1,2], [3,4]]
+    # into a Hash ({1=>2,3=>4}).
+    #
+    # NOTE: can't name this to_hash(), since that is defined in ActiveRecord
+    # libraries
     def custom_to_hash()
         hash = {}
         self.each do |elt|
@@ -142,6 +157,7 @@ class Array
         categories
     end
  
+    # Run binary search on the (sorted) Array
     # field is the method to issue a send to
     def binary_search(elem, field=nil, low=0, high=self.length-1)
       mid = low+((high-low)/2).to_i
@@ -158,6 +174,7 @@ class Array
       end
     end
 
+    # Return whether the Array is sorted according to <=>
     def sorted?(field=nil)
         return true if self.empty?
 
@@ -176,6 +193,7 @@ class Array
         return true
     end
 
+    # Return the most commonly occuring element of the Array
     def mode()
         counts = Hash.new(0)
         self.each { |elt| counts[elt] += 1 }
@@ -194,6 +212,9 @@ class Array
 end
 
 class String
+    # Return whether the string looks like an IP address (e.g. 12.2.5.185)
+    #
+    # NOTE: Doesn't sanity check values (e.g., greater than 255)
     def matches_ip?()
         return self =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/
     end

@@ -1,4 +1,5 @@
 #! /usr/bin/ruby
+
 require 'drb'
 def calculate_ping_timeout(numtargs)
 	# figure 30 parallel threads, max time for 1 is 2 seconds

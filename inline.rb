@@ -1,5 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Ruby is super slow at bit twiddling. Implement common operations in C.
+
 gem 'RubyInline'
 require 'inline'
 
@@ -65,21 +67,20 @@ class Example
         
          static VALUE in_private_prefix(VALUE addr) {
              char *addr_p = StringValuePtr(addr);
-             printf("%s", addr_p);
-             //struct in_addr in;
-             //inet_aton(addr_p, &in);
-             //unsigned int ip = in.s_addr;
+             struct in_addr in;
+             inet_aton(addr_p, &in);
+             unsigned int ip = in.s_addr;
 
-             //if( (ip > lower10 && ip < upper10 ) || (ip > lower172 && ip < upper172)
-             //                || (ip > lower192 && ip < upper192) ||
-             //                (ip > lowerMulti && ip < upperMulti) ||
-             //                (ip > lowerLoop && ip < upperLoop) ||
-             //                (ip > lower169 && ip < lower169) ||
-             //                (ip == zero)) {
-             //    return T_TRUE;
-             //} else {
-             //    return T_FALSE;
-             //}
+             if( (ip > lower10 && ip < upper10 ) || (ip > lower172 && ip < upper172)
+                             || (ip > lower192 && ip < upper192) ||
+                             (ip > lowerMulti && ip < upperMulti) ||
+                             (ip > lowerLoop && ip < upperLoop) ||
+                             (ip > lower169 && ip < lower169) ||
+                             (ip == zero)) {
+                 return T_TRUE;
+             } else {
+                 return T_FALSE;
+             }
           }
         }
     end

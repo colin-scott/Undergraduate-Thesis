@@ -1,5 +1,11 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Ruby interface to the revtr database running on Bouncer. Methods for
+# fetching historical reverse traceroute's from Dave's cache.
+#
+# TODO: move this functionality into db_interface.rb, where it should really
+# be
+
 require 'failure_isolation_consts'
 require 'db_interface'
 require 'socket'
@@ -20,6 +26,9 @@ class RevtrCache
         @logger = logger
     end
 
+    # Return a HistoricalReversePath for the given src, dst, pair. Finds the
+    # most recent cached reverse path. If none exist, puts failure reasons
+    # into the reverse path and returns an empty HistoricalReversePath object
     def get_cached_reverse_path(src, dst)
       path = HistoricalReversePath.new(src, dst)
     

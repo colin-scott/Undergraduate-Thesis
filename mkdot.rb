@@ -1,5 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Module for generating DOT graphs for human consumption of measurement data.
+
 # TODO:
 #    * This code is shite. Refactor just about everything. esp. add_path()
 #    * handle 0.0.0.0's more elegantly. To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
@@ -26,24 +28,27 @@ class DotGenerator
         @logger = logger
     end
 
+    # Give unique colors to each ASN
     DotGenerator::Colors = ["aquamarine",  "blue", "blueviolet", "brown", "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "crimson", "cyan", "darkgoldenrod1", "darkgreen", 
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
+    # Top level method for generating a DOT graph
     def generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces,
                          upstream_reverse_paths, output)
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
         create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
-        # locally rather than pushing the bits across the wire
+        # locally rather than pushing the bits across the wire to toil
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
     def create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, output)
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
-        oooo_marker = "a" # FUUCKKK. this is ugly 
+        # TODO: find a better way to keep 0.0.0.0's distinct
+        oooo_marker = "a" 
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths

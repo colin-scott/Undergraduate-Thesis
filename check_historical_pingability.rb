@@ -1,4 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+#
+# Given a list of IP addresses, print whether or not they are historically
+# pingable.
 
 input = ARGV.shift
 if input.nil?

@@ -1,3 +1,7 @@
+
+# In addition to the functionality of BgpInfo, retrieve DNS names for IP
+# addresses.
+
 require 'resolv'
 require 'BgpInfo'
 

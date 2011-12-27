@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Cron job. Run on yorker: `crontab -l`
+
+# Make sure that both the controller and the isolation module are generating
+# new log entries on a regular basis. If not, send out a warning email. 
+
 old_isolation=`cat isolation_log_size`
 old_controller=`cat controller_log_size`
 #du -b isolation.log | cut -f1 > isolation_log_size

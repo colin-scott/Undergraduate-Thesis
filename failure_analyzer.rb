@@ -1,4 +1,11 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+
+# Performs analytics on isolation measurements. For example, this module implements the
+# isolation algorithm.
+#
+# TODO: change method signatures to take a single outage or merged_outage
+# object rather than (src, dst, tr, spoofed_tr, etc. etc.)
+
 require 'failure_isolation_consts'
 require 'ip_info'
 require 'suspect_set_processors.rb'
@@ -9,6 +16,7 @@ require 'direction'
 # occasionally need it in the logs... ?
 
 class AlternatePath
+    # "Enum" for usable alternate paths between src and dst
     FORWARD = :"forward path"
     REVERSE = :"reverse path"
     HISTORICAL_REVERSE = :"historical reverse path"
@@ -17,13 +25,20 @@ end
 
 # further defined in suspect_processors.rb
 class Suspect
+    # Encapsulates a single suspected failed router (IP address) initialized from a single 
+    # Initializer method. A single IP address may appear in multiple Suspect
+    # objects (if chosen by multiple Initializer methods)
     attr_accessor :initializer
 end
 
 class MergedSuspect
+    # Encapsulates a single suspected failed router (IP address), along with all of the
+    # (src, dst) outages for one round on which the suspected failed router appeared, as well
+    # as all of the Initializer methods that chose it
     attr_accessor :ip, :outages, :initializers
 
     def initialize(suspects)
+        raise "More than one IP found!" if suspects.map { |s| s.ip }.uniq.size > 1
         @ip = suspects.map { |s| s.ip }.flatten.first
         @outages = suspects.map { |s| s.outage }.uniq
         @initializers = suspects.map { |s| s.initializer }.uniq
@@ -46,56 +61,82 @@ class FailureAnalyzer
         load_suspect_set_processors(ipInfo, logger, registrar, db)
     end
 
+    # Grab initializer and pruner methods
     # TODO: reload me whenever the data is read in again
     def load_suspect_set_processors(ipInfo, logger, registrar, db)
+        # Gather initializer methods from the Initializer class
         @initializer = Initializer.new(registrar, db, logger)
+        # .public_methods(false) excludes superclass methods
         public_methods = @initializer.public_methods(false)
         @suspect_set_initializers = public_methods.uniq.map { |m| @initializer.method m }
 
+        # Gather pruner methods from the Pruner class
         @pruner = Pruner.new(registrar, db, logger)
+        # .public_methods(false) excludes superclass methods
         public_methods = @pruner.public_methods(false)
         Pruner::OrderedMethods.each { |method| public_methods.unshift method  }
         @suspect_set_pruners = public_methods.uniq.map { |m| @pruner.method m }
     end
 
-    # returns the hop suspected to be close to the failure
-    # Assumes only one failure in the network...
+    # New isolation algorithm. Generates a suspect set and prunes that
+    # suspect set.
     #
-    # TODO: use old algorithm only for poisining experiments
+    # Note: also runs the old isolation algorithm for individual (src, dst)
+    # outages (just because it doesn't incur any additional measurements)
+    #
+    # TODO: use old isolation algorithm for poisining experiments, since new
+    # isolation algorithm isn't robust enough for poisoning yet.
     def identify_faults(merged_outage)
         if merged_outage.direction != Direction.FORWARD
+            # For bi-directional or reverse outages, execute the
+            # suspect set -> prune algorithm
             ip2suspects = Hash.new { |h,k| h[k] = [] }
+            # initialize suspect set
             all_suspect_ips, initial_suspect_ips = initialize_suspect_set(merged_outage, ip2suspects)
-            
+            # prune suspect set
             prune_suspect_set(merged_outage, all_suspect_ips)
 
-            # all_suspect_set_ips is modified in prune_suspect_set
+            # Note: all_suspect_set_ips is modified in prune_suspect_set()
             removed_ips = initial_suspect_ips - all_suspect_ips
             @logger.debug "removed_ips #{removed_ips.inspect}"
              
+            # Combine suspects that are common to multiple (src, dst) outages
             merged_remaining_suspects = ip2suspects.find_all { |ip, suspects| !removed_ips.include? ip }.map { |k,v| MergedSuspect.new(v) }
             merged_outage.suspected_failures[Direction.REVERSE] = merged_remaining_suspects
         end
 
-        # OK, for now, only call this on individual outages
+        # For forward + bidirectional outages, identify the first unreachable
+        # hops for each (src, dst) outage
+        
+        # run the old isolation algorithm on individual (src, dst) pairs
         merged_outage.each do |outage|
             identify_fault_single_outage(outage)
         end
 
+        # Forward suspects are the union of first unreachable hops for each
+        # (src, dst) forward or bidirectional outage
+        #       (computed by identify_fault_single_outage())
         merged_outage.suspected_failures[Direction.FORWARD] = merged_outage\
             .map { |o| (o.suspected_failures[Direction.FORWARD] or o.suspected_failures[Direction.FALSE_POSITIVE]) }.flatten.uniq
 
         merged_outage.suspected_failures[Direction.FORWARD] |= []
 
-        # XXX Why won't the html in the email display the class... only the
+        # XXX Why won't the html in the email display the name of the class... only the
         # '#' ...........
         merged_outage.suspected_failures[Direction.FORWARD].delete(nil)
     end
 
+    # Initialize the suspect set for a given merged_outage
+    #
+    # Return [all_suspect_ips, initial_suspect_ips]
+    #       (which are initially clones of eachother)
+    #
+    # Also fill in the ip -> Suspect hash
     def initialize_suspect_set(merged_outage, ip2suspects)
         initializer2suspectset = {}
 
         @suspect_set_initializers.each do |init|
+            # Gather suspects for initializer
             suspects = Set.new(init.call merged_outage)
             initializer_name = init.to_s
 
@@ -109,8 +150,8 @@ class FailureAnalyzer
             initializer2suspectset[initializer_name] = suspects
         end
 
-        # XXX we want to do something with # unique targets added ...
-        #     can be done with the ordering of suspect set initializers
+        # TODO: we should display # unique targets added in emails...
+        #     can be computed via the ordering of suspect set initializers
         all_suspect_ips = Set.new(ip2suspects.keys)
         initial_suspect_ips = all_suspect_ips.clone 
 
@@ -122,6 +163,13 @@ class FailureAnalyzer
         return [all_suspect_ips, initial_suspect_ips]
     end
 
+    # Prune the suspect set for a given merged_outage using the Pruner methods
+    #
+    # Sets merged_outage.pruner2incount_removed, a hash from:
+    #   { name of pruner method -> [# of suspects given to pruner, list of pruned suspects]
+    #
+    # Note that list of pruned suspects only includes hops which were not
+    # previously pruned by other pruners
     def prune_suspect_set(merged_outage, all_suspect_ips)
         pruner2incount_removed = {}
         @suspect_set_pruners.each do |pruner|
@@ -135,6 +183,10 @@ class FailureAnalyzer
         merged_outage.pruner2incount_removed = pruner2incount_removed
     end
 
+    # The old isolation algorithm. Acts on a single (src, dst) outage. For forward + bidirectional outages, 
+    # identify the unreachable hop adjacent to the last responsive forward hop. For reverse + bidirectional
+    # outages, identify the unresponsive hop on the historical revtr furthest
+    # from the destination.
     def identify_fault_single_outage(outage)
         if outage.direction.is_forward?
             # the failure is most likely adjacent to the last responsive forward hop
@@ -144,10 +196,12 @@ class FailureAnalyzer
             outage.suspected_failures[Direction.FORWARD] = [suspected_hop] unless suspected_hop.nil?
         end
 
-        # note: is_reverse? and is_forward? return true for bidirectional
-        # outages
+        # note: is_reverse? and is_forward? both return true for bidirectional
+        # outages. This implies that bidirectional outages will have non-empty
+        # suspected_failures[Direction.REVERSE] and
+        # suspected_failres[Direction.FORWARD]
         if outage.direction.is_reverse?
-            identify_failure_old(outage)
+            reverse_isolation_single_outage(outage)
         end
 
         if outage.direction == Direction.FALSE_POSITIVE
@@ -155,42 +209,34 @@ class FailureAnalyzer
         end
     end
 
-    def identify_failure_old(outage)
+    # Old isolation algorithm for reverse + bidirectional outages. Find the unresponsive hop
+    # on the historical revtr farthest from the destination.
+    #
+    # If the historical revtr is not valid, suspect list is empty.
+    def reverse_isolation_single_outage(outage)
         if !outage.historical_revtr.valid?
-            ## let m be the first forward hop that does not yield a revtr to s
-            tr_suspect = outage.tr.last_responsive_hop
-            spooftr_suspect = outage.spoofed_tr.last_responsive_hop
-            suspected_hop = Hop.later(tr_suspect, spooftr_suspect)
-            outage.suspected_failures[Direction.REVERSE] = [suspected_hop]
-
+            outage.suspected_failures[Direction.REVERSE] = []
             outage.complete_reverse_isolation = false
-
-            # baaaaah. This is confusing and not all that helpful.
-            #
-            # do some comparison of m's historical reverse path to infer the router which is either
-            # failed or changed its path
-            #
-            # doesn't make sense when running over logs... fine when run in
-            # real-time though
-            #
-            # Will only have a historical_revtr if the suspected hop is a
-            # historical hop, or the hops of the measured path overlap.
-            # historical_revtr = fetch_historical_revtr(merged_outage.src, suspected_hop)
         else
-            # TODO: more stuff with
             outage.suspected_failures[Direction.REVERSE] = [outage.historical_revtr.unresponsive_hop_farthest_from_dst()]
             outage.complete_reverse_isolation = true
-        end # what if the spoofed revtr went through?
+        end # TODO: what if the spoofed revtr went through for a reverse path outage? It shouldn't, but it could.
     end
 
-    # TODO: add as_hops_from_src to Hop objects
+    # Return the number of AS hops the suspected failure is from the
+    # source. (Not really that useful...)
+    #
+    # TODO: move as_hops_from_src to the Hop class
     def as_hops_from_src(suspected_hop, tr, spoofed_tr, historical_tr)
         as_hops_from_src = [count_AS_hops(tr, suspected_hop),
                 count_AS_hops(spoofed_tr, suspected_hop),
                 count_AS_hops(historical_tr, suspected_hop)].max
     end
 
-    # TODO: add as_hops_from_dst to Hop objects
+    # Return the number of AS hops the suspected failure is from the
+    # destination. (Not really that useful...)
+    #
+    # TODO: move as_hops_from_src to the Hop class
     def as_hops_from_dst(suspected_hop, historical_revtr, spoofed_revtr, spoofed_tr, tr, as_hops_from_src)
         metrics = [count_AS_hops(historical_revtr, suspected_hop),
                 count_AS_hops(spoofed_revtr, suspected_hop)]
@@ -203,7 +249,8 @@ class FailureAnalyzer
         metrics.max
     end
 
-    # # AS hops from the first hop in the path until the suspected hop
+    # Count the number of AS hops form the path's source to the
+    # suspected_hop's ASN
     def count_AS_hops(path, suspected_hop)
         return -1 if path.empty? || !path.valid? || !suspected_hop.is_a?(Hop)
 
@@ -239,22 +286,38 @@ class FailureAnalyzer
         end
     end
 
+    # Return the alternate paths that may be usable by the source or
+    # destination. The naive algorithm for now is to check pingability for
+    # every hop along the historical forward and reverse paths.
+    # Paths measured succesfully in working direction for uni-directional
+    # outages are included as well.
     def find_alternate_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
                                       spoofed_revtr, historical_revtr)
         alternate_paths = []
      
+        # Check historical reverse path
         if(historical_revtr.ping_responsive_except_dst?(dst) && 
                historical_revtr.compressed_as_path != spoofed_revtr.compressed_as_path)
+            # the destination won't be pingable, by our definition of outage.
+            # If the historical_revtr is exactly the same (at the ASN level) as the measured
+            # reverse path, only include the measured reverse path.
             alternate_paths << :"historical reverse path"
         end
     
+        # Check historical forward path
         historical_as_path = historical_tr.compressed_as_path
         spoofed_as_path = spoofed_tr.compressed_as_path
-        # if the spoofed_tr reached (reverse path problem), we compare the AS-level paths directly
-        # if the spoofed_tr didn't reach, we compare up the interesction of
-        # the two path. Both of these are subsumed by ([] & [])
         if(historical_tr.ping_responsive_except_dst?(dst) &&
                ((spoofed_as_path & historical_as_path) != spoofed_as_path))
+            # the desintaion won't be pingable by our definition of outage.
+            # IF the historical forward path is exactly the same (at the ASN
+            # level) as the measured forward path, only include the measured forward path. In particular:
+            #
+            #   if the spoofed_tr reached (reverse path problem), we compare the AS-level paths of the historical traceroute and
+            #   measured traceroute directly.
+            #
+            #   if the spoofed_tr didn't reach, we compare up the interesction of
+            #   the two paths. Both of these are subsumed by ([] & [])
             alternate_paths << :"historical forward path"
         end
     
@@ -269,17 +332,25 @@ class FailureAnalyzer
         alternate_paths
     end
 
+    # Return whether one of the directions was measured succesfully (for
+    # uni-directional outages)
+    #
+    # We use an arbitrary of "measured succesfully" for spoofed revtrs: must
+    # have <= a certain number of symmetry assumptions
     def measured_working_direction?(direction, spoofed_revtr)
         case direction
         when Direction.FORWARD
             return (spoofed_revtr.valid?) ? spoofed_revtr.num_sym_assumptions : false
         when Direction.REVERSE
-            return true # spoofed forward tr must have gone through
+            return true # spoofed forward tr must have gone through, by definition
         else
-            return false
+            return false # bi-directional not measured, by definition
         end
     end
 
+    # Return whether the measured path has changed from the historical path
+    #
+    # TODO: not yet implemented!
     def path_changed?(historical_tr, tr, spoofed_tr, direction)
        case direction
        when Direction.REVERSE
@@ -292,11 +363,8 @@ class FailureAnalyzer
        return false
     end
 
-    def compare_ground_truth(src, dst, direction, tr, spoofed_tr, historical_tr,
-                                      spoofed_revtr, historical_revtr, dst_tr, dst_spoofed_tr)
-        # we can probably do this post-hoc 
-    end
-
+    # Return the direction of the outage, given whether the forward + reverse
+    # paths were measured successfully
     def infer_direction(reverse_problem, forward_problem)
         if(reverse_problem and !forward_problem)
             # failure is only on the reverse path
@@ -315,12 +383,21 @@ class FailureAnalyzer
         direction
     end
 
+    # Return whether the outage passes second level filters
+    #
+    # TODO: get rid of testing flag
     def passes_filtering_heuristics?(outage, filter_tracker, testing=false, file=nil, skip_hist_tr=false)
         SecondLevelFilters.filter!(outage, filter_tracker, @ipInfo, testing, file, skip_hist_tr) 
         return outage.passed_filters
     end
 
-    # TODO: get rid of Mock Hops!!!
+    # Place the outage into a categoriazation bucket. See Section 5 of senior
+    # thesis for more info.
+    #
+    # TODO: get rid of Mock Hops! they were originally used for dot diagrams,
+    # but are no longer needed.
+    #
+    # TODO: factor out return value symbols into their own "enum" class
     def categorize_failure(outage)
         if outage.direction == Direction.BOTH or outage.direction == Direction.FORWARD
             # Do the measured forward paths stop at the same hop? They should...
@@ -402,6 +479,8 @@ class FailureAnalyzer
         end
     end
 
+    # Return the hops along the forward path(s) beyond the suspected failure which are pingable from the
+    # source
     def pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
         pingable_targets = []
 
@@ -412,6 +491,8 @@ class FailureAnalyzer
         pingable_targets
     end
 
+    # Return a list of the gateway routers along reverse path(s) which are pingable from the
+    # source, and directly adjacent to the destination's AS
     def pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
         pingable_targets = []
 

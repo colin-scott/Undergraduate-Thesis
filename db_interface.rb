@@ -1,5 +1,10 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+# Ruby interface to the revtr database running on Bouncer.
+#
+# All of isolation's queries to the DB should proceed through this module, including 
+# ad-hoc.
+
 # last_responsive will be 
 #    * "N/A" if not in the database
 #    * false if not historically pingable

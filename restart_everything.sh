@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Restart both the controller and the isolation system
+
 pkill -9 -f controller.rb
 pkill -9 -f run_failure_isolation.rb
 sleep 2

@@ -1,3 +1,6 @@
+# All modules needed by run_failure_isolation.rb. Can be dynmically reloaded
+# during runtime.
+
 load 'ip_info.rb'
 load 'mkdot.rb'
 load 'hops.rb'

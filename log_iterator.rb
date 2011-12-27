@@ -1,6 +1,11 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-# This code is such a piece of shit.
+# Module for iterating over isolation logs. 
+#
+# TODO: This code is really terrible. Most of it isn't even used anymore, and
+# should be removed
+#
+# See data_analysis/** for example usage
 
 require 'yaml'
 #require 'ip_info'

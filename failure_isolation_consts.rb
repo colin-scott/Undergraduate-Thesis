@@ -1,11 +1,14 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-# CONSTANTS!!!
+# Constants (and assorted convenience methods) for the isolation system.
+#
+# Lazily evaluates all large datasets
 
 require 'set'
 require 'utilities'
 require 'yaml'
 
+# Define these in case spooftr_config.rb was not loaded
 $REV_TR_TOOL_DIR ||= "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 $DATADIR ||= "/homes/network/revtr/spoofed_traceroute/data"
 
@@ -16,9 +19,11 @@ module FailureIsolation
     # ====================================
     CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
 
+    # Running on riot.cs.washington.edu
     PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
     "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux"]
     
+    # Length of each isolation round
     DefaultPeriodSeconds = 360
 
     PPTASKS = "~ethan/scripts/pptasks"
@@ -26,11 +31,10 @@ module FailureIsolation
     TestPing = "128.208.4.49" # crash.cs.washington.edu
 
     MonitorSlice = "uw_revtr2"
-    IsolationSlice = "uw_revtr" # why do we separate the slices?
+    IsolationSlice = "uw_revtr" # TODOC: why do we separate the slices?
 
     RevtrRequests = "/homes/network/revtr/failure_isolation/revtr_requests/current_requests.txt"
 
-    # out of place...
     ControllerUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_controller.txt").chomp : IO.read("#{$DATADIR}/uris/controller.txt").chomp
     RegistrarUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_registrar.txt").chomp : IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
@@ -41,11 +45,18 @@ module FailureIsolation
 
     CurrentPLPLTracesPath = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/currentlogdir/probes"
 
-    # MOVE ME
+    # Return all hops observed on most recent traceroutes from all PL nodes to
+    # the given site
+    #
+    # TODO: move me to a more "dynamic" module, e.g. failure_analyzer.rb
     def self.current_hops_on_pl_pl_traces_to_site(db, site)
         self.hops_on_pl_pl_traces_to_site(db, site, CurrentPLPLTracesPath)
     end
 
+    # Return the path to the directory containing Ethan's PL-PL paths for the
+    # given time object (time rounded to nearsest 5 minutes)
+    #
+    # TODO: move me to a more "dynamic" module, e.g. failure_analyzer.rb
     def self.pl_pl_path_for_date(time)
         root = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/"
         base = time.strftime("%Y/%m/%d/")
@@ -66,6 +77,10 @@ module FailureIsolation
         up_to_day+"/"+hour_minute+"/probes"
     end
 
+    # Return all hops ever observed on historical PL-PL traces to the given
+    # site.
+    #
+    # TODO: move me to a more "dynamic" module, e.g. failure_analyzer.rb
     # current pl pl traces, for pruning
     def self.hops_on_pl_pl_traces_to_site(db, site, path)
         return nil unless self.Site2Hosts.include? site
@@ -74,7 +89,7 @@ module FailureIsolation
         Set.new(`#{HopsTowardsSrc} /tmp/site_hosts.txt #{path}/*`.split("\n"))
     end
 
-    # returns direction2site2hops
+    # returns direction2site2hops,
     # where direction is one of :source or :destination
     # :source is hops seen sent from the source
     # and :destination is hops seen sent towards the destination
@@ -93,6 +108,7 @@ module FailureIsolation
 
     SiteMapper = "/homes/network/ethan/scripts/list_sites_for_pl_hosts_in_fileX.pl"
        
+    # Lazily evaluate hostname -> site mapping
     def self.Host2Site()
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
@@ -101,6 +117,7 @@ module FailureIsolation
                                           .split("\n").map { |line| line.split }.custom_to_hash)
     end
 
+    # Lazily evaluate site -> hostname mapping
     def self.Site2Hosts()
         return @Site2Hosts unless @Site2Hosts.nil?
         @Site2Hosts = Hash.new { |h,k| [] }
@@ -114,20 +131,24 @@ module FailureIsolation
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
+    # Logs of filter (first level, registration, and second level) statistics
     FilterStatsPath = "#{$DATADIR}/filter_stats"
 
     DotFiles = "#{$DATADIR}/dots"
 
     WebDirectory = "/homes/network/revtr/www/isolation_graphs"
 
+    # Ping results from VPs for most recent round
     PingMonitorState = "~/colin/target_state.yml"
     PingMonitorRepo = "#{$DATADIR}/ping_monitoring_state/"
+    PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state"
 
+    # Historical forward traceroutes gathered from VPS. TODO: move these to
+    # the bouncer DB
     HistoricalTraces = "#{$DATADIR}/most_recent_historical_traces.txt"
 
+    # Target lists
     DataSetDir = "/homes/network/revtr/spoofed_traceroute/datasets"
-
-    PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state"
     
     # ====================================
     #         Target Sets                #
@@ -163,7 +184,7 @@ module FailureIsolation
 
     # For Ethan's PL-PL traceroutes -- <hostname> <ip> <site>
     SpooferTargetsMetaDataPath = "#{DataSetDir}/up_spoofers_w_sites.txt"
-    #  XXX Take in from isolation_vantage_points table instaed of this static list.
+    # TODO: Take in from isolation_vantage_points table instaed of this static list.
     SpooferTargetsPath = "#{DataSetDir}/up_spoofers.ips"
     def self.SpooferTargets()
         @SpooferTargets ||= Set.new(IO.read(SpooferTargetsPath).split("\n").map { |s| s.strip })
@@ -187,8 +208,7 @@ module FailureIsolation
         @HubbleTargets ||= Set.new(IO.read(HubbleTargetsPath).split("\n").map { |s| s.strip })
     end
 
-    # !!!!!!!!!!!!!!!!!!!
-    #   to add a dataset, mimick the above lines
+    # NOTE: to add a dataset, mimick the above lines
     def self.get_dataset(dst)
         if self.HarshaPoPs.include? dst
             return DataSets::HarshaPoPs
@@ -207,6 +227,7 @@ module FailureIsolation
         end
     end
 
+    # Evaluate all of the lazily-evaluated datasets
     def self.ReadInDataSets()
         @Host2Site = nil
         self.Host2Site
@@ -232,6 +253,7 @@ module FailureIsolation
         self.UpdateTargetSet()
     end
 
+    # Compute the set of unique targets
     def self.UpdateTargetSet()
         @TargetSet = Set.new
         union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
@@ -256,6 +278,7 @@ module FailureIsolation
     #         Vantage Points             #
     # ====================================
 
+    # Number of unique VPs issuing pings 
     NumActiveNodes = 13
 
     AllNodesPath = "/homes/network/revtr/spoofed_traceroute/all_isolation_nodes.txt"
@@ -275,6 +298,7 @@ module FailureIsolation
 
     ToilNodesPath = "/home/cs/colin/ping_monitoring/cloudfront_monitoring/cloudfront_spoofing_monitoring_nodes.txt"
 
+    # Signal to failure_monitor to update it's metadata for a removed VP
     NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 
     def self.ReadInNodeSets()
@@ -300,6 +324,7 @@ module FailureIsolation
 
     IPToPoPMappingPath = "/homes/network/harsha/logs_dir/curr_clustering/curr_ip_to_pop_mapping.txt"
 
+    # Lazily evaluate IP -> Harsha's POP ID mapping
     # PoPs are symbols!
     def self.IPToPoPMapping()
         return  @IPToPoPMapping unless @IPToPoPMapping.nil?
@@ -336,7 +361,7 @@ module DataSets
     ATTTargets = :"ATT"
     HubbleTargets = :"Hubble Targets"
 
-    # !!!!!!!!!!!!!!!
+    # NOTE: 
     #  to add a dataset, add an element to this array, and edit
     #  the path in FailureIsolation. Note that these are the Sets! not the
     #  symbols
