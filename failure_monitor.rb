@@ -76,7 +76,7 @@ class FailureMonitor
 
         # minimum rounds in between successive isolation measurements sent from
         # a particular source to a particular destination
-        @@isolation_interval_rounds = 90
+        @@isolation_interval_rounds = 3
 
         # current logical round
         @current_round = 0

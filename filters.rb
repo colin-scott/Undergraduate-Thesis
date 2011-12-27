@@ -69,7 +69,8 @@ module FirstLevelFilters
         ISSUED_MEASUREMENTS_RECENTLY
     ])
 
-    # Run all first level filters. Mutates filter_trackers
+    # Run all first level filters. Mutates filter_trackers and
+    # observingnode2rounds
     def self.filter!(target, filter_trackers, observingnode2rounds, neverseen, stillconnected,
                      nodetarget2lastoutage, nodetarget2lastisolationattempt, 
                      current_round, isolation_interval)

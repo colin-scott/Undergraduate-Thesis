@@ -1,4 +1,5 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+$: << "./"
 
 # Simply append reverse hops onto the previous_week.txt
 # file.
