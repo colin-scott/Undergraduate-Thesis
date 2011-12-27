@@ -5,7 +5,7 @@ require 'isolation_module'
 require 'drb'
 require 'failure_dispatcher'
 require 'outage'
-require 'outage_correlation'
+require 'filter_stats'
 
 require 'utilities'
 Thread.abort_on_exception = true

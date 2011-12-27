@@ -276,7 +276,7 @@ class FailureMonitor
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
-        srcdst2filtertracker = apply_first_lvl_filters(target2observingnode2rounds, target2neverseen, target2stillconnected)
+        srcdst2filtertracker = apply_first_lvl_filters!(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
         now = Time.new
 
@@ -306,10 +306,11 @@ class FailureMonitor
     end
 
     # Filter out instable and complete outages
-    def apply_first_lvl_filters(target2observingnode2rounds, target2neverseen, target2stillconnected)
-        # Note that this method modifies target2observingnode2rounds --
-        # namely, it deletes all observing nodes that have recently issued
-        # measurements for the target 
+    #
+    # Note that this method modifies target2observingnode2rounds --
+    # namely, it deletes all observing nodes that have recently issued
+    # measurements for the target 
+    def apply_first_lvl_filters!(target2observingnode2rounds, target2neverseen, target2stillconnected)
         now = Time.new
         srcdst2filtertracker = {}
 
