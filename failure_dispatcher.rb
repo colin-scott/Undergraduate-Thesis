@@ -170,6 +170,7 @@ class FailureDispatcher
         # Now thread out on each src,dst pair, and issue the remaining
         # measurements in parallel
         Thread.new do
+            measurement_start = Time.new
             outage_threads = []
             srcdst2outage.each do |srcdst, outage|
                 outage_threads << Thread.new do
@@ -216,6 +217,9 @@ class FailureDispatcher
                     process_merged_outage(merged_outage, id, testing)
                 end
             end
+
+            measurement_end = Time.new
+            @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
         end
     end
 
