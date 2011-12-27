@@ -291,6 +291,7 @@ class HouseCleaner
             update_data_set(dataset, substitute_targets, bad_targets)
         end
 
+        # update 
         FailureIsolation.ReadInDataSets()
 
         @logger.debug "target lists updated"
