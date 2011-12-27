@@ -15,7 +15,7 @@ end
 
 time_bound = Time.parse(ARGV.join ' ')
 
-total = 0
+total_records = 0
 num_passed = 0
 num_failed = 0
 level2num_failed = Hash.new(0)
@@ -24,7 +24,7 @@ level2reason2count = Hash.new { |h,k| h[k] = Hash.new(0) }
 LogIterator::filter_tracker_iterate(time_bound) do |filter_tracker|
     # Each filter_tracker is a single (src, dst) outage
     # in case the filter_tracker came too early in the first day:
-    next if filter_tracker.start_time < time_bound 
+    next if filter_tracker.first_lvl_filter_time < time_bound 
 
     total_records += 1
     if filter_tracker.passed?
@@ -49,9 +49,9 @@ end
 puts "=============================="
 puts
 puts "(src, dst) outages since #{time_bound}"
-Stats.print_average("total", total, total)
-Stats.print_average("num_passed", num_passed, total)
-Stats.print_average("num_failed", num_failed, total)
+Stats.print_average("total", total_records, total_records)
+Stats.print_average("num_passed", num_passed, total_records)
+Stats.print_average("num_failed", num_failed, total_records)
 
 puts "=============================="
 puts
@@ -60,7 +60,7 @@ puts "Filter Statistics: "
 Filters::Levels.each do |level|
     puts "------------------------------"
     num_failed_here = level2num_failed[level]
-    puts "#{level}. # outages filtered here: #{num_failed_here}"
+    Stats.print_average("#{level}. # outages filtered here (% of total)", num_failed_here, total_records)
     puts
     puts "Individual triggers (% of outages filtered here):"
     reason2count = level2reason2count[level]
