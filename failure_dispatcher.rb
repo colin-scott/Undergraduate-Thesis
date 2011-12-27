@@ -138,8 +138,6 @@ class FailureDispatcher
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
-        return if srcdst2outage.empty? # optimization
-
         # ================================================================================
         # Issue Measurements                                                             #
         # ================================================================================
