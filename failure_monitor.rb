@@ -227,7 +227,7 @@ class FailureMonitor
     # encapsulate state into Hashes
     #
     # Returns [target2observingnode2rounds, target2neverseen, target2stillconnected]
-    def classify_outages(node2targetstate, testing=false)
+    def classify_outages(node2targetstate)
         # target -> { node -> # rounds }
         target2observingnode2rounds = Hash.new { |hash,key| hash[key] = {} }
         # target -> [node1, node2, ...]

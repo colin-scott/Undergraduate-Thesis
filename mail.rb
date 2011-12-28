@@ -91,20 +91,20 @@ class Emailer < ActionMailer::Base
     end
     def outage_detected(target, dataset, disconnected, connected, never_seen,
                         problems_at_the_source, outdated_nodes,
-                        not_sshable, testing=false)
+                        not_sshable)
         subject     "Outage detected: #{target}"
         from        "failures@cs.washington.edu"
-        recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
+        recipients  "failures@cs.washington.edu"
         body        :target => target, :dataset => dataset, :disconnected => disconnected,
                     :connected => connected, :never_seen => never_seen,
                     :problems_at_the_source => problems_at_the_source,
                     :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
     end
-    def isolation_results(merged_outage, testing=false)
+    def isolation_results(merged_outage)
         subject "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}"
         
         from        "failures@cs.washington.edu"
-        recipients  (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
+        recipients  "failures@cs.washington.edu"
 
         body        :merged_outage => merged_outage
     end
@@ -142,10 +142,10 @@ class Emailer < ActionMailer::Base
                     :possibly_bad_targets => possibly_bad_targets,
                    :bad_hops => bad_hops, :possibly_bad_hops => possibly_bad_hops
     end
-    def poison_notification(outage, testing)
+    def poison_notification(outage)
         subject "Poison Opportunity Detected!"
         from "failures@cs.washington.edu"
-        recipients (testing) ? "cs@cs.washington.edu" : "failures@cs.washington.edu"
+        recipients "failures@cs.washington.edu"
         body :outage => outage
     end
 end

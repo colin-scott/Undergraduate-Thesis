@@ -35,8 +35,8 @@ module FailureIsolation
 
     RevtrRequests = "/homes/network/revtr/failure_isolation/revtr_requests/current_requests.txt"
 
-    ControllerUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_controller.txt").chomp : IO.read("#{$DATADIR}/uris/controller.txt").chomp
-    RegistrarUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_registrar.txt").chomp : IO.read("#{$DATADIR}/uris/registrar.txt").chomp
+    #ControllerUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_controller.txt").chomp : IO.read("#{$DATADIR}/uris/controller.txt").chomp
+    #RegistrarUri = ($TEST) ? IO.read("#{$DATADIR}/uris/test_registrar.txt").chomp : IO.read("#{$DATADIR}/uris/registrar.txt").chomp
 
     ReadTraces = "~revtr/colin/Scripts/readouttraces"
     HopsTowardsSrc = "/homes/network/revtr/colin/Scripts/gather_hops_on_traces_towards_ipsX_input_filesY\*"
@@ -229,49 +229,49 @@ module FailureIsolation
 
     # Evaluate all of the lazily-evaluated datasets
     def self.ReadInDataSets()
-        @Host2Site = nil
-        self.Host2Site
-        @Site2Hosts = nil
-        self.Site2Hosts
-        @HarshaPoPs = nil
-        self.HarshaPoPs
-        @BeyondHarshaPoPs = nil
-        self.BeyondHarshaPoPs
-        @SpooferTargets = nil
-        self.SpooferTargets
-        @CloudfrontTargets = nil
-        self.CloudfrontTargets
-        # pops are symbols!
-        @IPToPoPMapping = nil
-        self.IPToPoPMapping
-        @TargetBlacklist = nil
-        self.TargetBlacklist
-        @ATTTargets = nil
-        self.ATTTargets
-        @HubbleTargets = nil
-        self.HubbleTargets
-        self.UpdateTargetSet()
+        #@Host2Site = nil
+        #self.Host2Site
+        #@Site2Hosts = nil
+        #self.Site2Hosts
+        #@HarshaPoPs = nil
+        #self.HarshaPoPs
+        #@BeyondHarshaPoPs = nil
+        #self.BeyondHarshaPoPs
+        #@SpooferTargets = nil
+        #self.SpooferTargets
+        #@CloudfrontTargets = nil
+        #self.CloudfrontTargets
+        ## pops are symbols!
+        #@IPToPoPMapping = nil
+        #self.IPToPoPMapping
+        #@TargetBlacklist = nil
+        #self.TargetBlacklist
+        #@ATTTargets = nil
+        #self.ATTTargets
+        #@HubbleTargets = nil
+        #self.HubbleTargets
+        #self.UpdateTargetSet()
     end
 
     # Compute the set of unique targets
     def self.UpdateTargetSet()
-        @TargetSet = Set.new
-        union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
-        @TargetSet.merge(union)
+        #@TargetSet = Set.new
+        #union = DataSets::AllDataSets.reduce(Set.new) { |sum,arr| sum | arr }
+        #@TargetSet.merge(union)
 
-        not_valid_ip = @TargetSet.find { |ip| !ip.matches_ip? }
-        raise "Invalid IP address in targets! #{nodt_valid_ip}" if not_valid_ip
+        #not_valid_ip = @TargetSet.find { |ip| !ip.matches_ip? }
+        #raise "Invalid IP address in targets! #{nodt_valid_ip}" if not_valid_ip
 
-        File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
-        # push out targets to monitoring nodes! 
-        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                    #{TargetSetPath} @:#{MonitorTargetSetPath}"
-        # also push out target set to toil in case it restarts nodes
-        system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}"
-        # ============================== #
-        #      riot specific!            #
-        # ============================== #
-        system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/"
+        #File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
+        ## push out targets to monitoring nodes! 
+        #system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
+        #            #{TargetSetPath} @:#{MonitorTargetSetPath}"
+        ## also push out target set to toil in case it restarts nodes
+        #system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}"
+        ## ============================== #
+        ##      riot specific!            #
+        ## ============================== #
+        #system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/"
     end
 
     # ====================================
@@ -302,14 +302,14 @@ module FailureIsolation
     NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
 
     def self.ReadInNodeSets()
-        @AllNodes = nil
-        self.AllNodes
+        #@AllNodes = nil
+        #self.AllNodes
 
-        @NodeBlacklist = nil
-        self.NodeBlacklist
+        #@NodeBlacklist = nil
+        #self.NodeBlacklist
 
-        @CurrentNodes = nil
-        self.CurrentNodes
+        #@CurrentNodes = nil
+        #self.CurrentNodes
     end
 
     # =========================
@@ -365,8 +365,8 @@ module DataSets
     #  to add a dataset, add an element to this array, and edit
     #  the path in FailureIsolation. Note that these are the Sets! not the
     #  symbols
-    AllDataSets = [FailureIsolation.HarshaPoPs, FailureIsolation.BeyondHarshaPoPs,
-        FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets]
+    #AllDataSets = [FailureIsolation.HarshaPoPs, FailureIsolation.BeyondHarshaPoPs,
+    #    FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets]
     #   FailureIsolation.HubbleTargets]
 
     def self.ToPath(dataset)

@@ -249,7 +249,7 @@ module SecondLevelFilters
 
    # Run all second level filters. Mutates filter_tracker, and sets
    # outage.passed_filters
-   def self.filter!(outage, filter_tracker, ip_info, testing=false, file=nil, skip_hist_tr=false)
+   def self.filter!(outage, filter_tracker, ip_info, file=nil, skip_hist_tr=false)
        # TODO: don't declare these variables like this... it's ugly
        src = outage.src
        dst = outage.dst 

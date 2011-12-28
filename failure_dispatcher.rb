@@ -120,7 +120,7 @@ class FailureDispatcher
     # Issue measurements, merge (src dst) outages, invoke isolation algorithm, and email results
     #
     # precondition: stillconnected are able to reach dst
-    def isolate_outages(srcdst2outage, srcdst2filter_tracker, testing=false) # TODO: get rid of this testing flag, and mock out components instead
+    def isolate_outages(srcdst2outage, srcdst2filter_tracker)
         # Set this to false at the beginning of each round
         @have_retried_connection = false
 
@@ -175,7 +175,7 @@ class FailureDispatcher
                     src,dst = srcdst
                     filter_tracker = srcdst2filter_tracker[srcdst]
                     outage.measurement_times += deep_copy(measurement_times)
-                    process_srcdst_outage(outage, filter_tracker, testing)
+                    process_srcdst_outage(outage, filter_tracker)
                 end
             end
 
@@ -197,22 +197,19 @@ class FailureDispatcher
 
             srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
-            # TODO: log to a fake location rather than using the testing flag
-            if !testing
-                log_filter_trackers(srcdst2filter_tracker)
-            end
+            log_filter_trackers(srcdst2filter_tracker)
 
             # ================================================================================
             # Merge (src, dst) outages                                                       #
             # ================================================================================
-            merged_outages = merge_outages(srcdst2outage.values, testing)
+            merged_outages = merge_outages(srcdst2outage.values)
             # id's needed later on
             merged_outage2id = assign_ids(merged_outages)
             @logger.debug "merged_outages: #{merged_outages}, merged_outage2id #{merged_outage2id}"
 
             merged_outage2id.each do |merged_outage, id|
                 Thread.new do
-                    process_merged_outage(merged_outage, id, testing)
+                    process_merged_outage(merged_outage, id)
                 end
             end
 
@@ -228,7 +225,7 @@ class FailureDispatcher
     # satifisfies multiple clustering algorithms.
     # 
     # TODO: use smarter merging heuristics?
-    def merge_outages(outages, testing)
+    def merge_outages(outages)
        # Note: bidirectional will appear twice, in forward mergings and reverse
        # mergings
        only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
@@ -239,12 +236,7 @@ class FailureDispatcher
        src2outages = only_reverse.categorize_on_attr(:src)
        reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::REVERSE) }
 
-       # TODO: get rid of the testing flag by preparing the test-cases to
-       # appear like real outages
-       if testing
-           # doesn't have a direction...
-           forward_merged << MergedOutage.new(outages, MergingMethod::FORWARD)
-       elsif !outages.find { |o| o.passed_filters }.nil? and forward_merged.empty? and reverse_merged.empty?
+       if !outages.find { |o| o.passed_filters }.nil? and forward_merged.empty? and reverse_merged.empty?
            # forward U reverse mergings should contain every (src, dst) pair
            raise "Not merging properly! #{outages.inspect}"
        end
@@ -296,22 +288,19 @@ class FailureDispatcher
     # Gather measurements and generate DOT graphs for a single (src, dst) outage
     #
     # Return whether the outage passed second level filters
-    def process_srcdst_outage(outage, filter_tracker, testing=false)
+    def process_srcdst_outage(outage, filter_tracker)
         @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}"
 
-        gather_measurements(outage, testing)
+        gather_measurements(outage)
 
         outage.file = get_uniq_filename(outage.src, outage.dst)
 
         # turn into a linked list ( I think? )
         outage.build
 
-        # TODO: log to a fake location rather than use the testing flag
-        if(!testing)
-            log_srcdst_outage(outage)
-        end
+        log_srcdst_outage(outage)
 
-        if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker, testing)
+        if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker)
             # Generate a DOT graph
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
                              outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
@@ -330,23 +319,20 @@ class FailureDispatcher
     #
     # id goes from 0 to n, where n is the number of merged_outages this round
     # (used for unique log filenames)
-    def process_merged_outage(merged_outage, id, testing=false)
+    def process_merged_outage(merged_outage, id)
         @logger.debug "process_merged_outage: #{merged_outage.sources}, #{merged_outage.destinations}"
         analyze_measurements(merged_outage)    
     
         merged_outage.file = get_uniq_filename(id, id)
 
-        # TODO: log to a fake location rather than using a testing flag
-        if(!testing)
-            log_merged_outage(merged_outage)
-        end
+        log_merged_outage(merged_outage)
 
         # If one of the riot VPs, attempt to trigger a BGP poison
-        @poisoner.check_poisonability(merged_outage, testing)
+        @poisoner.check_poisonability(merged_outage)
         
-        if(merged_outage.is_interesting? or testing)
+        if(merged_outage.is_interesting?)
             # at least one of the inside outages passed filters, so email
-            Emailer.isolation_results(merged_outage, testing)
+            Emailer.isolation_results(merged_outage)
             # TODO: sometimes the email never gets delivered...
             @logger.info "Attempted to email isolation results #{Time.now}"
         end
@@ -395,7 +381,7 @@ class FailureDispatcher
     #
     # TODO: I should figure out a better way to gather data, rather
     # than this longgg method
-    def gather_measurements(outage, testing)
+    def gather_measurements(outage)
         reverse_problem = outage.pings_towards_src.empty?
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
@@ -482,7 +468,7 @@ class FailureDispatcher
 
         @logger.debug "pings to non-responsive hops issued"
 
-        if outage.direction != Direction.REVERSE and outage.direction != Direction.BOTH and !testing
+        if outage.direction != Direction.REVERSE and outage.direction != Direction.BOTH
             # Only issue spoofed revtrs for forward outages (since spoofed
             # revtrs take a looooong time to measure)
             outage.measurement_times << ["revtr", Time.new]

@@ -1,6 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 # For a given log file, generate a DOT graph
+# TODO: out of date, probably won't work
 
 require 'mkdot'
 require 'log_iterator'

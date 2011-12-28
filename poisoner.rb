@@ -38,7 +38,7 @@ class Poisoner
     #   - source is a BGP Mux node
     #   - outage is reverse or bidirectional
     #   - outage passed filters
-    def check_poisonability(merged_outage, testing=false)
+    def check_poisonability(merged_outage)
         src2direction2outage2failures = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = Hash.new { |h2,k2| h2[k2] = [] } } }
 
         merged_outage.each do |o|
@@ -59,14 +59,14 @@ class Poisoner
             end
         end
 
-        poison(src2direction2outage2failures, merged_outage, testing)
+        poison(src2direction2outage2failures, merged_outage)
     end
 
     # Choose the ASN to poison from the chosen outaeg, and execute a poisoning
     #
     # pre: all outages in src2direction2outage2failures are ready to be
     # poisoned (not just random)
-    def poison(src2direction2outage2failures, merged_outage, testing)
+    def poison(src2direction2outage2failures, merged_outage)
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:
@@ -84,7 +84,7 @@ class Poisoner
                     @logger.warn "asn_to_poison nil, reverse: #{direction2outage2failures[Direction.REVERSE]}"
                     next
                 end
-                execute_poison(src, asn_to_poison, outage, testing)
+                execute_poison(src, asn_to_poison, outage)
             elsif !direction2outage2failures[Direction.FORWARD].empty? # Direction.FORWARD
                 outage2failures = direction2outage2failures[Direction.FORWARD]
 
@@ -95,11 +95,11 @@ class Poisoner
                     next
                 end
 
-                execute_poison(src, asn_to_poison, outage, testing)
+                execute_poison(src, asn_to_poison, outage)
             end
         end
 
-        log_outages(src2direction2outage2failures) # if !testing
+        log_outages(src2direction2outage2failures) 
     end
 
     # helper method. Given a merged_outage, return:
@@ -157,12 +157,12 @@ class Poisoner
     end
 
     # ssh to riot and execute the poisoning
-    def execute_poison(src, asn, outage, testing)
+    def execute_poison(src, asn, outage)
         @logger.debug "Attempting to send poison notification email #{src} #{asn}"
-        Emailer.poison_notification(outage, testing)
+        Emailer.poison_notification(outage)
 
         # log event. On riot, I think
-        # poison
-        system %{ssh cs@riot.cs.washington.edu "/home/cs/poisoning/execute_poison.rb #{src} #{asn}"} if !testing
+        # TODO: refactor this to be more easily testable (easier to mock out)
+        system %{ssh cs@riot.cs.washington.edu "/home/cs/poisoning/execute_poison.rb #{src} #{asn}"} 
     end
 end

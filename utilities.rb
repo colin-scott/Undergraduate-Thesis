@@ -209,6 +209,17 @@ class Array
         end
         max_key
     end
+
+    # Shuffle the elements of the Array in random order
+    def shuffle!()
+        shuffled = self.sort_by { rand }
+
+        # TODO: better way to modify self?
+        shuffled.each_with_index do |i, elt|
+            print i
+            self[i] = elt
+        end
+    end
 end
 
 class String
