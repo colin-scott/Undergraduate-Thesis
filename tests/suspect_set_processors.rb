@@ -9,7 +9,7 @@ require 'failure_analyzer'
 require 'outage'
 require 'suspect_set_processors'
 require 'db_interface'
-require 'fixtures'
+require 'fixtures/fixtures'
 require 'utilities'
 Thread.abort_on_exception = true
 

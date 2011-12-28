@@ -1,6 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 
+
 #require 'rspec'
 require 'isolation_module'
 #require 'drb'
@@ -19,8 +20,8 @@ Thread.abort_on_exception = true
 #        @database = DatabaseInterface.new
 #        @log = LoggerLog.new($stderr)
 #        @analyzer = FailureAnalyzer.new(IpInfo.new, @log, @registrar, @database)
-#        @outage1 = Marshal.load(IO.read("mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
-#        @outage2 = Marshal.load(IO.read("mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
+#        @outage1 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
+#        @outage2 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
 #
 #        @merged_outage = MergedOutage.new([@outage1, @outage2])
 #    end
@@ -37,8 +38,8 @@ end
 @database = DatabaseInterface.new
 @log = LoggerLog.new($stderr)
 @analyzer = FailureAnalyzer.new(IpInfo.new, @log, MockRegistrar.new, @database)
-@outage1 = Marshal.load(IO.read("mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
-@outage2 = Marshal.load(IO.read("mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
+@outage1 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
+@outage2 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
 @merged_outage = MergedOutage.new([@outage1, @outage2])
 
 @analyzer.identify_faults(@merged_outage)

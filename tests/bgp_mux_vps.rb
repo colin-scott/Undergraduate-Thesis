@@ -26,13 +26,13 @@ if ARGV.empty?
     srcdst = [src, target]
     outage = Outage.new(src, target, receivers, [], [], [])
     outage_correlation = OutageCorrelation.new(target, [src], receivers)
-    dispatcher.isolate_outages({srcdst => outage},{target => outage_correlation}, true)
+    dispatcher.isolate_outages({srcdst => outage},{target => outage_correlation})
 else
     src = ARGV.shift
     dst = ARGV.shift
     srcdst = [src, dst]
     dispatcher.isolate_outages({ srcdst => ARGV.map { |str| str.gsub(/,$/, '')  }},
-                               {srcdst => []}, {srcdst => []}, true)
+                               {srcdst => []}, {srcdst => []})
 end
 
 sleep

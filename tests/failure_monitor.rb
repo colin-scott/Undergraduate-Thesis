@@ -1,7 +1,10 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << "../"
 
-require 'isolation_module' # Don't want to have to load this...
+# TODO: turn this into a real unit test rather than printing out stdout
+
+# TODO: Don't want to have to load this
+require 'isolation_module' 
 require 'failure_monitor'
 
 monitor = FailureMonitor.new
@@ -12,7 +15,7 @@ node2targetstate = { "froo.froo" => outage_state,
                      "frooz.frooz" => outage_state, 
                      "fram.fram" => connected_state }
 
-target2observingnode2rounds, target2neverseen, target2stillconnected = monitor.classify_outages(node2targetstate, true)
+target2observingnode2rounds, target2neverseen, target2stillconnected = monitor.classify_outages(node2targetstate)
 $stderr.puts "target2observingnode2rounds #{target2observingnode2rounds}"
 $stderr.puts "target2neverseen #{target2neverseen}" 
 $stderr.puts "target2stillconnected #{target2stillconnected}"
