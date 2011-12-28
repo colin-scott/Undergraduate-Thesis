@@ -142,14 +142,14 @@ module FirstLevelFilters
     # other nodes. Make sure that the outage is legitimiate by ensuring that
     # at least one non BGP Mux node is observing
     def self.no_non_poisoner_observing?(nodes)
-        nodes.find { |n| !FailureIsolation::PoisonerNames.include? n }
+        not nodes.find { |n| not FailureIsolation::PoisonerNames.include? n }
     end
 
     # BGP Mux nodes are a bit wonky -- they observe far more outages than the
     # other nodes. Make sure that the outage is legitimiate by ensuring that
     # at least one non BGP Mux receiver has connectivity with the dest
     def self.no_non_poisoner_connected?(stillconnected)
-        stillconnected.find { |n| !FailureIsolation::PoisonerNames.include? n } 
+        not stillconnected.find { |n| not FailureIsolation::PoisonerNames.include? n } 
     end
 
     # Figure out whether any of the observing sources have recently issued

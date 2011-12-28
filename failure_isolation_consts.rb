@@ -20,8 +20,10 @@ module FailureIsolation
     CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
 
     # Running on riot.cs.washington.edu
-    PoisonerNames = ["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
-    "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux"]
+    PoisonerNames = Set.new(["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
+                             "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux",
+                             "UWAS.SENTINEL", "PRIN.SENTINEL", "WISC.SENTINEL", "CLEM.SENTINEL", "GATE.SENTINEL",
+                             "uwas.sentinel", "prin.sentinel", "wisc.sentinel", "gate.sentinel", "gate.sentinel"])
     
     # Length of each isolation round
     DefaultPeriodSeconds = 360
