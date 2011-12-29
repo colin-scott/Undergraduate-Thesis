@@ -5,7 +5,7 @@
 # Lazily evaluates all large datasets
 
 require 'set'
-require 'utilities'
+require_relative 'utilities'
 require 'yaml'
 
 # Define these in case spooftr_config.rb was not loaded

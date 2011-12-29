@@ -350,7 +350,7 @@ class FailureMonitor
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
         if (FailureIsolation.AllNodes - FailureIsolation.NodeBlacklist).empty?
-            Emailer.isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}")
+            Emailer.isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}").deliver
             return
         end
         
@@ -360,12 +360,12 @@ class FailureMonitor
         @logger.debug "finished finding substitites for vps"
 
         Emailer.faulty_node_report(outdated,
-                                           source_problems,
-                                           not_sshable,
-                                           not_controllable,
-                                           failed_measurements,
-                                           bad_srcs,
-                                           possibly_bad_srcs)
+                                   source_problems,
+                                   not_sshable,
+                                   not_controllable,
+                                   failed_measurements,
+                                   bad_srcs,
+                                   possibly_bad_srcs).deliver
 
         return if to_swap_out.empty?
 
@@ -417,7 +417,7 @@ class FailureMonitor
                 @house_cleaner.find_substitutes_for_unresponsive_targets()
         @logger.debug "finished finding substitutes for targets"
 
-        Emailer.isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+        Emailer.isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops).deliver
          
         @house_cleaner.swap_out_unresponsive_targets(dataset2unresponsive_targets, dataset2substitute_targets) 
     end

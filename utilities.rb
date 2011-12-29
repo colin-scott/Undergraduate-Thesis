@@ -10,7 +10,7 @@ require 'thread'
 require 'forwardable'
 
 if RUBY_PLATFORM != 'java'
-  require 'inline'
+  require_relative 'inline'
 
 # ||= so we don't redefine it
 $LOG ||= $stderr

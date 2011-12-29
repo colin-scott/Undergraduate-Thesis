@@ -97,7 +97,7 @@ class FailureDispatcher
                     @rtrSvc.respond_to?(:anything?)
                 rescue DRb::DRbConnError
                     # Email only gets sent to Dave for now
-                    Emailer.isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu")
+                    Emailer.isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu").deliver
                 end 
             end
         end
@@ -109,9 +109,9 @@ class FailureDispatcher
     def sanity_check_registered_vps
         registered_vps = @controller.hosts.clone
         if registered_vps.empty?
-            Emailer.isolation_exception("No VPs are registered with the controller!")
+            Emailer.isolation_exception("No VPs are registered with the controller!").deliver
         elsif Set.new(@controller.under_quarantine) == Set.new(registered_vps)
-            Emailer.isolation_exception("All VPs are quarentined!")
+            Emailer.isolation_exception("All VPs are quarentined!").deliver
         end
 
         registered_vps
@@ -332,7 +332,7 @@ class FailureDispatcher
         
         if(merged_outage.is_interesting?)
             # at least one of the inside outages passed filters, so email
-            Emailer.isolation_results(merged_outage)
+            Emailer.isolation_results(merged_outage).deliver
             # TODO: sometimes the email never gets delivered...
             @logger.info "Attempted to email isolation results #{Time.now}"
         end
@@ -708,7 +708,7 @@ class FailureDispatcher
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_connection_refused])
         rescue Exception, NoMethodError => e
-            Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}") 
+            Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver 
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_exception])
         rescue Timeout::Error

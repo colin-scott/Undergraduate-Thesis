@@ -4,7 +4,7 @@
 # Copied directly from the reverse traceroute system (originally written by
 # Ashoat)
 
-require 'failure_isolation_consts'
+require_relative 'failure_isolation_consts'
 require 'action_mailer'
 
 ActionMailer::Base.delivery_method = :sendmail
@@ -14,140 +14,130 @@ ActionMailer::Base.prepend_view_path("#{$REV_TR_TOOL_DIR}/templates")
 ActionMailer::Base.raise_delivery_errors = true
 
 class Emailer < ActionMailer::Base
-    def test_email(email)
-        subject     "Ashoat is testing!"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-    end
-    def successful_revtr(email, source, destination, traceroute)
-        subject     "Reverse traceroute from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-        body        :traceroute => traceroute
-    end
-    def timeout_error(email)
-        subject     "[revtr error] Execution of measurement exceeded timeout"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-    end
-    def timeout_to_us(emails)
-        subject     "[revtr error] Execution of measurement exceeded timeout"
-        from        "revtr@cs.washington.edu"
-        recipients  "revtr@cs.washington.edu"
-        body        :emails => emails
-    end
-    def error(email)
-        subject     "[revtr error] Error occurred!"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-    end
-    def critical_error(script, error, backtrace, emails)
-        subject     "[revtr error] CRITICAL ERROR OCCURRED!"
-        from        "revtr@cs.washington.edu"
-        recipients  "revtr@cs.washington.edu"
-        body        :script => script, :err => error, :bt => backtrace, :emails => emails
-    end
-    def tr_parse_fail(source, destination, error, tr, log_id, email)
-        subject     "Could not parse given traceroute from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  "revtr@cs.washington.edu"
-        body        :error => error, :tr => tr, :log_id => log_id, :email => email
-    end
-    def tr_parse_success(source, destination, tr, revtr, parsed, log_id, email)
-        subject     "Traceroute comparison results from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  "revtr@cs.washington.edu"
-        body        :tr => tr, :parsed => parsed, :revtr => revtr, :log_id => log_id, :email => email
-    end
-    def tr_fail(email, source, destination)
-        subject     "Reverse traceroute from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-        body        :source => source, :dest => destination
-    end
-    def revtr_fail(email, source, destination)
-        subject     "Reverse traceroute from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-        body        :source => source, :dest => destination
-    end
-    def blocked(email, source, destination)
-        subject     "Reverse traceroute from #{destination} back to #{source}"
-        from        "revtr@cs.washington.edu"
-        recipients  email
-        bcc         "revtr@cs.washington.edu"
-        body        :dest => destination
-    end
-    def check_up_vps_issue(vps, issue)
-        subject     "VPs having trouble with #{issue}"
-        from        "revtr@cs.washington.edu"
-        recipients  "revtr@cs.washington.edu"
-        body        :vps => vps.join("<br />"), :issue => issue
-    end
-    def outage_detected(target, dataset, disconnected, connected, never_seen,
-                        problems_at_the_source, outdated_nodes,
-                        not_sshable)
-        subject     "Outage detected: #{target}"
-        from        "failures@cs.washington.edu"
-        recipients  "failures@cs.washington.edu"
-        body        :target => target, :dataset => dataset, :disconnected => disconnected,
-                    :connected => connected, :never_seen => never_seen,
-                    :problems_at_the_source => problems_at_the_source,
-                    :outdated_nodes => outdated_nodes, :not_sshable => not_sshable
-    end
-    def isolation_results(merged_outage)
-        subject "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}"
-        
-        from        "failures@cs.washington.edu"
-        recipients  "failures@cs.washington.edu"
-
-        body        :merged_outage => merged_outage
-    end
+    #def test_email(email)
+    #    mail :subject => "Ashoat is testing!", 
+    #        :from => "revtr@cs.washington.edu",
+    #        :recipients => email
+    #end
+    #def successful_revtr(email, source, destination, traceroute)
+    #    mail :subject => "Reverse traceroute from #{destination} back to #{source}",
+    #         :from => "revtr@cs.washington.edu",
+    #         :recipients => email,
+    #         :bcc => "revtr@cs.washington.edu",
+    #         :body => {:traceroute => traceroute}
+    #end
+    #def timeout_error(email)
+    #    :subject => "[revtr error] Execution of measurement exceeded timeout",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => email,
+    #    :bcc => "revtr@cs.washington.edu"
+    #end
+    #def timeout_to_us(emails)
+    #    :subject => "[revtr error] Execution of measurement exceeded timeout",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => "revtr@cs.washington.edu",
+    #    :body => {:emails => emails}
+    #end
+    #def error(email)
+    #    :subject => "[revtr error] Error occurred!",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => email,
+    #    :bcc => "revtr@cs.washington.edu"
+    #end
+    #def critical_error(script, error, backtrace, emails)
+    #    :subject => "[revtr error] CRITICAL ERROR OCCURRED!",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => "revtr@cs.washington.edu",
+    #    :body => {:script => script, :err => error, :bt => backtrace, :emails => emails}
+    #end
+    #def tr_parse_fail(source, destination, error, tr, log_id, email)
+    #    :subject => "Could not parse given traceroute from #{destination} back to #{source}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => "revtr@cs.washington.edu",
+    #    :body => {:error => error, :tr => tr, :log_id => log_id, :email => email}
+    #end
+    #def tr_parse_success(source, destination, tr, revtr, parsed, log_id, email)
+    #    :subject => "Traceroute comparison results from #{destination} back to #{source}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => "revtr@cs.washington.edu",
+    #    :body => {:tr => tr, :parsed => parsed, :revtr => revtr, :log_id => log_id, :email => email}
+    #end
+    #def tr_fail(email, source, destination)
+    #    :subject => "Reverse traceroute from #{destination} back to #{source}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => email,
+    #    :bcc => "revtr@cs.washington.edu",
+    #    :body => {:source => source, :dest => destination}
+    #end
+    #def revtr_fail(email, source, destination)
+    #    :subject => "Reverse traceroute from #{destination} back to #{source}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => email,
+    #    :bcc => "revtr@cs.washington.edu",
+    #    :body => {:source => source, :dest => destination}
+    #end
+    #def blocked(email, source, destination)
+    #    :subject => "Reverse traceroute from #{destination} back to #{source}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => email,
+    #    :bcc => "revtr@cs.washington.edu",
+    #    :body => {:dest => destination}
+    #end
+    #def check_up_vps_issue(vps, issue)
+    #    :subject => "VPs having trouble with #{issue}",
+    #    :from => "revtr@cs.washington.edu",
+    #    :recipients => "revtr@cs.washington.edu",
+    #    :body => {:vps => vps.join("<br />"), :issue => issue}
+    #:end
+    #def isolation_results(merged_outage)
+    #    {:merged_outage => merged_outage}
+    #    :subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
+    #    :from => "failures@cs.washington.edu",
+    #    :recipients => "failures@cs.washington.edu",
+    #end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
-        subject     "Isolation Module Exception"
-        from        "failures@cs.washington.edu"
-        recipients  recipient
-        body        :exception => exception
+        @exception = exception
+        mail :subject => "Isolation Module Exception",
+             :from => "failures@cs.washington.edu",
+             :recipients => recipient
     end
-    def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
-                          bad_srcs, possibly_bad_srcs)
-        subject     "faulty monitoring node report"
-        from        "failures@cs.washington.edu"
-        recipients  "failures@cs.washington.edu"
-        body         :outdated_nodes => outdated_nodes,
-                     :problems_at_the_source => problems_at_the_source,
-                     :not_sshable => not_sshable,
-                     :not_controllable => not_controllable,
-                     :failed_measurements => failed_measurements,
-                     :bad_srcs => bad_srcs,
-                     :possibly_bad_srcs => possibly_bad_srcs
-    end
-    def dot_graph(jpg_path)
-        name = File.basename(jpg_path)
-        subject     "Failure Isolation Graph Results #{name}"
-        from        "failures@cs.washington.edu"
-        recipients  "failures@cs.washington.edu"
-        attachment  :filename => name, :content_type => "image/jpeg", :body => File.read(jpg_path) 
-    end
+    #def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
+    #                      bad_srcs, possibly_bad_srcs)
+    #    {:outdated_nodes => outdated_nodes,
+    #                 :problems_at_the_source => problems_at_the_source,
+    #                 :not_sshable => not_sshable,
+    #                 :not_controllable => not_controllable,
+    #                 :failed_measurements => failed_measurements,
+    #                 :bad_srcs => bad_srcs,
+    #                 :possibly_bad_srcs => possibly_bad_srcs}
+
+    #    :subject => "faulty monitoring node report",
+    #    :from => "failures@cs.washington.edu",
+    #    :recipients => "failures@cs.washington.edu",
+    #end
+    #def dot_graph(jpg_path)
+    #    :name => = File.basename(jpg_path),
+    #    :subject => "Failure Isolation Graph Results #{name}",
+    #    :from => "failures@cs.washington.edu",
+    #    :recipients => "failures@cs.washington.edu",
+    #    :attachment => {:filename => name, :content_type => "image/jpeg", :body => File.read(jpg_path)}
+    #end
     def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
-      subject     "Isolation target status"
-      from        "failures@cs.washington.edu"
-      recipients  "failures@cs.washington.edu"
-      body        :dataset2unresponsive_targets => dataset2unresponsive_targets, 
-                    :possibly_bad_targets => possibly_bad_targets,
-                   :bad_hops => bad_hops, :possibly_bad_hops => possibly_bad_hops
+        @dataset2unresponsive_targets = dataset2unresponsive_targets 
+        @possibly_bad_targets = possibly_bad_targets
+        @bad_hops = bad_hops
+        @possibly_bad_hops = possibly_bad_hops
+
+        mail :subject => "Isolation target status",
+             :from => "failures@cs.washington.edu",
+             :recipients => "failures@cs.washington.edu"
     end
-    def poison_notification(outage)
-        subject "Poison Opportunity Detected!"
-        from "failures@cs.washington.edu"
-        recipients "failures@cs.washington.edu"
-        body :outage => outage
-    end
+    #def poison_notification(outage)
+    #    # {:outage => outage}
+    #    :subject => "Poison Opportunity Detected!",
+    #    :from => "failures@cs.washington.edu",
+    #    :recipients => "failures@cs.washington.edu"
+    #end
 end
 
 def email_and_die
@@ -158,4 +148,9 @@ def email_and_die
     emails = "Luckily, the critical error didn't affect any users."
     if ($requests.is_a?(Array) && $requests.length > 0) then emails = "The following requests (by log ID) were affected: " + $requests.collect { |req| req.log.id.to_s + " (" + req.email + ")" }.join(", ") end
     Emailer.critical_error($0, error, bt, emails)
+end
+
+if __FILE__ == $0
+    puts Emailer.isolation_exception("how did you get here")
+    puts Emailer.isolation_status({},[],[],[])
 end

@@ -159,7 +159,7 @@ class Poisoner
     # ssh to riot and execute the poisoning
     def execute_poison(src, asn, outage)
         @logger.debug "Attempting to send poison notification email #{src} #{asn}"
-        Emailer.poison_notification(outage)
+        Emailer.poison_notification(outage).deliver
 
         # log event. On riot, I think
         # TODO: refactor this to be more easily testable (easier to mock out)
