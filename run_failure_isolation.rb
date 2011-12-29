@@ -44,7 +44,7 @@ Thread.abort_on_exception = true
 begin
    logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
    logger.level = Logger::INFO
-   Emailer.LOGGER = logger
+   Emailer::LOGGER = logger
    db = DatabaseInterface.new(logger)
    dispatcher = FailureDispatcher.new(db, logger)
    monitor = FailureMonitor.new(dispatcher, db, logger) 

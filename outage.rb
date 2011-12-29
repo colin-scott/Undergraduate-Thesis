@@ -59,7 +59,7 @@ class MergedOutage
 
     # Did at least one (src, dst) outage pass filters?
     def is_interesting?()
-        return !@outages.find { |outage| outage.passed_filters }.nil?
+        return @outages.find { |outage| outage.passed_filters }
     end
 
     # Return all outages where the destination was under our control

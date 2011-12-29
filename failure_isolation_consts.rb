@@ -17,8 +17,6 @@ module FailureIsolation
     # ====================================
     #         miscellaneous              #
     # ====================================
-    CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
-
     # Running on riot.cs.washington.edu
     PoisonerNames = Set.new(["UWAS.BGPMUX", "PRIN.BGPMUX", "WISC.BGPMUX", "CLEM.BGPMUX", "GATE.BGPMUX",
                              "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux",
@@ -132,6 +130,8 @@ module FailureIsolation
     IsolationResults = "#{$DATADIR}/isolation_results_final"
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
+
+    CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
 
     # Logs of filter (first level, registration, and second level) statistics
     FilterStatsPath = "#{$DATADIR}/filter_stats"

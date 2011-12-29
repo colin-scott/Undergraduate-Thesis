@@ -1,4 +1,6 @@
 
+$: << "./"
+
 # In charge of initiating BGP Poisonings and logging poisoning results
 
 require 'failure_isolation_consts'
@@ -167,7 +169,7 @@ class Poisoner
             end
         end
 
-        File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f|  YAML.dump(previous_outages, f) }
+        File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f| YAML.dump(previous_outages, f) }
     end
 
     # ssh to riot and execute the poisoning

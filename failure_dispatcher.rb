@@ -197,7 +197,12 @@ class FailureDispatcher
 
             srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
-            log_filter_trackers(srcdst2filter_tracker)
+            # There should always be a one-to-one mapping between trackers and outages
+            num_passed_outages = srcdst2outage.find_all { |srcdst, outage| outage.passed? }.size
+            num_passed_trackers = srcdst2filter_tracker.find_all { |srcdst, filter_tracker| filter_tracker.passed? }.size
+            if num_passed_outages != num_passed_trackers
+                raise AssertionError.new "# of passed outages (#{num_passed_outages}) != # of passed filters (#{num_passed_trackers})"
+            end
 
             # ================================================================================
             # Merge (src, dst) outages                                                       #
@@ -212,6 +217,8 @@ class FailureDispatcher
                     process_merged_outage(merged_outage, id)
                 end
             end
+
+            log_filter_trackers(srcdst2filter_tracker)
 
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
@@ -236,7 +243,7 @@ class FailureDispatcher
        src2outages = only_reverse.categorize_on_attr(:src)
        reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::REVERSE) }
 
-       if !outages.find { |o| o.passed_filters }.nil? and forward_merged.empty? and reverse_merged.empty?
+       if (Set.new(forward_merged) & Set.new(reverse_merged)) != Set.new(outages)
            # forward U reverse mergings should contain every (src, dst) pair
            raise "Not merging properly! #{outages.inspect}"
        end

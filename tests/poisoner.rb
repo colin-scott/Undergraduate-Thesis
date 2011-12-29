@@ -6,16 +6,14 @@ Thread.abort_on_exception = true
 require 'direction'
 require 'poisoner'
 require 'rspec'
-require 'ip_info'
+require_relative 'unit_test_root'
 
 describe Poisoner do
-    let(:ip_info) { IpInfo.new }
-
     before(:each) do
         @p = Poisoner.new
         # Don't actually poison
         @p.stub(:execute_poison)
-        # Don't actually log
+        # Don't actually log (yet)
         @p.stub(:log_outages)
 
         @outage1 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
@@ -31,8 +29,8 @@ describe Poisoner do
         @outage1.passed_filters = true
         @outage2.passed_filters = true
         
-        @outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", ip_info)]
-        @outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", ip_info)]
+        @outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", TestVars::IP_INFO)]
+        @outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", TestVars::IP_INFO)]
         
         @merged_outage = MergedOutage.new([@outage1, @outage2])
     end
@@ -51,6 +49,15 @@ describe Poisoner do
             @outage2.direction = Direction.FORWARD
 
             @p.check_poisonability(@merged_outage)
+        end
+    end
+
+    describe "#log_outages" do
+        it "should log one outage properly" do
+            @p.unstub(:log_outages)
+
+            @p.log_outages({"mlab"=>{Direction.REVERSE=>{@outage1=>@outage1.suspected_failures[Direction.REVERSE]}}})
+            puts IO.read(TestVars::CurrentMuxOutagesPath)
         end
     end
 end
