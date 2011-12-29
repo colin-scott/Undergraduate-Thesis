@@ -146,7 +146,7 @@ class Emailer < ActionMailer::Base
         end
     end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
-        LOGGER.info "Attempted to send isolation_exception email"
+        LOGGER.info "Attempted to send isolation_exception email #{exception}"
 
         @exception = exception
 
@@ -212,5 +212,7 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    puts Emailer.isolation_exception("ActionMailer is broken?", "ikneaddough@gmail.com")
+    mail = Emailer.isolation_exception("ActionMailer is broken?")
+    puts mail
+    mail.deliver
 end

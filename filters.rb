@@ -192,7 +192,7 @@ module RegistrationFilters
         now = Time.new
 
         # list of sources that weren't registered (shouldn't ever happen)
-        email_warnings = []
+        email_warnings = Set.new
 
         srcdst2outage.each do |srcdst, outage|
             filter_tracker = srcdst2filter_tracker[srcdst]
@@ -215,14 +215,10 @@ module RegistrationFilters
 
         if not email_warnings.empty?
             message = %{
-            The following ping monitors were not registered with the isolation controller:
-            #{email_warnings.join "\n"}
-            
-
-            The following VPs were registered with the isolation controller:
-            #{registered_vps.join "\n"}
+                The following #{email_warnings.size}  ping monitors were not registered with the isolation controller:
+                #{email_warnings.join "\n"}
             }
-
+            
             Emailer.isolation_exception(message, "ikneaddough@gmail.com").deliver
         end
     end
