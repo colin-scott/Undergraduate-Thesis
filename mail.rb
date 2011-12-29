@@ -5,6 +5,7 @@
 # Ashoat)
 
 require_relative 'failure_isolation_consts'
+require_relative 'utilities'
 require 'action_mailer'
 
 ActionMailer::Base.delivery_method = :sendmail
@@ -14,6 +15,8 @@ ActionMailer::Base.prepend_view_path("#{$REV_TR_TOOL_DIR}/templates")
 ActionMailer::Base.raise_delivery_errors = true
 
 class Emailer < ActionMailer::Base
+    LOGGER = LoggerLog.new($stderr)
+
     def test_email(email)
         mail :subject => "Ashoat is testing!", 
              :from => "revtr@cs.washington.edu",
@@ -114,6 +117,8 @@ class Emailer < ActionMailer::Base
              :recipients => "revtr@cs.washington.edu"
     end
     def isolation_results(merged_outage)
+        LOGGER.debug "Attempted to send isolation_results email"
+
         @merged_outage = merged_outage
 
         mail :subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
@@ -121,6 +126,8 @@ class Emailer < ActionMailer::Base
              :recipients => "failures@cs.washington.edu"
     end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
+        LOGGER.debug "Attempted to send isolation_exception email"
+
         @exception = exception
 
         mail :subject => "Isolation Module Exception",
@@ -129,6 +136,8 @@ class Emailer < ActionMailer::Base
     end
     def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
                           bad_srcs, possibly_bad_srcs)
+        LOGGER.debug "Attempted to send faulty_node_report email"
+
         @outdated_nodes = outdated_node
         @problems_at_the_source = problems_at_the_source
         @not_sshable = not_sshable
@@ -142,6 +151,8 @@ class Emailer < ActionMailer::Base
              :recipients => "failures@cs.washington.edu"
     end
     def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
+        LOGGER.debug "Attempted to send faulty_node_report email"
+
         @dataset2unresponsive_targets = dataset2unresponsive_targets 
         @possibly_bad_targets = possibly_bad_targets
         @bad_hops = bad_hops
@@ -152,6 +163,8 @@ class Emailer < ActionMailer::Base
              :recipients => "failures@cs.washington.edu"
     end
     def poison_notification(outage)
+        LOGGER.debug "Attempted to send poison_notification email"
+
         @outage = outage
         
         mail :subject => "Poison Opportunity Detected!",

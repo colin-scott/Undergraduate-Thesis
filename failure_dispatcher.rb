@@ -333,8 +333,6 @@ class FailureDispatcher
         if(merged_outage.is_interesting?)
             # at least one of the inside outages passed filters, so email
             Emailer.isolation_results(merged_outage).deliver
-            # TODO: sometimes the email never gets delivered...
-            @logger.info "Attempted to email isolation results #{Time.now}"
         end
     end
 
