@@ -1,7 +1,8 @@
-#!/homes/network/revtr/ruby-upgrade/bin/ruby
+#!/homes/network/revtr/jruby/bin/jruby
 
 $: << "./"
-require_relative 'utilities'
+require 'utilities'
+require 'rubygems'
 
 #  Is controller_log used?
 #  it does update controller on all VPs in the main thread, but now that will
@@ -11,7 +12,7 @@ require_relative 'utilities'
 # to call back to get URI
 # put a log message after the last waiting
 # don't allow restarts in middle of measurements
-$ID = "$Id: controller.rb,v 1.100 2010/08/21 01:56:48 ethan Exp $"
+$ID = "$Id: controller.rb,v 1.121 2011/12/29 00:25:20 choffnes Exp $"
 $VERSION = $ID.split(" ").at(2).to_f
 
 require 'drb'
@@ -24,16 +25,6 @@ require 'resolv'
 
 # we use OpenDNS (anycasted) for test pings
 $TEST_IP = "8.8.8.8"
-
-#$split_hash = Hash.new(0)
-#
-#class String
-#    alias :old_split :split
-#    def split(pattern=$;,limit=0)
-#        $split_hash[caller[0]] += 1
-#        old_split(pattern,limit)
-#    end
-#end
 
 class SockTimeout < Timeout::Error
     def initialize(extended_msg="timed out")
@@ -69,14 +60,12 @@ class BadPingError < VPError
         super(hostname,msg)
     end
     def to_s
-
         super + "\n" + @ping.join("\n")
     end
 end
 
 class QuarantineFailure < VPError
     def initialize(hostname,original_exception,quarantine_exception)
-
         @original_exception=original_exception
         @quarantine_exception=quarantine_exception
         super(hostname)
@@ -85,7 +74,6 @@ class QuarantineFailure < VPError
     attr_reader :hostname, :original_exception, :quarantine_exception
 
     def to_s
-
         super + "[#{@original_exception},#{@quarantine_exception}]"
     end
 end
@@ -99,15 +87,15 @@ class Registrar
     # note that this is different behavior than controller.register, which
     # just returns the exception
     def register(vp)
+		uri=vp.uri
         @controller.log("Register attempt: #{vp.uri}")
 
         name = nil
         begin
             name = vp.name
-        rescue
+        rescue Exception
         end
 
-        uri=vp.uri
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
         result=@controller.register(uri, name)
@@ -183,7 +171,7 @@ class Registrar
              if controller_uri==uri
                  @controller.unregister_host(host)
              end
-         rescue
+ 		rescue Exception
             @controller.log "Unable to unregister #{vp}: #{$!}"
          end
         return results
@@ -316,10 +304,16 @@ end
 
 class Controller
     def Controller::calculate_ping_timeout(numtargs)
-
         # figure 30 parallel threads, max time for 1 is 2 seconds
         (numtargs.to_f/30.0).ceil * 2 + 10
     end
+
+	def Controller::calculate_hole_punch_timeout(numtargs)
+		# figure 30 parallel threads, max time for 1 is 2 seconds
+		# playing around with the scaling factor
+		(numtargs.to_f/30.0).ceil * 4 + 20
+	end
+
 
     def Controller::calculate_spoof_timeout(numtargs)
 
@@ -327,7 +321,6 @@ class Controller
     end
 
     def Controller::calculate_traceroute_timeout(numtargs)
-
         # figure 30 parallel threads, max time for 1 is 20 seconds
         (numtargs.to_f/30.0).ceil * 20 + 10  
     end
@@ -343,6 +336,10 @@ class Controller
         if hostname.nil?
             hostname=Controller::uri2hostname(uri)
         end
+        if $rename_vp.has_key?(hostname)
+			# note this line assigns both hostname and uri
+			uri = uri.gsub(hostname, hostname=$rename_vp[hostname])
+		end
         # mlab nodes can only be contacted back via their IP address for our
         # slice, not hostname.  so if we get an IP, we want to change the
         # "hostname" variable to be a hostname.  and if we got a hostname for
@@ -353,10 +350,7 @@ class Controller
                 raise RuntimeError, "Missing IP for M-Lab #{hostname} at #{uri}", caller
             end
             uri = uri.gsub(hostname, $pl_host2ip[hostname])
-        elsif $rename_vp.has_key?(hostname)
-            # note this line assigns both hostname and uri
-            uri = uri.gsub(hostname, hostname=$rename_vp[hostname])
-        end
+                end
         return [(uri.nil? ? nil : uri.downcase),hostname.downcase]
     end
 
@@ -405,19 +399,16 @@ class Controller
     attr_reader :ulimit, :drb
 
     def version
-
         return $VERSION
     end
 
     def uri
-
         self.drb.uri
     end
     
     # if touch and prune, we try to issue a command on them and only retain
     # those that respond
     def hosts(touchAndPrune=false)
-
         hosts=@vp_lock.synchronize{@hostname2vp.keys}
         if touchAndPrune
             check_up_hosts(hosts)
@@ -433,7 +424,6 @@ class Controller
     # in other words, it always prunes now, but it may add back if
     # quarantining is successful
     def check_up_hosts(hostlisthash, settings={ :retry => true, :maxalert => NO_EMAIL, :timeout => 30})
-
         if hostlisthash.class==Array
             hostlisthash=hostlisthash.to_h(true)
         end
@@ -447,7 +437,6 @@ class Controller
             settings[:maxalert]=NO_EMAIL
         end
         results, unsuccessful_hosts=issue_command_on_hosts(hostlisthash,settings){|h,p| h.backtic("hostname --fqdn").chomp("\n").strip.downcase}
-
         uphosts=[]
         results.each{|vp|
              uphosts <<  ($rename_vp.has_key?(vp.at(0)) ? $rename_vp[vp.at(0)] : vp.at(0))
@@ -460,13 +449,11 @@ class Controller
 #                 self.unregister_host(h)
 #             }
 #         end
-       
         return uphosts
     end
 
     # locked is whether we care about locking the count
     def vp_count(locked=false)
-
         if locked
             return @vp_lock.synchronize{@hostname2vp.length}
         else 
@@ -482,7 +469,7 @@ class Controller
 
     # raises UnknownVPError if can't find it
     def get_vp(hostname)
-        if !hostname.respond_to?(:downcase)
+        if not hostname.respond_to?(:downcase)
             log("Given hostname doesn't respond to :downcase")
             raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
         end
@@ -497,7 +484,6 @@ class Controller
     end
 
     def dump_vps(filename)
-
         vp_s=""
         @vp_lock.synchronize do
             @hostname2uri.each_pair{|host,uri|
@@ -517,7 +503,6 @@ class Controller
     # raises UnknownVPError if can't find it
     def get_uri(hostname)
         uri=@vp_lock.synchronize{@hostname2uri[hostname.downcase]}
-
         if uri.nil?
             log("no matching vp for #{hostname}")
             raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
@@ -551,7 +536,7 @@ class Controller
             end
             # sleep to make sure at least one controller is up at all times, to
             # avoid triggering the cronjob
-        rescue
+        rescue Exception
             log "Exception shutting down #{$!.class} #{$!}"
         ensure
         # need to thread out, so that we return the DRb call before shutting
@@ -620,7 +605,7 @@ class Controller
                     raise BadPingError.new(vp.uri,pings)
                 end
             }
-        rescue
+        rescue Exception
             return $!
         end
     end
@@ -629,7 +614,7 @@ class Controller
         begin
             vp=DRbObject.new nil, uri
             return vp_broken?(vp)
-        rescue
+        rescue Exception
             return $!
         end
     end
@@ -644,7 +629,7 @@ class Controller
         open_fds=lsof.length
         begin
             uri,hostname=Controller::rename_uri_and_host(uri,hostname)
-        rescue
+		rescue Exception
             log("Unable to rename #{hostname} as #{uri}: #{$!}")
             return $!
         end
@@ -746,7 +731,7 @@ class Controller
     #
                 reg_return=register(uri, my_hostname)
             # only exception this should see is  UnknownVPError
-            rescue
+            rescue Exception
                 reg_return=$!
             end
 
@@ -786,7 +771,7 @@ class Controller
                         Thread.current[:results]=probes
                         Thread.current[:success]=true
                     }
-                rescue
+                rescue Exception
                     if my_retry_command
                         my_retry_command=false
                         sleep 2
@@ -851,7 +836,6 @@ class Controller
     # :timeout
     # :backtrace
     def issue_command_on_hosts(hostname2params,settings={ :retry => false, :maxalert => TEXT},&method)
-        Thread.current[:name]="#{__method__}:#{hostname2params.inspect}"
         if settings.is_a?(Numeric)
             settings={ :timeout => settings }
         end
@@ -874,7 +858,7 @@ class Controller
                         Thread.current[:results]=method_return
                         Thread.current[:success]=true
                     }
-                rescue
+				rescue SockTimeout
                     if my_retry_command
                         my_retry_command=false
                         sleep 2
@@ -923,12 +907,10 @@ class Controller
     end
 
     def issue_command_on_hosts_w_maxalert(hostname2params,timeout,retry_command,maxalert=TEXT,&method)
-
         issue_command_on_hosts(hostname2params,{ :timeout => timeout, :retry => retry_command, :maxalert => maxalert}, &method)
     end
 
     def issue_command_on_hosts_w_opt_retry(hostname2params,timeout,retry_command=false,&method)
-
         issue_command_on_hosts(hostname2params,{ :timeout => timeout, :retry => retry_command, :maxalert => TEXT}, &method)
     end
 
@@ -949,7 +931,6 @@ class Controller
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def traceroute(hostname2targets,settings={ :timeout => 180, :retry => false, :maxalert => TEXT})
-
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -966,7 +947,6 @@ class Controller
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def rr(hostname2targets,settings={ :retry => false, :maxalert => TEXT})
-
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -983,7 +963,6 @@ class Controller
 
     # returns [results, unsuccesful_hosts, privates, blacklisted]
     def ts(hostname2targets,settings={ :retry => false, :maxalert => TEXT})
-
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
@@ -1011,7 +990,6 @@ class Controller
     # option to specify a max number of parallel receivers
     # maxalert and retry may not be supported yet
     def spoof_rr(receiver2spoofer2targets, settings={ :retry => true, :parallel_receivers => :all})
-
         # this is for backwards compatability
         if settings.is_a?(Numeric) or settings.is_a?(Symbol)
             settings={ :parallel_receivers => settings }
@@ -1044,13 +1022,11 @@ class Controller
     end
 
     def spoof_ts(receiver2spoofer2targets, settings={ :retry => true } )
-
         settings[ :probe_type ] = :ts
         spoof_and_receive_probes(receiver2spoofer2targets, settings) {|x| x.collect{|y| y.at(0)}} 
     end
 
     def spoof_tr(receiver2spoofer2targets, settings={ :retry => true } )
-
         settings[ :probe_type ] = :tr
         spoof_and_receive_probes(receiver2spoofer2targets, settings) {|x| x.collect{|y| y[0]}} 
     end
@@ -1178,7 +1154,7 @@ class Controller
                                                     my_spoofer.spoof_tr({$pl_host2ip[my_receiver_name] => probes_to_send[my_spoofer_name]}) 
                                                 end
                                             }
-                                        rescue
+										rescue Exception
                                             if settings.include?(:backtrace)
                                                 $!.set_backtrace($!.backtrace + settings[:backtrace])
                                             end
@@ -1214,7 +1190,8 @@ class Controller
                         Thread.current[:results]=probes
                         Thread.current[:success]=true
                     }
-                rescue  # end exception block for the receiver thread
+				# end exception block for the receiver thread
+				rescue Exception
                     if my_retry_command
                         my_retry_command=false
                         sleep 2
@@ -1245,7 +1222,6 @@ class Controller
 
 ### WILL NEED TO KILL MORE THAN ONE PROCESS FOR SINGLE IP?
     def get_results(in_progress)
-
         hostname2pid = {}
         in_progress.each { |pid, hostname|
             hostname2pid[hostname] = pid
@@ -1254,27 +1230,21 @@ class Controller
     end
 
     def execute_ping(hostname2targets)
-
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_ping(dests) }
     end
 
     def execute_rr(hostname2targets)
-
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_rr(dests) }
     end
 
     def execute_traceroute(hostname2targets)
-
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_traceroute(dests) }
     end
 
     def execute_ts(hostname2targets)
-
         issue_command_on_hosts(hostname2targets, 30) { |vp, dests| vp.launch_ts(dests) }
     end
 end
-
-
 
 # This hash will hold all of the options
 # parsed from the command-line by
@@ -1324,10 +1294,9 @@ optparse.parse!
 
 require options[:config]
 
-require_relative 'file_lock'
+require 'file_lock'
 Lock::acquire_lock("controller_lock.txt") unless options[:actual_test]
 
-require "#{$REV_TR_TOOL_DIR}/reverse_traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
 require "#{$REV_TR_TOOL_DIR}/traceroute"
 require "#{$REV_TR_TOOL_DIR}/spoofed_ping"

@@ -212,7 +212,7 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    mail = Emailer.isolation_exception("ActionMailer is broken?")
+    mail = Emailer.isolation_exception("ActionMailer is broken?", "ikneaddough@gmail.com")
     puts mail
     mail.deliver
 end

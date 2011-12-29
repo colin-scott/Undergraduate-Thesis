@@ -10,7 +10,9 @@ require 'thread'
 require 'forwardable'
 
 if RUBY_PLATFORM != 'java'
+  puts RUBY_PLATFORM
   require 'inline'
+end
 
 # ||= so we don't redefine it
 $LOG ||= $stderr
@@ -230,7 +232,6 @@ class String
         return self =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/
     end
 end
-end
 
 module ProbeController
 
@@ -344,88 +345,103 @@ module ProbeController
 end
 
 module Inet
-  # Let's make Ruby's bit fiddling reasonably fast!
-  inline(:C) do |builder|
-       builder.include "<sys/types.h>"
-       builder.include "<sys/socket.h>"
-       builder.include "<netinet/in.h>"
-       builder.include "<arpa/inet.h>"
+  if RUBY_PLATFORM != "java" 
+    # Let's make Ruby's bit fiddling reasonably fast!
+    inline(:C) do |builder|
+         builder.include "<sys/types.h>"
+         builder.include "<sys/socket.h>"
+         builder.include "<netinet/in.h>"
+         builder.include "<arpa/inet.h>"
 
-       builder.prefix %{
+         builder.prefix %{
 
-       // 10.0.0.0/8
-       #define lower10 167772160
-       #define upper10 184549375
-       // 172.16.0.0/12
-       #define lower172 2886729728
-       #define upper172 2887778303
-       // 192.168.0.0/16
-       #define lower192 3232235520
-       #define upper192 3232301055
-       // 224.0.0.0/4
-       #define lowerMulti 3758096384
-       #define upperMulti 4026531839
-       // 127.0.0.0/16
-       #define lowerLoop 2130706432
-       #define upperLoop 2147483647
-       // 169.254.0.0/16 (DHCP)
-       #define lower169 2851995648
-       #define upper169 2852061183
-       // 0.0.0.0
-       #define zero 0
-       
-       }
-
-       builder.c_singleton %{
-
-       // can't call ntoa() directly
-       char *ntoa(unsigned int addr) {
-           struct in_addr in;
-           // convert to default jruby byte order
-           addr = ntohl(addr);
-           in.s_addr = addr;
-           return inet_ntoa(in);
-        }
-
-        }
-
-       builder.c_singleton %{
-
-       // can't call aton() directly
-       unsigned int aton(const char *addr) {
-           struct in_addr in;
-           inet_aton(addr, &in);
-           // inet_aton() already gets the byte order correct I guess?
-           return in.s_addr;
-        }
-
-        }
-
-        builder.c_singleton %{
-       
-        int in_private_prefix(const char *addr) {
-            // can't call aton() apparently?
-            // so we'll just be redundant
-            struct in_addr in;
-            inet_aton(addr, &in);
-            unsigned int ip = in.s_addr;
-
-            if( (ip > lower10 && ip < upper10 ) || (ip > lower172 && ip < upper172)
-                            || (ip > lower192 && ip < upper192) ||
-                            (ip > lowerMulti && ip < upperMulti) ||
-                            (ip > lowerLoop && ip < upperLoop) ||
-                            (ip > lower169 && ip < lower169) ||
-                            (ip == zero)) {
-                return 1;
-            } else {
-                return 0;
-            }
+         // 10.0.0.0/8
+         #define lower10 167772160
+         #define upper10 184549375
+         // 172.16.0.0/12
+         #define lower172 2886729728
+         #define upper172 2887778303
+         // 192.168.0.0/16
+         #define lower192 3232235520
+         #define upper192 3232301055
+         // 224.0.0.0/4
+         #define lowerMulti 3758096384
+         #define upperMulti 4026531839
+         // 127.0.0.0/16
+         #define lowerLoop 2130706432
+         #define upperLoop 2147483647
+         // 169.254.0.0/16 (DHCP)
+         #define lower169 2851995648
+         #define upper169 2852061183
+         // 0.0.0.0
+         #define zero 0
+         
          }
-       }
-  end
 
-  def self.in_private_prefix?(addr)
-      self.in_private_prefix(addr) == 1;
+         builder.c_singleton %{
+
+         // can't call ntoa() directly
+         char *ntoa(unsigned int addr) {
+             struct in_addr in;
+             // convert to default jruby byte order
+             addr = ntohl(addr);
+             in.s_addr = addr;
+             return inet_ntoa(in);
+          }
+
+          }
+
+         builder.c_singleton %{
+
+         // can't call aton() directly
+         unsigned int aton(const char *addr) {
+             struct in_addr in;
+             inet_aton(addr, &in);
+             // inet_aton() already gets the byte order correct I guess?
+             return in.s_addr;
+          }
+
+          }
+
+          builder.c_singleton %{
+         
+          int in_private_prefix(const char *addr) {
+              // can't call aton() apparently?
+              // so we'll just be redundant
+              struct in_addr in;
+              inet_aton(addr, &in);
+              unsigned int ip = in.s_addr;
+
+              if( (ip > lower10 && ip < upper10 ) || (ip > lower172 && ip < upper172)
+                              || (ip > lower192 && ip < upper192) ||
+                              (ip > lowerMulti && ip < upperMulti) ||
+                              (ip > lowerLoop && ip < upperLoop) ||
+                              (ip > lower169 && ip < lower169) ||
+                              (ip == zero)) {
+                  return 1;
+              } else {
+                  return 0;
+              }
+           }
+         }
+    end
+
+    def self.in_private_prefix?(addr)
+        self.in_private_prefix(addr) == 1;
+    end
+  else
+	$PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
+
+	def Inet::ntoa( intaddr )
+		((intaddr >> 24) & 255).to_s + '.' + ((intaddr >> 16) & 255).to_s + '.'  + ((intaddr >> 8) & 255).to_s + '.' + (intaddr & 255).to_s 
+	end
+
+	def Inet::aton(dotted)
+		ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
+		val=0
+		ints.each{|n| val=(val*256)+n}
+		return val
+	end
   end
 
   def Inet::prefix(ip,length)
@@ -896,89 +912,6 @@ class LoggerLog < Log
           @myLog.info date+ " " +p
     end
 end
-
-def load_cache_svcs()
-  if $server_info.nil? then $server_info = Hash.new{|h,k| h[k] = {}} end
-  $server_info["cache_rr"]={}
-  $server_info["cache_rr"][:uripath]="/homes/network/revtr/www/vps/failure_isolation/cache_service.txt"
-  uri =`cat ~revtr/www/vps/failure_isolation/cache_service.txt 2>/dev/null`
-  $server_info["cache_rr"][:uri] = uri
-  $LOG.puts "Connecting to #{uri}"
-  cache = DRbObject.new nil, uri
-  $server_info["cache_rr"][:server] = cache
-
-  cache_rr_svcs = []
-    
-
-  if File.exists? "/homes/network/revtr/www/vps/failure_isolation/cache_rr1_service.txt" then
-    1.upto(16).each{|i|
-      if File.exists? "/homes/network/revtr/www/vps/failure_isolation/cache_rr#{i}_service.txt" then
-        $server_info["cache_rr_#{i}"]={}
-        $server_info["cache_rr_#{i}"][:uripath]="/homes/network/revtr/www/vps/failure_isolation/cache_rr#{i}_service.txt"
-        uri =`cat #{$server_info["cache_rr_#{i}"][:uripath]} 2>/dev/null`
-        $server_info["cache_rr_#{i}"][:uri] = uri
-        $LOG.puts "Connecting to #{uri} (cache_rr #{i})"
-        cache = DRbObject.new nil, uri
-        $server_info["cache_rr_#{i}"][:server] = cache
-
-        cache_rr_svcs << "cache_rr_#{i}"
-      end
-    }
-  else
-    cache_rr_svcs << cache
-  end
-
-  $LOG.puts "Extending monitor mixin"
-  cache_rr_svcs.extend(MonitorMixin)
-  cache_rr_svcs
-
-end 
-
-module CacheService
-  def CacheService::issue_to_cache(server_info, retries=1, &method)
-
-    failed_connections=0
-    begin
-      if $server_info[server_info][:server].nil?
-        if $server_info[server_info][:uri].nil?
-          $server_info[server_info][:uri]=`cat #{$server_info[server_info][:uripath]} 2>/dev/null`
-          if $server_info[server_info][:uri].strip == "" then retries +=1 end
-        end
-        $LOG.puts "Connecting to #{server_info.to_s} #{$server_info[server_info][:uri]}"
-        $server_info[server_info][:server] = DRbObject.new nil, $server_info[server_info][:uri]
-      end
-      if($TIMING) then
-        timer = Time.now
-      end
-      results=method.call($server_info[server_info][:server])
-      if($TIMING) then
-        $LOG.puts "TIMING: call to #{server_info.to_s} took #{Time.now - timer} seconds"
-        #$LOG.puts "Call was: #{method.to_ruby}"
-      end
-      #$server_info[server_info][:server]=nil
-      return results
-    rescue DRb::DRbConnError,DRb::DRbBadURI, TypeError
-      $server_info[server_info][:server]=nil
-      $server_info[server_info][:uri]=nil
-      failed_connections += 1
-      if(retries == -1) then #if retries is -1, then puts the error but don't raise an exception.
-        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s])
-      elsif failed_connections<=retries
-        $LOG.puts(["#{server_info.to_s} refused connection, retrying","EXCEPTION!  #{server_info.to_s} refused connection, retrying: " + $!.to_s+$!.backtrace.join("\n")])
-        sleep 10
-        retry
-      else
-        $LOG.puts(["#{server_info.to_s} refused connection, failing", "EXCEPTION! #{server_info.to_s} refused connection, failing: " + $!.to_s +
-          "\n" + $!.backtrace.join("\n")])
-        raise DRb::DRbConnError, $!.message,$!.backtrace
-      end
-    end
-
-  end
-
-end
-
-
 if $0 == __FILE__
     puts Inet::prefix("1.2.3.4", 4)
     puts Inet::ntoa(Inet::aton("1.2.3.4"))
