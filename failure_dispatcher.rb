@@ -191,7 +191,7 @@ class FailureDispatcher
             outage_threads.each { |thread| thread.join }
 
             t_prime = Time.new
-            @logger.info("Took #{t_prime} - #{t} seconds to join on measurement threads")
+            @logger.info("Took #{t_prime - t} seconds to join on measurement threads")
             # TODO: use a thread pool to keep # threads constant
             @logger.info("Total threads in the system after join: #{Thread.list.size}")
 
