@@ -39,8 +39,6 @@ def filter_and_aggregate(time_bound=get_time_bound(), predicate=lambda { |tracke
         next if filter_tracker.first_lvl_filter_time < time_bound 
         next unless predicate.call filter_tracker
 
-        puts filter_tracker.source
-    
         total_records += 1
         if filter_tracker.passed?
             num_passed += 1 
@@ -89,6 +87,5 @@ def filter_and_aggregate(time_bound=get_time_bound(), predicate=lambda { |tracke
 end
 
 if __FILE__ == $0
-    #filter_and_aggregate()
-    filter_and_aggregate(get_time_bound(), lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source })
+    filter_and_aggregate()
 end

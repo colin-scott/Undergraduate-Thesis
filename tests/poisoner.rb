@@ -1,36 +1,56 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 
-require 'direction'
-require 'outage'
-require 'hops'
-require 'poisoner'
-
-require 'ip_info'
-
-require 'utilities'
 Thread.abort_on_exception = true
 
-p = Poisoner.new
-outage1 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
-outage2 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
+require 'direction'
+require 'poisoner'
+require 'rspec'
+require 'ip_info'
 
-outage1.src = "prin.bgpmux"
-outage2.src = "UWAS.BGPMUX"
+describe Poisoner do
+    let(:ip_info) { IpInfo.new }
 
-outage1.direction = Direction.REVERSE
-outage2.direction = Direction.BOTH
+    before(:each) do
+        @p = Poisoner.new
+        # Don't actually poison
+        @p.stub(:execute_poison)
+        # Don't actually log
+        @p.stub(:log_outages)
 
-outage1.complete_reverse_isolation = true
+        @outage1 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
+        @outage2 = Marshal.load(IO.read("fixtures/mlab1.ath01.measurement-lab.org_193.200.159.1_20110921081829.bin"))
+        @outage1.src = "prin.bgpmux"
+        @outage2.src = "UWAS.BGPMUX"
+        
+        @outage1.direction = Direction.REVERSE
+        @outage2.direction = Direction.BOTH
+        
+        @outage1.complete_reverse_isolation = true
+        
+        @outage1.passed_filters = true
+        @outage2.passed_filters = true
+        
+        @outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", ip_info)]
+        @outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", ip_info)]
+        
+        @merged_outage = MergedOutage.new([@outage1, @outage2])
+    end
 
-outage1.passed_filters = true
-outage2.passed_filters = true
+    describe "#check_poisonability" do
+        it "should poison reverse path outages" do
+            @p.should_receive(:execute_poison)
 
-ip_info = IpInfo.new
-outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", ip_info)]
-outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", ip_info)]
+            @p.check_poisonability(@merged_outage)
+        end
 
-merged_outage = MergedOutage.new([outage1, outage2])
+        it "should skip forward path outages" do
+            @p.should_not_receive(:execute_poison)
+             
+            @outage1.direction = Direction.FORWARD
+            @outage2.direction = Direction.FORWARD
 
-#p.execute_poison("wisc.bgpmux", "1424")
-p.check_poisonability(merged_outage)
+            @p.check_poisonability(@merged_outage)
+        end
+    end
+end

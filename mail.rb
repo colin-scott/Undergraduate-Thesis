@@ -171,6 +171,6 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    puts Emailer.isolation_exception("how did you get here")
+    puts Emailer.isolation_exception("how did you get here").class
     puts Emailer.isolation_status({},[],[],[])
 end

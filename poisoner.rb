@@ -39,6 +39,7 @@ class Poisoner
     #   - outage is reverse or bidirectional
     #   - outage passed filters
     def check_poisonability(merged_outage)
+        # Direction is either FORWARD or BOTH
         src2direction2outage2failures = Hash.new { |h,k| h[k] = Hash.new { |h1,k1| h1[k1] = Hash.new { |h2,k2| h2[k2] = [] } } }
 
         merged_outage.each do |o|
@@ -54,19 +55,27 @@ class Poisoner
                     src2direction2outage2failures[o.src][Direction.REVERSE][o] += o.suspected_failures[Direction.REVERSE]
                 end
             elsif o.direction == Direction.BOTH and !o.suspected_failures[Direction.FORWARD].nil? and !o.suspected_failures[Direction.FORWARD].empty?
+                # Note that in the old isolation algorithm suspects for bidirectional failures 
+                # are computed from forward traceroutes
                 # POISON!!!!!!!! 
-                src2direction2outage2failures[o.src][Direction.FORWARD][o] += o.suspected_failures[Direction.FORWARD]
+                src2direction2outage2failures[o.src][Direction.BOTH][o] += o.suspected_failures[Direction.FORWARD]
             end
         end
+
+        return if src2direction2outage2failures.empty?
 
         poison(src2direction2outage2failures, merged_outage)
     end
 
-    # Choose the ASN to poison from the chosen outaeg, and execute a poisoning
+    # Choose the ASN to poison from the chosen outage, and execute a poisoning
     #
     # pre: all outages in src2direction2outage2failures are ready to be
     # poisoned (not just random)
     def poison(src2direction2outage2failures, merged_outage)
+        if src2direction2outage2failures.empty?
+            raise AssertionError.new("src2direction2outage2failures should not be empty!") 
+        end
+
         # for now, we only poison a single ASN at a time
         # find the set of all sources
         # then prioritize:
@@ -85,21 +94,23 @@ class Poisoner
                     next
                 end
                 execute_poison(src, asn_to_poison, outage)
-            elsif !direction2outage2failures[Direction.FORWARD].empty? # Direction.FORWARD
-                outage2failures = direction2outage2failures[Direction.FORWARD]
+            elsif direction2outage2failures.include? Direction.BOTH and !direction2outage2failures[Direction.BOTH].empty? 
+                outage2failures = direction2outage2failures[Direction.BOTH]
 
                 asn_to_poison, outage = asns_to_poison(outage2failures)
 
                 if asn_to_poison.nil?
-                    @logger.warn "asn_to_poison nil, both: #{direction2outage2failures[Direction.FORWARD]}"
+                    @logger.warn "asn_to_poison nil, both: #{direction2outage2failures[Direction.BOTH]}"
                     next
                 end
 
                 execute_poison(src, asn_to_poison, outage)
+            else
+                raise AssertionError.new("poison() should not see forward outages!")
             end
         end
-
-        log_outages(src2direction2outage2failures) 
+        
+        log_outages(src2direction2outage2failures)
     end
 
     # helper method. Given a merged_outage, return:
@@ -119,6 +130,10 @@ class Poisoner
     #
     # TODO: this is broken!
     def log_outages(src2direction2outage2failures)
+        if src2direction2outage2failures.empty?
+            raise AssertionError.new("src2direction2outage2failures should not be empty!") 
+        end
+
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
         begin
@@ -128,13 +143,12 @@ class Poisoner
         end
 
         previous_outages = [] unless previous_outages
-
+        
         current_time = Time.new
 
         src2direction2outage2failures.each do |src, direction2outage2failures|
             direction2outage2failures.each do |direction, outage2failures|
                 outage2failures.each do |outage, failures|
-
                     # see if there was already an entry with the same
                     #   -  source, destination, and direction
                     already_there = previous_outages.find do |time_src_dst_dir_failures| 

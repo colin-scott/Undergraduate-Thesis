@@ -10,7 +10,7 @@ require 'thread'
 require 'forwardable'
 
 if RUBY_PLATFORM != 'java'
-  require_relative 'inline'
+  require 'inline'
 
 # ||= so we don't redefine it
 $LOG ||= $stderr
@@ -343,9 +343,7 @@ module ProbeController
   end
 end
 
-$inline_inet_broken = true
 module Inet
-  if RUBY_PLATFORM != 'java' and !$inline_inet_broken  
   # Let's make Ruby's bit fiddling reasonably fast!
   inline(:C) do |builder|
        builder.include "<sys/types.h>"
@@ -383,6 +381,8 @@ module Inet
        // can't call ntoa() directly
        char *ntoa(unsigned int addr) {
            struct in_addr in;
+           // convert to default jruby byte order
+           addr = ntohl(addr);
            in.s_addr = addr;
            return inet_ntoa(in);
         }
@@ -395,6 +395,7 @@ module Inet
        unsigned int aton(const char *addr) {
            struct in_addr in;
            inet_aton(addr, &in);
+           // inet_aton() already gets the byte order correct I guess?
            return in.s_addr;
         }
 
@@ -431,37 +432,7 @@ module Inet
     ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
     return ((ip>>(32-length))<<(32-length))
   end
-  else
-    $PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
   
-    def Inet::ntoa( intaddr )
-      ((intaddr >> 24) & 255).to_s + '.' + ((intaddr >> 16) & 255).to_s + '.'  + ((intaddr >> 8) & 255).to_s + '.' + (intaddr & 255).to_s 
-    end
-  
-    def Inet::aton(dotted)
-      if /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})?$/.match(dotted)==nil then return 0 end
-      ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
-      val=0
-      ints.each{|n| val=(val*256)+n}
-      return val
-    end
-  
-    def Inet::prefix(ip,length)
-      ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
-      return ((ip>>(32-length))<<(32-length))
-    end
-  
-    def Inet::in_private_prefix?(ip)
-      ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
-      $PRIVATE_PREFIXES.each do |prefix|
-        return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
-      end
-      return false
-    end
-
-     
-  end
-
   $blacklisted_prefixes=nil
   def Inet::in_blacklisted_prefix?(ip)
     ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")

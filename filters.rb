@@ -187,9 +187,12 @@ module RegistrationFilters
     ])
 
     # Run all registration level filters. Mutates srcdst2filter_tracker and
-    # srcdst2outage (removes outages which didn't pass
+    # srcdst2outage (removes outages which didn't pass)
     def self.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps)
         now = Time.new
+
+        # list of sources that weren't registered (shouldn't ever happen)
+        email_warnings = []
 
         srcdst2outage.each do |srcdst, outage|
             filter_tracker = srcdst2filter_tracker[srcdst]
@@ -206,13 +209,27 @@ module RegistrationFilters
             if RegistrationFilters.src_not_registered?(srcdst[0], registered_vps)
                 filter_tracker.failure_reasons << SRC_NOT_REGISTERED
                 srcdst2outage.delete srcdst
+                email_warnings << srcdst[0]
             end
+        end
+
+        if not email_warnings.empty?
+            message = %{
+            The following ping monitors were not registered with the isolation controller:
+            #{email_warnings.join "\n"}
+            
+
+            The following VPs were registered with the isolation controller:
+            #{registered_vps.join "\n"}
+            }
+
+            Emailer.isolation_exception(message, "ikneaddough@gmail.com").deliver
         end
     end
 
     # Can't run isolation if the source is not responding to the controller!
     def self.src_not_registered?(src, registered_vps)
-        !(registered_vps.include?(src))
+        not registered_vps.include?(src)
     end
 
     # Can't send spoofed probes if no conected nodes are responding to the controller!
