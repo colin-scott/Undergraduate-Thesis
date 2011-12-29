@@ -112,7 +112,7 @@ class Emailer < ActionMailer::Base
         mail :subject => "VPs having trouble with #{issue}",
              :from => "revtr@cs.washington.edu",
              :recipients => "revtr@cs.washington.edu"
-    :end
+    end
     def isolation_results(merged_outage)
         @merged_outage = merged_outage
 
