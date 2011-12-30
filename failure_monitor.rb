@@ -46,7 +46,7 @@ class FailureMonitor
         begin
             @vps_2_targets_never_seen = YAML.load_file(@@never_seen_yml)
             raise unless @vps_2_targets_never_seen
-        rescue
+        rescue Exception
             @vps_2_targets_never_seen = {}
 
             # unresponsive until proven otherwise
@@ -59,7 +59,7 @@ class FailureMonitor
             # [node, target] -> last time outage was observed
             @nodetarget2lastoutage = (File.readable? @@last_outage_yml) ? YAML.load_file(@@last_outage_yml) : {}
             raise unless @nodetarget2lastoutage.is_a?(Hash)
-        rescue
+        rescue Exception
             @nodetarget2lastoutage = {}
         end
 
@@ -177,7 +177,7 @@ class FailureMonitor
                 yml_hash.each do |k,v|
                    hash[k.strip] = v
                 end 
-            rescue
+            rescue Exception
                 @logger.puts "Corrupt YAML file: #{node}"
                 next
             end

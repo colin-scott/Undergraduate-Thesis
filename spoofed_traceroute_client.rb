@@ -82,7 +82,7 @@ dsts.each{|dst|
 	begin
 		dst_ip=Resolv.getaddress(dst)
 		dst2display[dst_ip]= ((dst_ip==dst) ? "#{Resolv.getname(dst) rescue ""} (#{dst})" : "#{dst} (#{dst_ip})")
-	rescue
+	rescue Exception
 		$stderr.puts "Unable to resolve #{dst}: #{$!}"
 	end
 }

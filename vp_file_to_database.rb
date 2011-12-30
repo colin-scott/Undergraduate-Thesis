@@ -9,7 +9,7 @@ begin
 
     require 'sql'
 
-rescue
+rescue Exception
 
     email_and_die
 

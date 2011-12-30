@@ -74,7 +74,7 @@ class VantagePoint < Prober
 			if controller_uri.nil?
 				controller_uri = Prober::get_default_controller_uri
 			end
-		rescue
+		rescue Exception
 			self.log("Unable to fetch controller uri:",$!)
 		end
 		begin
@@ -83,7 +83,7 @@ class VantagePoint < Prober
 			else
 				update_controller(controller_uri)
 			end
-		rescue
+		rescue Exception
 			self.log("Unable to register:",$!)
 		end
 	end
@@ -125,7 +125,7 @@ class VantagePoint < Prober
 	def stop_service
 		begin
 			self.unregister
-		rescue
+		rescue Exception
 			self.log("Unable to unregister when stopping service: #{$!.class} #{$!}\n#{$!.backtrace.join("\n")}")
 		ensure
 			super
@@ -157,7 +157,7 @@ class VantagePoint < Prober
 						self.log("Unregistering for new controller")
 						self.unregister
 					end
-				rescue
+				rescue Exception
 					self.log "Exception: Unable to unregister from #{@controller_uri} #{$!.to_s}", $VP_ERROR
 				end
 			end
@@ -235,7 +235,7 @@ class VantagePoint < Prober
 			else
 				self.log "No upgrade available from #{UPDATE_INFO[component][:version]}"
 			end
-		rescue
+		rescue Exception
 			self.log "Unable to check for update: #{$!.class}: #{$!.to_s}\n#{$!.backtrace.join("\n")}"
 		end
 		return updated
@@ -386,7 +386,7 @@ if not $started
 					vp.stop_service
 					vp=VantagePoint.new(options[:controller_uri],options[:acl], options[:front], options[:port], options[:proberoute_dir],options[:output_dir])
 				end
-			rescue
+			rescue Exception
 	 			vp.log "Exception: Can't check for update #{$!.to_s}\n" + $!.backtrace.join("\n"), $VP_ERROR
 			ensure
 				sleep(36000 + rand(36000))
@@ -427,7 +427,7 @@ if not $started
 		$stderr.puts "joining"
 		update_thread.join
 		$stderr.puts "thread dead"
-	rescue
+	rescue Exception
 	end
 	vp.shutdown(0)
 	# DRb might not start properly in certain cases, so want something else to

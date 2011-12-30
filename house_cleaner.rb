@@ -146,7 +146,7 @@ class HouseCleaner
         File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+"){|f| 
             pop2edgertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
         }
-        rescue
+        rescue Exception
             @logger.puts "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}"
         end
 

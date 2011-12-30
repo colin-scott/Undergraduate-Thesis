@@ -18,7 +18,7 @@ begin
     require 'date'
     require 'slice'
 
-rescue
+rescue Exception
 
     email_and_die
 

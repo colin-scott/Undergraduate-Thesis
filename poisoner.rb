@@ -140,7 +140,7 @@ class Poisoner
         previous_outages = []
         begin
             previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
-        rescue
+        rescue Exception
             @logger.warn "failed to load yaml file #{$!}"
         end
 

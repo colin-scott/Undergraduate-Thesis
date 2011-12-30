@@ -111,7 +111,7 @@ class Registrar
         name = nil
         begin
             name = vp.name
-        rescue
+        rescue Exception
         end
 
         uri=vp.uri
@@ -140,7 +140,7 @@ class Registrar
         #                     raise BadPingError.new(host,pings, "Test ping to #{$TEST_IP} failed.  Aborting reverse traceroute.")
         #                 end
         #             }
-        #         rescue
+        #         rescue Exception
         #             @controller.log("Unsuccessful test ping for reverse traceroute from #{dsts.join(",")} back to #{vp}: #{pings}.  FAILING!\n#{$!.class}: #{$!.to_s}")
         #             raise RuntimeError.new("#{$!.class}: #{$!.to_s}")
         #         end
@@ -233,7 +233,7 @@ class Registrar
 
         begin
            unregister(source) unless already_registered
-        rescue
+        rescue Exception
            @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
@@ -259,7 +259,7 @@ class Registrar
 
         begin
            unregister(source) unless already_registered
-        rescue
+        rescue Exception
            @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
@@ -285,7 +285,7 @@ class Registrar
 
         begin
            unregister(source) unless already_registered
-        rescue
+        rescue Exception
            @controller.log "Unable to unregister #{source}: #{$!}"
            return
         end
@@ -1119,7 +1119,7 @@ class Controller
                                     else
                                         log(["#{my_receiver_name} timed out punching holes", "EXCEPTION! " + $!.to_s], $SOCK_TIMEOUT_ERROR)
                                     end
-                                rescue
+                                rescue Exception
                                     if my_retry_command
                                         my_retry_command=false
                                         sleep 2

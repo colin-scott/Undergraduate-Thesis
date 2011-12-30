@@ -13,7 +13,7 @@ class IpInfo
     def get_addr(dst)
         begin
             dst_ip=Resolv.getaddress(dst)
-        rescue
+        rescue Exception
             $stderr.puts "Unable to resolve #{dst}: #{$!}"
         end
     end
