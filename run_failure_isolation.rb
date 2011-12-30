@@ -1,6 +1,10 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << "./"
 
+if RUBY_PLATFORM == "java"
+    require 'rubygems'
+end
+
 # Main isolation process. Allocates several objects: 
 #    - Failure Monitor (pulls ping logs, identifies partial outages)
 #    - Failure Dispatcher (handed outages, issues isolation measurements, and
@@ -17,11 +21,12 @@ Lock::acquire_lock("isolation_lock.txt")
 # TODO: These dependancies should be moved into the individual classes
 # that need them
 
+require 'utilities'
+require 'action_mailer'
 require 'isolation_module'
 require 'drb'
 require 'drb/acl'
 require 'net/http'
-require 'mail'
 require 'yaml'
 require 'time'
 require 'fileutils'

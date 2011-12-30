@@ -7,7 +7,7 @@
 require 'failure_isolation_consts'
 require 'set'
 require 'mysql'
-require 'mail'
+require 'isolation_mail'
 require 'socket'
 require 'utilities'
 require 'db_interface'

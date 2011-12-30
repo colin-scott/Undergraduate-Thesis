@@ -1,20 +1,15 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-# AcionMailer module for sending various emails to the failures@ mailing list. 
+# ActionMailer module for sending various emails to the failures@ mailing list. 
 # Copied directly from the reverse traceroute system (originally written by
 # Ashoat)
-
-require_relative 'failure_isolation_consts'
-require_relative 'utilities'
-require 'action_mailer'
+#
+# TODO: not sure why format() isn't being called automatically...
 
 ActionMailer::Base.delivery_method = :sendmail
-#ActionMailer::Base.template_root = "#{$REV_TR_TOOL_DIR}/templates"
-ActionMailer::Base.prepend_view_path("./templates")
-#$TEMPLATE_PATH = "#{$REV_TR_TOOL_DIR}/templates"
+ActionMailer::Base.perform_deliveries = true
 ActionMailer::Base.raise_delivery_errors = true
-
-puts ActionMailer::Base.view_paths
+ActionMailer::Base.prepend_view_path("./templates")
 
 class Emailer < ActionMailer::Base
     LOGGER = LoggerLog.new($stderr)
@@ -22,7 +17,9 @@ class Emailer < ActionMailer::Base
     def test_email(email)
         mail(:subject => "Ashoat is testing!", 
              :from => "revtr@cs.washington.edu",
-             :recipients => email)
+             :to => email)  do |format|
+            format.html { render "test_email.text.html.erb" } 
+        end
     end
     def successful_revtr(email, source, destination, traceroute)
         @source = source
@@ -31,26 +28,32 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Reverse traceroute from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
-             :bcc => "revtr@cs.washington.edu")
+             :to => email,
+             :bcc => "revtr@cs.washington.edu")  do |format|
+            format.html { render "succesful_revtr.text.html.erb" } 
+        end
     end
     def timeout_error(email)
         mail(:subject => "[revtr error] Execution of measurement exceeded timeout",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
-             :bcc => "revtr@cs.washington.edu")
+             :to => email,
+             :bcc => "revtr@cs.washington.edu")  do |format|
+            format.html { render "timeout_error.text.html.erb" } 
+        end
     end
     def timeout_to_us(emails)
         @emails = emails
 
         mail(:subject => "[revtr error] Execution of measurement exceeded timeout",
              :from => "revtr@cs.washington.edu",
-             :recipients => "revtr@cs.washington.edu")
+             :to => "revtr@cs.washington.edu") do |format|
+            format.html { render "timeout_to_us.text.html.erb" } 
+        end
     end
     def error(email)
         mail(:subject => "[revtr error] Error occurred!",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
+             :to => email,
              :bcc => "revtr@cs.washington.edu") do |format|
             format.html { render "error.text.html.erb" } 
         end
@@ -63,7 +66,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "[revtr error] CRITICAL ERROR OCCURRED!",
              :from => "revtr@cs.washington.edu",
-             :recipients => "revtr@cs.washington.edu") do |format|
+             :to => "revtr@cs.washington.edu") do |format|
             format.html { render "critical_error.text.html.erb" } 
         end
     end
@@ -75,7 +78,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Could not parse given traceroute from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => "revtr@cs.washington.edu") do |format|
+             :to => "revtr@cs.washington.edu") do |format|
             format.html { render "tr_parse_fail.text.html.erb" } 
         end
     end
@@ -88,7 +91,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Traceroute comparison results from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => "revtr@cs.washington.edu") do |format|
+             :to => "revtr@cs.washington.edu") do |format|
             format.html { render "tr_parse_success.text.html.erb" } 
         end
     end
@@ -98,7 +101,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Reverse traceroute from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
+             :to => email,
              :bcc => "revtr@cs.washington.edu") do |format|
             format.html { render "tr_fail.text.html.erb" } 
         end
@@ -109,7 +112,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Reverse traceroute from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
+             :to => email,
              :bcc => "revtr@cs.washington.edu") do |format|
             format.html { render "revtr_fail.text.html.erb" } 
         end
@@ -119,7 +122,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Reverse traceroute from #{destination} back to #{source}",
              :from => "revtr@cs.washington.edu",
-             :recipients => email,
+             :to => email,
              :bcc => "revtr@cs.washington.edu") do |format|
             format.html { render "blocked.text.html.erb" } 
         end
@@ -130,7 +133,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "VPs having trouble with #{issue}",
              :from => "revtr@cs.washington.edu",
-             :recipients => "revtr@cs.washington.edu") do |format|
+             :to => "revtr@cs.washington.edu") do |format|
             format.html { render "check_up_vps_issue.text.html.erb" } 
         end
     end
@@ -141,7 +144,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
              :from => "failures@cs.washington.edu",
-             :recipients => "failures@cs.washington.edu") do |format|
+             :to => "failures@cs.washington.edu") do |format|
             format.html { render "isolation_results.text.html.erb" } 
         end
     end
@@ -152,7 +155,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Isolation Module Exception",
              :from => "failures@cs.washington.edu",
-             :recipients => recipient) do |format|
+             :to => recipient) do |format|
             format.html { render "isolation_exception.text.html.erb" } 
         end
     end
@@ -170,7 +173,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "faulty monitoring node report",
              :from => "failures@cs.washington.edu",
-             :recipients => "failures@cs.washington.edu") do |format|
+             :to => "failures@cs.washington.edu") do |format|
             format.html { render "faulty_node_report.text.html.erb" } 
         end
     end
@@ -184,7 +187,7 @@ class Emailer < ActionMailer::Base
 
         mail(:subject => "Isolation target status",
              :from => "failures@cs.washington.edu",
-             :recipients => "failures@cs.washington.edu") do |format|
+             :to => "failures@cs.washington.edu") do |format|
             format.html { render "isolation_status.text.html.erb" } 
         end
     end
@@ -195,7 +198,7 @@ class Emailer < ActionMailer::Base
         
         mail(:subject => "Poison Opportunity Detected!",
              :from => "failures@cs.washington.edu",
-             :recipients => "failures@cs.washington.edu") do |format|
+             :to => "failures@cs.washington.edu") do |format|
             format.html { render "poison_notification.text.html.erb" } 
         end
     end
@@ -214,5 +217,5 @@ end
 if __FILE__ == $0
     mail = Emailer.isolation_exception("ActionMailer is broken?", "ikneaddough@gmail.com")
     puts mail
-    mail.deliver
+    mail.deliver!
 end

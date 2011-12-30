@@ -9,7 +9,7 @@ require 'file_lock'
 Lock::acquire_lock("check_up_and_start_lock.txt")
 
 require '../spooftr_config'
-require 'mail'
+require 'isolation_mail'
 
 begin
 

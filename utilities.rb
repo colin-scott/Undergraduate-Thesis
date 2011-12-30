@@ -10,7 +10,6 @@ require 'thread'
 require 'forwardable'
 
 if RUBY_PLATFORM != 'java'
-  puts RUBY_PLATFORM
   require 'inline'
 end
 

@@ -1,11 +1,13 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+$: << "./"
+
 # Constants (and assorted convenience methods) for the isolation system.
 #
 # Lazily evaluates all large datasets
 
 require 'set'
-require_relative 'utilities'
+require 'utilities'
 require 'yaml'
 
 # Define these in case spooftr_config.rb was not loaded

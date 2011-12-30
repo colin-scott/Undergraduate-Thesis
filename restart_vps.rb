@@ -5,7 +5,7 @@
 
 #require 'config_website'
 require '../spooftr_config'
-require 'mail'
+require 'isolation_mail'
 
 begin
 
