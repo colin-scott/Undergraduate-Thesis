@@ -6,9 +6,8 @@
 
 require 'hops'
 require 'set'
-#require 'failure_analyzer'
+require 'failure_analyzer'
 require 'failure_isolation_consts'
-require 'log_iterator'
 
 # What heuristic was used to merge the Outages 
 module MergingMethod
@@ -215,9 +214,40 @@ class Outage
    def dst_as()
    end
 
+   # For compatibility with log_iterator.rb TODO: remove me
+   def self.parse_time(filename, measurements)
+        # heuristic 1: if this was after I started logging measurement times, just 
+        # take the timestamp of the first measurement
+        if !measurement_times.nil? and !measurement_times.empty?
+            return measurement_times[0][1]
+        end
+
+        timestamp = filename.split('_')[-1].split('.')[0]
+    
+        # heuristic 4: guess based on the timestamp
+        year = timestamp[0..3]
+        # we know that no log is from before Feb. 12th. So it must be a single
+        # digit.
+        month = timestamp[4..4] 
+        days_in_month = (month == "2") ? 28 : 31
+    
+        timestamp = timestamp[5..-1]
+    
+        if timestamp.size == "DDHHMMSS".size
+           day = timestamp[0..1]
+           hour = timestamp[2..3]
+           minute = timestamp[4..5]
+           second = timestamp[6..7]
+        else
+           return nil
+        end
+    
+        return Time.local(year, month, day, hour, minute, second)
+   end
+  
    # Return the time measurements were initiated for this outage
    def time
-        @time = LogIterator::parse_time(@file, @measurement_times) if @time.nil?
+        @time = self.parse_time(@file, @measurement_times) if @time.nil?
         @time = false if @time.nil? # TODO: need a better way to distinguish nil from "not able to parse time"
         @time
    end

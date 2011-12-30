@@ -8,13 +8,13 @@
 # See data_analysis/** for example usage
 
 require 'yaml'
-#require 'ip_info'
+require 'ip_info'
 require 'hops'
 require 'isolation_module'
 require 'set'
 require 'time'
 require 'filter_stats'
-#require 'outage'
+require 'outage'
 require 'direction'
 require 'failure_isolation_consts'
 require 'time'
@@ -426,99 +426,7 @@ module LogIterator
 
     # Start time should be logged... not end time of measurements...
     def LogIterator::parse_time(filename, measurement_times)
-        # heuristic 1: if this was after I started logging measurement times, just 
-        # take the timestamp of the first measurement
-        if !measurement_times.nil? and !measurement_times.empty?
-            return measurement_times[0][1]
-        end
-    
-        # heuristic 2: the file mtimes are correct for isolation_results_rev2
-        #    unfortunately the files in isolation_results_rev3 and
-        #    isolation_results_rev4 were overwritten, so they all have the same
-        #    mtimes
-        #rev2 = FailureIsolation.LastIsolationResults+"/"+filename
-        #if File.exists?(rev2)
-        #    f = File.open(rev2, "r")
-        #    mtime = f.mtime
-        #    f.close
-        #    return mtime 
-        #end
-    
-        timestamp = filename.split('_')[-1].split('.')[0]
-    
-        ## heuristic 3: I have .jpgs in the ~/www folder with
-        ##      month/day/ subdirectories...
-        #jpg = filename.gsub(/yml$/, "jpg")
-    
-        #if File.exists?(FailureIsolation::WebDirectory+"/"+"1")
-        #    return 
-        #end
-    
-        # heuristic 4: guess based on the timestamp
-        year = timestamp[0..3]
-        # we know that no log is from before Feb. 12th. So it must be a single
-        # digit.
-        month = timestamp[4..4] 
-        days_in_month = (month == "2") ? 28 : 31
-    
-        timestamp = timestamp[5..-1]
-    
-        if timestamp.size == "DDHHMMSS".size
-           day = timestamp[0..1]
-           hour = timestamp[2..3]
-           minute = timestamp[4..5]
-           second = timestamp[6..7]
-        #elsif timestamp.size == "DDHHMMSS".size - 1
-        #   # one of them is compressed   
-        #   guesses = LogIterator::infer_one_digit_fields(timestamp, days_in_month)
-        #   #return nil unless guesses.reduce(:|)
-        #   return nil if !guesses[0] || !(guesses[-1] && !guesses[0..-2].reduce(:|))  # if the first field doesn't make sense, it's unambiguous
-        #   day, hour, minute, second = LogIterator::parse_given_single_digit(timestamp, guesses, 1)
-        #elsif timestamp.size == "DDHHMMSS".size - 2
-        #   # two of them are compressed
-        #   #guesses = infer_one_digit_fields(timestamp, days_in_month)
-        #   return nil # unless guesses.reduce(:|)
-        #elsif timestamp.size == "DDHHMMSS".size - 3
-        #   # three of them are compressed
-        #   #guesses = infer_one_digit_fields(timestamp, days_in_month)
-        #   return nil # unless guesses.reduce(:|)
-        #elsif timestamp.size == "DDHHMMSS".size - 4
-        #   # all of them are compressed
-        #   day = timestamp[0..0]
-        #   hour = timestamp[1..1]
-        #   minute = timestamp[2..2]
-        #   second = timestamp[3..3] 
-        else
-           return nil
-        end
-    
-        #$stderr.puts timestamp
-        #$stderr.puts "day: #{day} hour: #{hour} minute: #{minute} second: #{second}"
-        #$stderr.puts filename
-        return Time.local(year, month, day, hour, minute, second)
-    end
-    
-    def LogIterator::infer_one_digit_fields(timestamp, days_in_month)
-        # DDHHMMSS
-        day_one = (timestamp[0..1].to_i > days_in_month) 
-        hour_one = (timestamp[2..3].to_i >= 60) # || timestamp[2..2] == "0"
-        minute_one = (timestamp[4..5].to_i >= 60) # || timestamp[4..4] == "0"
-        second_one = (timestamp[6..7].to_i >= 60) # || timestamp[6..6] == "0"
-        [day_one, hour_one, minute_one, second_one]
-    end
-    
-    def LogIterator::parse_given_single_digit(timestamp, guesses, num_compressed)
-       day_one, hour_one, minute_one, second_one = guesses
-       #$stderr.puts guesses.inspect
-       if day_one
-          return [timestamp[0..0], timestamp[1..2], timestamp[3..4], timestamp[5..6]]
-       elsif hour_one
-          return [timestamp[0..1], timestamp[2..2], timestamp[3..4], timestamp[5..6]]
-       elsif minute_one
-          return [timestamp[0..1], timestamp[2..3], timestamp[4..4], timestamp[5..6]]
-       elsif second_one
-          return [timestamp[0..1], timestamp[2..3], timestamp[4..5], timestamp[6..6]]
-       end
+        Outage.parse_time(filename, measurement_times)
     end
 
     def self.parse_correlation_time(filename)
@@ -534,6 +442,7 @@ module LogIterator
         return Time.local(year, month, day, hour, minute, second)
     end
 end
+
 
 if __FILE__ == $0
     require 'isolation_module'

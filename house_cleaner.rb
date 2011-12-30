@@ -6,7 +6,6 @@
 
 require 'failure_isolation_consts'
 require 'set'
-require 'mysql'
 require 'isolation_mail'
 require 'socket'
 require 'utilities'

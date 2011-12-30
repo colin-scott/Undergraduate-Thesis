@@ -355,9 +355,4 @@ if $0 == __FILE__
 #    Dot::generate_jpg("PLANETLAB1.RESEARCH.WPI.NET", "planetlab2.cis.UPENN.EDU (158.130.6.253)",
 #        "forward path", "Routers on paths beyond Harsha's PoPs", tr, spoofed_tr, historic_tr, revtr, historic_revtr, ARGV.shift)
 
-    require 'log_iterator' 
-    d = DotGenerator.new
-    LogIterator::read_log_rev4(FailureIsolation::IsolationResults+"/plgmu4.ite.gmu.edu_77.221.192.1_2011224142939.bin") do |outage|
-       d.generate_jpg(outage.src, outage.dst, outage.direction, outage.dataset, outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr, "testing.jpg")
-    end
 end
