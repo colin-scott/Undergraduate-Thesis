@@ -6,7 +6,7 @@
 
 require 'hops'
 require 'set'
-require 'failure_analyzer'
+#require 'failure_analyzer'
 require 'failure_isolation_consts'
 require 'log_iterator'
 

@@ -21,25 +21,28 @@ Lock::acquire_lock("isolation_lock.txt")
 # TODO: These dependancies should be moved into the individual classes
 # that need them
 
+require 'db_interface'
+require 'pstore'
+require 'failure_monitor'
+
 require 'utilities'
-require 'action_mailer'
-require 'isolation_module'
+require 'isolation_mail'
+require 'active_record'
+require 'fileutils'
 require 'drb'
 require 'drb/acl'
 require 'net/http'
 require 'yaml'
 require 'time'
-require 'fileutils'
 require 'thread'
-require 'reverse_traceroute_cache'
+#require 'reverse_traceroute_cache'
 require 'ip_info'
 require 'mkdot'
 require 'hops'
-require 'db_interface'
 require 'revtr_cache_interface'
 require 'failure_analyzer'
 require 'failure_dispatcher'
-require 'failure_monitor'
+require 'isolation_module'
 
 # TODO: move me into FailureIsolationConsts
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"

@@ -1,6 +1,7 @@
 
 # Coordinate measurements for detected measurements, and log/email results
 
+require 'outage'
 require 'failure_isolation_consts'
 require 'drb'
 require 'drb/acl'
@@ -16,7 +17,6 @@ require 'reverse_traceroute_cache'
 require 'timeout'
 require 'failure_analyzer'
 require 'isolation_mail'
-require 'outage'
 require 'utilities'
 require 'poisoner'
 require 'filters'

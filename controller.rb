@@ -1,4 +1,4 @@
-#!/homes/network/revtr/jruby/bin/jruby
+#!/homes/network/revtr/jruby/bin/jruby  --server -J-Xmx3g --fast -J-XX:+UseParallelGC -J-Djruby.thread.pooling=true
 
 $: << "./"
 require 'utilities'

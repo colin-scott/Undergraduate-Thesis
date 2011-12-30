@@ -12,8 +12,11 @@
 #    * nil if not initialized (not grabbed from the
 #       DB yet)
 
-require 'mysql'
-require 'mysql_connection_manager'
+if RUBY_PLATFORM == "java"
+    require "mysql_connection_manager_jdbc"
+else
+    require 'mysql_connection_manager'
+end
 require 'socket'
 require 'utilities'
 require 'set'

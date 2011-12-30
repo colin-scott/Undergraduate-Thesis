@@ -447,6 +447,14 @@ module Inet
     ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
     return ((ip>>(32-length))<<(32-length))
   end
+
+  def Inet::in_private_prefix?(ip)
+  	ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
+  	$PRIVATE_PREFIXES.each do |prefix|
+  		return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
+  	end
+  	return false
+  end
   
   $blacklisted_prefixes=nil
   def Inet::in_blacklisted_prefix?(ip)
