@@ -50,11 +50,11 @@ class RevtrCache
     
         # no match, try remapping to next hop
         results = @connection.query sql
-        if results.rowData.isEmpty
+        if not results.next
         if @@do_remapping
           sql = "select inet_ntoa(endpoint) as e, last_hop from endpoint_mappings where src=#{src} and endpoint=#{dst} limit 1"
           results = @connection.query sql
-          if not results.rowData.isEmpty 
+          if not not results.next 
             results.each_hash{|row|
               old_dst = dst
               dst = row["last_hop"].to_i
@@ -73,7 +73,7 @@ class RevtrCache
           # still no match, so output the status for probing this node
           results = @connection.query sql
         end # end if do_remapping
-          if results.rowData.isEmpty 
+          if not results.next 
             reason = "not yet attempted"
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
             "#{src} and dst=#{dst}"
@@ -83,7 +83,7 @@ class RevtrCache
               results.each_hash{|row|
                 reason = row["state"] + " at " + row["lastUpdate"]
               }
-            rescue Mysql::Error
+            rescue Exception
               @logger.warn "Error with query: #{sql}"
               @logger.puts $!
             end
@@ -95,7 +95,7 @@ class RevtrCache
     
             return path
           end
-        end # results.rowData.isEmpty == 0
+        end # not results.next == 0
         
         # ok, we have results, let's start parsing them
         results.each_hash do |row|
@@ -129,7 +129,7 @@ class RevtrCache
 
           break unless path.empty?
         end # results.each_hash
-      rescue Mysql::Error
+      rescue Exception
         @logger.puts "Error with query: #{sql}"
         @logger.puts $!
       end # begin
@@ -156,7 +156,7 @@ class RevtrCache
       # in this case, we have to look from the previous hop
       sql = "select * from vp_stats where src=#{src} and dest=#{hop}"
       sym_results = @connection.query sql
-      if sym_results.rowData.isEmpty
+      if not sym_results.next
         sym_results.each_hash{|row|
           sym_type = nil
           is_spoof = false
@@ -215,7 +215,7 @@ class RevtrCache
             "spoof: rr? #{rr_spoof_text} ts? #{ts_spoof_text}"
     
         } # end each_hash
-      end # end if sym_results.rowData.isEmpty
+      end # end if sym_not results.next
 
       return reasons
    end
@@ -223,7 +223,7 @@ end
 
 if $0 == __FILE__
   connection = DatabaseInterface.new
-  cache = RevtrCache.new(connection, IpInfo.new)
+  cache = RevtrCache.new(IpInfo.new,  connection)
 
 #  if ARGV.empty?
 #    $stderr.puts "Usage: #{$0} <src ip> <dst ip>"
@@ -266,7 +266,7 @@ while not done
         done = true
       end
     }
-  rescue Mysql::Error
+  rescue Exception
     puts "DB connection error" + $db_host
   end
 end # while not done
