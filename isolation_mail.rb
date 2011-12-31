@@ -1,5 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
+$: << "./"
+
 # ActionMailer module for sending various emails to the failures@ mailing list. 
 # Copied directly from the reverse traceroute system (originally written by
 # Ashoat)
@@ -7,6 +9,7 @@
 # TODO: not sure why format() isn't being called automatically...
 
 require 'action_mailer'
+require 'utilities'
 
 ActionMailer::Base.delivery_method = :sendmail
 ActionMailer::Base.perform_deliveries = true

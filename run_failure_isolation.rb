@@ -24,7 +24,6 @@ Lock::acquire_lock("isolation_lock.txt")
 require 'db_interface'
 require 'pstore'
 require 'failure_monitor'
-
 require 'utilities'
 require 'isolation_mail'
 require 'active_record'
@@ -35,14 +34,15 @@ require 'net/http'
 require 'yaml'
 require 'time'
 require 'thread'
-#require 'reverse_traceroute_cache'
+require 'reverse_traceroute_cache'
 require 'ip_info'
 require 'mkdot'
 require 'hops'
 require 'revtr_cache_interface'
 require 'failure_analyzer'
 require 'failure_dispatcher'
-require 'isolation_module'
+
+#require 'isolation_module'
 
 # TODO: move me into FailureIsolationConsts
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"

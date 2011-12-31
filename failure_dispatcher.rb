@@ -624,7 +624,12 @@ class FailureDispatcher
         replace_receivers_for_riot!(srcdst2receivers)
         
         # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
+        begin
+            spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
+        rescue Exception => e
+            @logger.warn "Registrar timed out on spoofed pings towards source! #{e} #{e.backtrace}"
+            spoofed_ping_results = {}
+        end
 
         @logger.debug "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
@@ -651,7 +656,12 @@ class FailureDispatcher
             replace_receivers_for_riot!(srcdst2stillconnected)
 
             # Issue spoofed trs all at once to ensure unique spoofer ids
-            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
+            begin
+                srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
+            rescue Exception => e
+                @logger.warn "Registrar timed out on issue_spoofed_traceroutes! #{e} #{e.backtrace}"
+                srcdst2sortedttlrtrs = {}
+            end
                                                 
             srcdst2outage.each do |srcdst, outage|
                 outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
@@ -681,7 +691,14 @@ class FailureDispatcher
     #
     # precondition: targets is a single element array. Not sure why this is
     def issue_normal_traceroutes(src, targets)
-        dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
+        # Issue spoofed trs all at once to ensure unique spoofer ids
+        begin
+            dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
+        rescue Exception => e
+            @logger.warn "Registrar timed out on issue_normral_traceroutes! #{e} #{e.backtrace}"
+            dest2ttlhoptuples = {}
+        end
+
 
         # TODO: this parsing should be done directly in tracerouter.rb
         targ2paths = {}
@@ -791,7 +808,11 @@ class FailureDispatcher
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
-        responsive = @registrar.ping(source, all_targets.to_a, true)
+        begin
+            responsive = @registrar.ping(source, all_targets.to_a, true)
+        rescue Exception => e
+            @logger.warn "Timed out in request_pings! #{e} #{e.backtrace}"
+        end
         responsive ||= []
         @logger.debug "Responsive to ping: #{responsive.inspect}"
 
@@ -821,7 +842,13 @@ class FailureDispatcher
         # nice hashmap from ips -> hops
         targets = non_responsive_hops.map { |hop| hop.ip }
 
-        src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
+        begin
+            src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
+        rescue Exception => e
+            @logger.warn "Timed out in request_pings! #{e} #{e.backtrace}"
+            src2reachable = {}
+        end
+
         pingable_ips = src2reachable.value_set.to_a
 
         non_responsive_hops.each do |hop|

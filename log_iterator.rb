@@ -445,9 +445,6 @@ end
 
 
 if __FILE__ == $0
-    require 'isolation_module'
-    require 'mkdot'
-
     #directions = Hash.new(0)
 
     #LogIterator::iterate() do |file, src, dst, dataset, direction, formatted_connected, formatted_unconnected,

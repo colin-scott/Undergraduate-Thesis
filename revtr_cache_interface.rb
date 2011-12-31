@@ -50,11 +50,11 @@ class RevtrCache
     
         # no match, try remapping to next hop
         results = @connection.query sql
-        if results.num_rows() == 0
+        if results.rowData.isEmpty
         if @@do_remapping
           sql = "select inet_ntoa(endpoint) as e, last_hop from endpoint_mappings where src=#{src} and endpoint=#{dst} limit 1"
           results = @connection.query sql
-          if results.num_rows() > 0
+          if not results.rowData.isEmpty 
             results.each_hash{|row|
               old_dst = dst
               dst = row["last_hop"].to_i
@@ -73,7 +73,7 @@ class RevtrCache
           # still no match, so output the status for probing this node
           results = @connection.query sql
         end # end if do_remapping
-          if results.num_rows() == 0
+          if results.rowData.isEmpty 
             reason = "not yet attempted"
             sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
             "#{src} and dst=#{dst}"
@@ -95,7 +95,7 @@ class RevtrCache
     
             return path
           end
-        end # results.num_rows() == 0
+        end # results.rowData.isEmpty == 0
         
         # ok, we have results, let's start parsing them
         results.each_hash do |row|
@@ -156,7 +156,7 @@ class RevtrCache
       # in this case, we have to look from the previous hop
       sql = "select * from vp_stats where src=#{src} and dest=#{hop}"
       sym_results = @connection.query sql
-      if sym_results.num_rows() > 0
+      if sym_results.rowData.isEmpty
         sym_results.each_hash{|row|
           sym_type = nil
           is_spoof = false
@@ -215,7 +215,7 @@ class RevtrCache
             "spoof: rr? #{rr_spoof_text} ts? #{ts_spoof_text}"
     
         } # end each_hash
-      end # end if sym_results.num_rows()
+      end # end if sym_results.rowData.isEmpty
 
       return reasons
    end

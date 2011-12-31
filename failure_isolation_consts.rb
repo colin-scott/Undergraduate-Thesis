@@ -264,7 +264,7 @@ module FailureIsolation
         @TargetSet.merge(union)
 
         not_valid_ip = @TargetSet.find { |ip| !ip.matches_ip? }
-        raise "Invalid IP address in targets! #{nodt_valid_ip}" if not_valid_ip
+        raise "Invalid IP address in targets! #{not_valid_ip}" if not_valid_ip
 
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
         # push out targets to monitoring nodes! 
@@ -401,16 +401,24 @@ module PoP
 end
 
 if $0 == __FILE__
+    require 'thread'
+    Thread.abort_on_exception = true
+
+    Thread.new { sleep }
+
     require 'time'
     t = Time.parse("2011-09-19 11:40:43 -0700")
     
     puts FailureIsolation.pl_pl_path_for_date(t)
 
-    FailureIsolation.ReadInDataSets
+    puts "foo"
+    puts FailureIsolation.TargetSet.size
+    puts "bar"
+
 
     require 'yaml'
-    previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
-    puts previous_outages.inspect
+    #previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
+    #puts previous_outages.inspect
 
     #a = FailureIsolation.ATTTargets
     #t = FailureIsolation.TargetSet

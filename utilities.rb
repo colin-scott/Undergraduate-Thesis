@@ -344,6 +344,11 @@ module ProbeController
 end
 
 module Inet
+  def Inet::prefix(ip,length)
+    ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
+    return ((ip>>(32-length))<<(32-length))
+  end
+
   if RUBY_PLATFORM != "java" 
     # Let's make Ruby's bit fiddling reasonably fast!
     inline(:C) do |builder|
@@ -441,19 +446,14 @@ module Inet
 		ints.each{|n| val=(val*256)+n}
 		return val
 	end
-  end
 
-  def Inet::prefix(ip,length)
-    ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
-    return ((ip>>(32-length))<<(32-length))
-  end
-
-  def Inet::in_private_prefix?(ip)
-  	ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
-  	$PRIVATE_PREFIXES.each do |prefix|
-  		return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
-  	end
-  	return false
+    def Inet::in_private_prefix?(ip)
+    	ip=Inet::aton(ip) if  ip.is_a?(String) and ip.include?(".")
+    	$PRIVATE_PREFIXES.each do |prefix|
+    		return true if Inet::aton(prefix.at(0))==Inet::prefix(ip,prefix.at(1))
+    	end
+    	return false
+    end
   end
   
   $blacklisted_prefixes=nil
