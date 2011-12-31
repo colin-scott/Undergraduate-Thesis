@@ -2,6 +2,7 @@
 
 # Very similar to check_up_and_start_vps.rb (in fact, completely redundant),
 # but rather than troubleshooting problems, simply reboot the VPs.
+# TODO: merge with check_up_and_start_vps.rb
 
 #require 'config_website'
 
