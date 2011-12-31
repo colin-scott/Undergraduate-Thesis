@@ -1,5 +1,7 @@
-#!/homes/network/revtr/ruby-upgrade/bin/ruby
-#
+#!/homes/network/revtr/jruby/bin/jruby
+$: << "./"
+$: << "../"
+
 # Find common issues with PL VPs and attempt to fix them
 #
 # @author: Ashoat
@@ -8,8 +10,10 @@
 require 'file_lock'
 Lock::acquire_lock("check_up_and_start_lock.txt")
 
-require '../spooftr_config'
 require 'isolation_mail'
+
+$PL_HOSTNAMES_W_IPS = "/homes/network/revtr/spoofed_traceroute/data/pl_hostnames_w_ips.txt"
+$VP_SLICE = "uw_revtr2"
 
 begin
 

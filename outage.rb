@@ -159,6 +159,11 @@ class Outage
             @formatted_connected = []
             @formatted_unconnected = []
             @formatted_never_seen = []
+        when 1 # Keywords
+            hash = args[0]
+            hash.each do |key, value|
+               self.send("#{key}=", value) 
+            end
         when 6
             @src, @dst, @connected, @formatted_connected, @formatted_unconnected, @formatted_never_seen = args
 
@@ -349,6 +354,10 @@ class Outage
        @historical_tr.link_listify!
        @historical_revtr.link_listify!
        @spoofed_revtr.link_listify!
+   end
+
+   def passed?
+      @passed_filters
    end
 
    def to_s(verbose=true)

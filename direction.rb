@@ -72,11 +72,19 @@ module BackwardsCompatibleDirection
         case str
         when FORWARD
             return Direction.FORWARD
+        when FORWARD.to_sym
+            return Direction.FORWARD
         when REVERSE
+            return Direction.REVERSE
+        when REVERSE.to_sym
             return Direction.REVERSE
         when BOTH
             return Direction.BOTH
+        when BOTH.to_sym
+            return Direction.BOTH
         when FALSE_POSITIVE
+            return Direction.FALSE_POSITIVE
+        when FALSE_POSITIVE.to_sym
             return Direction.FALSE_POSITIVE
         else
             raise "unknown direction #{str}"

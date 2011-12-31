@@ -5,33 +5,50 @@ require 'isolation_module'
 require 'drb'
 require 'failure_dispatcher'
 require 'outage'
-require 'outage_correlation'
-
 require 'utilities'
-Thread.abort_on_exception = true
 
-dispatcher = FailureDispatcher.new()
+require_relative 'unit_test_root'
 
-hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.sort_by { rand }.clone
-src = hosts.shift
-receivers = hosts[0..5]
+describe FailureDispatcher do
+    let(:dispatcher) { FailureDispatcher.new } 
 
-if ARGV.empty?
-    target = "132.252.152.193"
-    srcdst = [src, target]
-    outage = Outage.new(src, target, receivers, [], [], [])
-    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
-    dispatcher.isolate_outages({srcdst => outage},{srcdst => filter_tracker})
-else
-    src = ARGV.shift
-    dst = ARGV.shift
-    srcdst = [src, dst]
-    outage = Outage.new(src, target, receivers, [], [], [])
-    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
-    dispatcher.isolate_outages({srcdst => outage},{srcdst => failure_tracker})
+    describe "#merge_outages" do
+        it "produces the same # of (src,dst) pairs as it is given" do
+            input_outages = []
+            for dst in ["1.2.3.4", "2.3.4.5"]
+                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => dst, :direction => Direction.BOTH)
+            end
+            dispatcher.merge_outages(input_outages)
+        end 
+    end
 end
 
-sleep
+
+# TODO: this is really an end-to-end test
+#Thread.abort_on_exception = true
+#
+#dispatcher = FailureDispatcher.new()
+#
+#hosts = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri).hosts.sort_by { rand }.clone
+#src = hosts.shift
+#receivers = hosts[0..5]
+#
+#if ARGV.empty?
+#    target = "132.252.152.193"
+#    srcdst = [src, target]
+#    outage = Outage.new(src, target, receivers, [], [], [])
+#    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
+#    dispatcher.isolate_outages({srcdst => outage},{srcdst => filter_tracker})
+#else
+#    src = ARGV.shift
+#    dst = ARGV.shift
+#    srcdst = [src, dst]
+#    outage = Outage.new(src, target, receivers, [], [], [])
+#    filter_tracker = FilterTracker.new(src, target, receivers, Time.new)
+#    dispatcher.isolate_outages({srcdst => outage},{srcdst => failure_tracker})
+#end
+#
+#sleep
 
 # ========== Path Splicing ========== TODO:
 #require 'drb'

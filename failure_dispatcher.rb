@@ -243,9 +243,15 @@ class FailureDispatcher
        src2outages = only_reverse.categorize_on_attr(:src)
        reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::REVERSE) }
 
-       if (Set.new(forward_merged) & Set.new(reverse_merged)) != Set.new(outages)
+       # For debugging. TODO: put me into unit tests instead of here.
+       forward_src_dsts = Set.new(forward_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
+       reverse_src_dsts = Set.new(reverse_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
+       all_outages = Set.new(outages.map { |o| {:src => o.src, :dst => o.dst} })
+       if (forward_src_dsts | reverse_src_dsts).size != all_outages.size
            # forward U reverse mergings should contain every (src, dst) pair
-           raise "Not merging properly! #{outages.inspect}"
+           # TODO: raise rather than log?
+           @logger.warn "Not merging properly! #{forward_src_dsts.to_a.inspect} #{reverse_src_dsts.to_a.inspect} #{all_outages.to_a.inspect}"
+           @logger.warn "union: #{(forward_src_dsts | reverse_src_dsts).to_a.inspect}"
        end
        
        return forward_merged + reverse_merged
@@ -315,7 +321,7 @@ class FailureDispatcher
 
             outage.graph_url = generate_web_symlink(outage.jpg_output)
         else
-            @logger.puts "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
+            @logger.debug "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
 
         return outage.passed_filters
@@ -413,18 +419,18 @@ class FailureDispatcher
 
         @logger.debug "traceroutes issued"
 
-        # I see empty measurements from time to time, which shouldn't happen
-        if outage.tr.empty?
-            @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
-            restart_atd(outage.src)
-            sleep 10
-            tr_time2 = Time.new
-            outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
-            if outage.tr.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
-                @node_2_failed_measurements[outage.src] += 1
-            end
-        end
+        ## I see empty measurements from time to time, which shouldn't happen
+        #if outage.tr.empty?
+        #    @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
+        #    restart_atd(outage.src)
+        #    sleep 10
+        #    tr_time2 = Time.new
+        #    outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+        #    if outage.tr.empty?
+        #        @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+        #        @node_2_failed_measurements[outage.src] += 1
+        #    end
+        #end
 
         # Set to the # of times measurements were reissued. False of
         # measurements succeeded on the first attempt
@@ -456,17 +462,17 @@ class FailureDispatcher
 
         @logger.debug "non-revtr pings issued"
 
-        # Moar empty measurements!
-        if ping_responsive.empty?
-            @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
-            restart_atd(outage.src)
-            sleep 10
-            ping_responsive, non_responsive_hops = check_reachability(outage)
-            if ping_responsive.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
-                @node_2_failed_measurements[outage.src] += 1
-            end
-        end
+        ## Moar empty measurements!
+        #if ping_responsive.empty?
+        #    @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
+        #    restart_atd(outage.src)
+        #    sleep 10
+        #    ping_responsive, non_responsive_hops = check_reachability(outage)
+        #    if ping_responsive.empty?
+        #        @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+        #        @node_2_failed_measurements[outage.src] += 1
+        #    end
+        #end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
@@ -624,12 +630,7 @@ class FailureDispatcher
         replace_receivers_for_riot!(srcdst2receivers)
         
         # hash is target2receiver2succesfulvps
-        begin
-            spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
-        rescue Exception => e
-            @logger.warn "Registrar timed out on spoofed pings towards source! #{e} #{e.backtrace}"
-            spoofed_ping_results = {}
-        end
+        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
 
         @logger.debug "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}"
 
@@ -656,12 +657,7 @@ class FailureDispatcher
             replace_receivers_for_riot!(srcdst2stillconnected)
 
             # Issue spoofed trs all at once to ensure unique spoofer ids
-            begin
-                srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
-            rescue Exception => e
-                @logger.warn "Registrar timed out on issue_spoofed_traceroutes! #{e} #{e.backtrace}"
-                srcdst2sortedttlrtrs = {}
-            end
+            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
                                                 
             srcdst2outage.each do |srcdst, outage|
                 outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
@@ -692,12 +688,7 @@ class FailureDispatcher
     # precondition: targets is a single element array. Not sure why this is
     def issue_normal_traceroutes(src, targets)
         # Issue spoofed trs all at once to ensure unique spoofer ids
-        begin
-            dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
-        rescue Exception => e
-            @logger.warn "Registrar timed out on issue_normral_traceroutes! #{e} #{e.backtrace}"
-            dest2ttlhoptuples = {}
-        end
+        dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
 
 
         # TODO: this parsing should be done directly in tracerouter.rb
@@ -808,11 +799,7 @@ class FailureDispatcher
         all_targets = Set.new
         all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
 
-        begin
-            responsive = @registrar.ping(source, all_targets.to_a, true)
-        rescue Exception => e
-            @logger.warn "Timed out in request_pings! #{e} #{e.backtrace}"
-        end
+        responsive = @registrar.ping(source, all_targets.to_a, true)
         responsive ||= []
         @logger.debug "Responsive to ping: #{responsive.inspect}"
 
@@ -842,12 +829,7 @@ class FailureDispatcher
         # nice hashmap from ips -> hops
         targets = non_responsive_hops.map { |hop| hop.ip }
 
-        begin
-            src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
-        rescue Exception => e
-            @logger.warn "Timed out in request_pings! #{e} #{e.backtrace}"
-            src2reachable = {}
-        end
+        src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
 
         pingable_ips = src2reachable.value_set.to_a
 

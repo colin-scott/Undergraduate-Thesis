@@ -858,7 +858,7 @@ class Controller
                         Thread.current[:results]=method_return
                         Thread.current[:success]=true
                     }
-				rescue SockTimeout
+				rescue Exception
                     if my_retry_command
                         my_retry_command=false
                         sleep 2

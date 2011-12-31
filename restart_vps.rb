@@ -4,8 +4,11 @@
 # but rather than troubleshooting problems, simply reboot the VPs.
 
 #require 'config_website'
-require '../spooftr_config'
+
 require 'isolation_mail'
+$PL_HOSTNAMES_W_IPS = "/homes/network/revtr/spoofed_traceroute/data/pl_hostnames_w_ips.txt"
+$VP_SLICE = "uw_revtr2"
+
 
 begin
 

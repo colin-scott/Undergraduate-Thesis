@@ -213,6 +213,9 @@ module RegistrationFilters
             end
         end
 
+        # TODO: remove me when riot is running again
+        email_warnings.delete_if { |src| FailureIsolation::PoisonerNames.include? src }
+
         if not email_warnings.empty?
             message = %{
                 The following #{email_warnings.size}  ping monitors were not registered with the isolation controller:

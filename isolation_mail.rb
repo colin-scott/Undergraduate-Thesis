@@ -8,10 +8,23 @@ $: << "./"
 #
 # TODO: not sure why format() isn't being called automatically...
 
+require 'rubygems'
 require 'action_mailer'
 require 'utilities'
 
-ActionMailer::Base.delivery_method = :sendmail
+#ActionMailer::Base.delivery_method = :sendmail
+# Sendmail isn't working with jruby, so we use smtp on our own
+# uwfailures@gmail.com account
+ActionMailer::Base.delivery_method = :smtp
+ActionMailer::Base.smtp_settings = {
+  :address              => "smtp.gmail.com",
+  :port                 => 587,
+  :domain               => 'yorker.cs.washington.edu',
+  :user_name            => 'uwfailures',
+  :password             => 'orcisten666',
+  :authentication       => 'plain',
+  :enable_starttls_auto => true  }
+
 ActionMailer::Base.perform_deliveries = true
 ActionMailer::Base.raise_delivery_errors = true
 ActionMailer::Base.prepend_view_path("./templates")
@@ -148,7 +161,7 @@ class Emailer < ActionMailer::Base
         @merged_outage = merged_outage
 
         mail(:subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
-             :from => "failures@cs.washington.edu",
+             :from => "uwfailures@gmail.com",
              :to => "failures@cs.washington.edu") do |format|
             format.html { render "isolation_results.text.html.erb" } 
         end
@@ -159,7 +172,7 @@ class Emailer < ActionMailer::Base
         @exception = exception
 
         mail(:subject => "Isolation Module Exception",
-             :from => "failures@cs.washington.edu",
+             :from => "uwfailures@gmail.com",
              :to => recipient) do |format|
             format.html { render "isolation_exception.text.html.erb" } 
         end
@@ -177,7 +190,7 @@ class Emailer < ActionMailer::Base
         @possibly_bad_srcs = possibly_bad_src
 
         mail(:subject => "faulty monitoring node report",
-             :from => "failures@cs.washington.edu",
+             :from => "uwfailures@gmail.com",
              :to => "failures@cs.washington.edu") do |format|
             format.html { render "faulty_node_report.text.html.erb" } 
         end
@@ -191,7 +204,7 @@ class Emailer < ActionMailer::Base
         @possibly_bad_hops = possibly_bad_hops
 
         mail(:subject => "Isolation target status",
-             :from => "failures@cs.washington.edu",
+             :from => "uwfailures@gmail.com",
              :to => "failures@cs.washington.edu") do |format|
             format.html { render "isolation_status.text.html.erb" } 
         end
@@ -202,7 +215,7 @@ class Emailer < ActionMailer::Base
         @outage = outage
         
         mail(:subject => "Poison Opportunity Detected!",
-             :from => "failures@cs.washington.edu",
+             :from => "uwfailures@gmail.com",
              :to => "failures@cs.washington.edu") do |format|
             format.html { render "poison_notification.text.html.erb" } 
         end
@@ -220,7 +233,7 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    mail = Emailer.isolation_exception("ActionMailer is broken?", "ikneaddough@gmail.com")
+    mail = Emailer.isolation_exception("FYI, sendmail was acting up again -- this time for jruby. smtp seems to work though -- so I made a new Gmail account. You might want to update your filters")
     puts mail
     mail.deliver!
 end

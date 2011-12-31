@@ -637,7 +637,6 @@ class UnionFind
   end
 end
 
-if RUBY_PLATFORM != 'java'
 class Array
   # convert to a hash
   # if given a param, assigns that value to everything
@@ -700,7 +699,7 @@ class Hash
     end
   end
 end
-end
+
 #$ip2cluster = Hash.new{ |h,k| h.has_key?(k) ? h[k] : ( h.has_key?(k.split(".")[0..2].join(".") + ".0/24") h[k.split(".")[0..2].join(".") + ".0/24"] : k.split(".")[0..2].join(".") + ".0/24") }
 $ip2cluster = Hash.new{ |h,k| h.has_key?(k) ? h[k] : k }
 $cluster2ips = Hash.new(Array.new)
