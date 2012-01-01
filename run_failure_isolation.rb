@@ -49,7 +49,7 @@ $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to
 # Fail the main thread if any of the subthreads barf
 Thread.abort_on_exception = true
 
-def allocate_modules()
+def allocate_modules(logger)
    db = DatabaseInterface.new(logger)
    house_cleaner = HouseCleaner.new(logger, db)
    dispatcher = FailureDispatcher.new(logger, db, house_cleaner)
@@ -61,7 +61,7 @@ begin
    logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
    logger.level = Logger::INFO
    Emailer::LOGGER = logger
-   monitor = allocate_modules()
+   monitor = allocate_modules(logger)
 
    Signal.trap("TERM") { monitor.persist_state; exit }
    Signal.trap("KILL") { monitor.persist_state; exit }
@@ -77,7 +77,7 @@ begin
        load 'auxiliary_modules.rb'
 
        # Reallocate all of the objects
-       monitor = allocate_modules()
+       monitor = allocate_modules(logger)
        monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
    end
 
