@@ -22,6 +22,7 @@ require 'poisoner'
 require 'filters'
 require 'pstore'
 require 'timeout'
+require 'house_cleaner'
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -33,8 +34,9 @@ class FailureDispatcher
     # results. (we assume that the size of this field is constant)
     attr_accessor :node_2_failed_measurements  
 
-    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
+    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new)
         @logger = logger
+        @house_cleaner = house_cleaner
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
@@ -133,7 +135,7 @@ class FailureDispatcher
         registered_vps = sanity_check_registered_vps
         # Note: filter! removes srcdst2outages where the registration filters
         # did not pass
-        RegistrationFilters.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps)
+        RegistrationFilters.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps, @house_cleaner)
 
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"

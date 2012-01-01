@@ -15,12 +15,12 @@ require 'utilities'
 require 'filters'
 
 class FailureMonitor
-    def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu")
+    def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu", house_cleaner=HouseCleaner.new)
         @dispatcher = dispatcher
         @db = db
         @logger = logger
         @email = email
-        @house_cleaner = HouseCleaner.new(logger, @db)
+        @house_cleaner = house_cleaner
 
         # TODO: handle these with optparse
         @@minutes_per_round = 2
@@ -36,8 +36,9 @@ class FailureMonitor
         @@source_specific_problem_threshold = 0.35
 
         # we send out faulty_node_audit reports every
-        # @@node_audit_period_rounds rounds
-        @@node_audit_period_rounds = 24*60 / @@minutes_per_round
+        # @@node_audit_period_rounds rounds (twice a day)
+        # 1 / day = rounds / minutes * 60 minutes / hour * 24 hours / day
+        @@node_audit_period_rounds = 2 * ((1.0/@@minutes_per_round) * 60 * 24).to_i
 
         @target_set_size = FailureIsolation.TargetSet.size
 

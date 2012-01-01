@@ -5,4 +5,4 @@
 # dynamically reload its modules.
 
 
-pkill -SIGUSR1 -f run_failure_isolation.rb
+pkill -SIGALRM -f run_failure_isolation.rb

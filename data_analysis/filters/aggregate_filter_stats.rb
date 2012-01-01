@@ -26,7 +26,7 @@ class OptsParser
     def initialize()
         @options = {}
         @options_parser = OptionParser.new("Usage: #{$0} [options] (make sure to wrap all options in quotes)") do |opts|
-            @options[:time_start] = Time.now - (24 * 60 * 60) 
+            @options[:time_start] = Time.now - (24 * 60 * 60)
             opts.on( '-t', '--time_start TIME',
                        "Filter outages before TIME (of the form 'YYYY.MM.DD [HH.MM.SS]'). [default last 24 hours]") do |time|
                 @options[:time_start] = Time.parse time
@@ -38,18 +38,17 @@ class OptsParser
                 @options[:time_end] = Time.parse time
             end
     
-            @options[:predicate] = lambda { |tracker| true }
-            @options[:lambda_string] = "'lambda { |tracker| true }'"
+            # Hash from human readable lamda -> predicate
+            @options[:predicates] = { "'lambda { |tracker| true }'" =>  lambda { |tracker| true } }
             opts.on('-p', '--predicate LAMBDA',
                        "Only consider stats trackers LAMBDA returns true. Invokes eval on given arg. [default: #{@options[:lambda_string]}]") do |filter|
-                @options[:lambda_string] = "'#{filter}'"
-                @options[:predicate] = eval(filter)
+                @options[:predicates] = { "'#{filter}'" => eval(filter) }
             end
     
             opts.on('-n', '--no-poisoners',
                        "Set pre-defined predicate for exluding BGP Mux nodes") do |t|
-                @options[:lambda_string] = "'lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }'"
-                @options[:predicate] = lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }
+                @options[:predicates][ "'lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }'"] = \
+                                         lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }
             end
         end
     end
@@ -62,26 +61,36 @@ class OptsParser
     def display()
        $stderr.puts "Filtering outages before #{@options[:time_start]}"
        $stderr.puts "Filtering outages after  #{@options[:time_end]}"
-       $stderr.puts "Applying predicate #{@options[:lambda_string]}"
+       $stderr.puts "Applying predicates:"
+       @options[:predicates].each do |name, predicate|
+            $stderr.puts "       #{name}"
+       end
        self
+    end
+
+    def passes_predicates?(filter_tracker)
+        @options[:predicates].each do |string, predicate|
+           return false unless predicate.call filter_tracker
+        end
+        return true
     end
 end
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that
 # FilterTracker is of interest
-def filter_and_aggregate(time_start, time_end, predicate)
+def filter_and_aggregate(options)
     total_records = 0
     num_passed = 0
     num_failed = 0
     level2num_failed = Hash.new(0)
     level2reason2count = Hash.new { |h,k| h[k] = Hash.new(0) }
     
-    LogIterator::filter_tracker_iterate(time_start) do |filter_tracker|
+    LogIterator::filter_tracker_iterate(options[:time_start]) do |filter_tracker|
         # Each filter_tracker is a single (src, dst) outage
-        next if filter_tracker.first_lvl_filter_time < time_start
-        next if filter_tracker.first_lvl_filter_time > time_end
-        next unless predicate.call filter_tracker
+        next if filter_tracker.first_lvl_filter_time < options[:time_start]
+        next if filter_tracker.first_lvl_filter_time > options[:time_end]
+        next unless options.passes_predicates?(filter_tracker)
 
         total_records += 1
         if filter_tracker.passed?
@@ -105,7 +114,7 @@ def filter_and_aggregate(time_start, time_end, predicate)
     
     puts "=============================="
     puts
-    puts "(src, dst) outages since #{time_start} and before #{time_end}"
+    puts "(src, dst) outages since #{options[:time_start]} and before #{options[:time_end]}"
     Stats.print_average("total", total_records, total_records)
     Stats.print_average("num_passed", num_passed, total_records)
     Stats.print_average("num_failed", num_failed, total_records)
@@ -131,6 +140,7 @@ def filter_and_aggregate(time_start, time_end, predicate)
 end
 
 if __FILE__ == $0
+    $stderr.puts "Note: invoke with --help to see more options"
     options = OptsParser.new.parse!.display
-    filter_and_aggregate(options[:time_start], options[:time_end], options[:predicate])
+    filter_and_aggregate(options)
 end

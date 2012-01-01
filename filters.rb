@@ -188,7 +188,7 @@ module RegistrationFilters
 
     # Run all registration level filters. Mutates srcdst2filter_tracker and
     # srcdst2outage (removes outages which didn't pass)
-    def self.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps)
+    def self.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps, house_cleaner)
         now = Time.new
 
         # list of sources that weren't registered (shouldn't ever happen)
@@ -223,6 +223,9 @@ module RegistrationFilters
             }
             
             Emailer.isolation_exception(message, "ikneaddough@gmail.com").deliver
+
+            # and swap them out while we're at it
+            house_cleaner.swap_out_faulty_nodes(email_warnings)
         end
     end
 
