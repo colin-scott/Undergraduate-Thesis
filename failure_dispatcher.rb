@@ -23,6 +23,12 @@ require 'filters'
 require 'pstore'
 require 'timeout'
 require 'house_cleaner'
+if RUBY_PLATFORM == "java"
+    require 'java'
+    java_import java.util.concurrent.Executors
+    # TODO: HACK. Make me a platform-independant class variable
+    $executor = Executors.newFixedThreadPool(400)
+end
 
 # This guy is just in charge of issuing measurements and logging/emailing results
 #
@@ -173,11 +179,17 @@ class FailureDispatcher
             measurement_start = Time.new
             outage_threads = []
             srcdst2outage.each do |srcdst, outage|
-                outage_threads << Thread.new do
+                block = lambda do
                     src,dst = srcdst
                     filter_tracker = srcdst2filter_tracker[srcdst]
                     outage.measurement_times += deep_copy(measurement_times)
                     process_srcdst_outage(outage, filter_tracker)
+                end
+
+                if $executor
+                    outage_threads << $executor.submit(&block)
+                else
+                    outage_threads << Thread.new(&block)
                 end
             end
 
@@ -190,7 +202,7 @@ class FailureDispatcher
             # TODO: this barrier might take arbitrarily long. Mostly needed
             # for merging pruposes, but we might consider instrumenting this
             # and doing something smarter if it's a bottleneck
-            outage_threads.each { |thread| thread.join }
+            outage_threads.each { |thread| ($executor) ? thread.get : thread.join }
 
             t_prime = Time.new
             @logger.info("Took #{t_prime - t} seconds to join on measurement threads")
@@ -214,9 +226,13 @@ class FailureDispatcher
             merged_outage2id = assign_ids(merged_outages)
             @logger.debug "merged_outages: #{merged_outages}, merged_outage2id #{merged_outage2id}"
 
+
             merged_outage2id.each do |merged_outage, id|
-                Thread.new do
-                    process_merged_outage(merged_outage, id)
+                block = lambda { process_merged_outage(merged_outage, id) }
+                if $executor
+                    $executor.submit(&block)
+                else
+                    Thread.new(&block)
                 end
             end
 
