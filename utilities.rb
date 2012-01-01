@@ -434,17 +434,20 @@ module Inet
         self.in_private_prefix(addr) == 1;
     end
   else
-	$PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
+    require 'java'
+    # Too see these methods, run $ vim ~/jruby/lib/patricia-trie.jar
+    # and look at org/adverk/collection/IpAddressConverter
+    require '/homes/network/revtr/jruby/lib/patricia-trie.jar'
+    IpAddressConverter = org.ardverk.collection.IpAddressConverter
 
+	$PRIVATE_PREFIXES=[["192.168.0.0",16], ["10.0.0.0",8], ["127.0.0.0",8], ["172.16.0.0",12], ["169.254.0.0",16], ["224.0.0.0",4], ["0.0.0.0",8]]
+   
 	def Inet::ntoa( intaddr )
-		((intaddr >> 24) & 255).to_s + '.' + ((intaddr >> 16) & 255).to_s + '.'  + ((intaddr >> 8) & 255).to_s + '.' + (intaddr & 255).to_s 
+		IpAddressConverter.inet_ntoa(intaddr)
 	end
 
 	def Inet::aton(dotted)
-		ints=dotted.chomp("\n").split(".").collect{|x| x.to_i}
-		val=0
-		ints.each{|n| val=(val*256)+n}
-		return val
+		IpAddressConverter.inet_aton(dotted)
 	end
 
     def Inet::in_private_prefix?(ip)
