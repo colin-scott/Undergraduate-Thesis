@@ -24,7 +24,7 @@ Lock::acquire_lock("isolation_lock.txt")
 require 'db_interface'
 require 'pstore'
 require 'failure_monitor'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'isolation_mail'
 require 'active_record'
 require 'fileutils'
@@ -41,7 +41,6 @@ require 'hops'
 require 'revtr_cache_interface'
 require 'failure_analyzer'
 require 'failure_dispatcher'
-
 #require 'isolation_module'
 
 # TODO: move me into FailureIsolationConsts

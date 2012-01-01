@@ -1,7 +1,7 @@
 #!/homes/network/revtr/jruby/bin/jruby  --server -J-Xmx3g --fast -J-XX:+UseParallelGC -J-Djruby.thread.pooling=true
 
 $: << "./"
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'rubygems'
 
 #  Is controller_log used?

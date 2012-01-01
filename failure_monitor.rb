@@ -11,7 +11,7 @@ require 'set'
 require 'yaml'
 require 'outage'
 require 'filter_stats'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'filters'
 
 class FailureMonitor

@@ -19,7 +19,7 @@ require 'timeout'
 require 'failure_analyzer'
 require 'isolation_mail'
 require 'outage'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'direction'
 
 # In charge of initiating BGP Poisonings and logging poisoning results

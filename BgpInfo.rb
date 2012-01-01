@@ -4,7 +4,7 @@ $: << "./"
 # Keeps an in-memory Trie of origin_as_mapping's IP address information
 # For example, retrieve ASNs or prefixes for a given IP
 
-require 'utilities.rb'
+require 'isolation_utilities.rb'
 require 'set'
 
 if RUBY_PLATFORM != "java"

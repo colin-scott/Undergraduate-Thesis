@@ -19,7 +19,7 @@ require 'hops'
 require 'set'
 require 'ip_info'
 require 'resolv'
-require 'utilities'
+require 'isolation_utilities.rb'
 
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 

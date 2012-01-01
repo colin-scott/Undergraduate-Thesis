@@ -7,7 +7,7 @@ $: << "./"
 # Lazily evaluates all large datasets
 
 require 'set'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'yaml'
 
 # Define these in case spooftr_config.rb was not loaded

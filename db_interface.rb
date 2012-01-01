@@ -18,7 +18,7 @@ else
     require 'mysql_connection_manager'
 end
 require 'socket'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'set'
 require 'failure_isolation_consts'
 

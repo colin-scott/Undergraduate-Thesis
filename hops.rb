@@ -16,7 +16,7 @@
 # =============================================================================
 
 require 'forwardable'
-require 'utilities'
+require 'isolation_utilities.rb'
 
 # Generic Path class
 class Path

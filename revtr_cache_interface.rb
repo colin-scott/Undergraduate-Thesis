@@ -9,7 +9,7 @@
 require 'failure_isolation_consts'
 require 'db_interface'
 require 'socket'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'ip_info'
 require 'hops'
 

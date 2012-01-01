@@ -27,7 +27,7 @@
 #
 # TODO: wrap suspects in their own class.
 
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'db_interface'
 require 'failure_isolation_consts'
 

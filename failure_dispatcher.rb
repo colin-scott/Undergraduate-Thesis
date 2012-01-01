@@ -17,12 +17,13 @@ require 'reverse_traceroute_cache'
 require 'timeout'
 require 'failure_analyzer'
 require 'isolation_mail'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'poisoner'
 require 'filters'
 require 'pstore'
 require 'timeout'
 require 'house_cleaner'
+
 if RUBY_PLATFORM == "java"
     require 'java'
     java_import java.util.concurrent.Executors

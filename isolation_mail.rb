@@ -10,7 +10,7 @@ $: << "./"
 
 require 'rubygems'
 require 'action_mailer'
-require 'utilities'
+require 'isolation_utilities.rb'
 
 #ActionMailer::Base.delivery_method = :sendmail
 # Sendmail isn't working with jruby, so we use smtp on our own

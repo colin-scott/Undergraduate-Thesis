@@ -8,7 +8,7 @@ require 'failure_isolation_consts'
 require 'set'
 require 'isolation_mail'
 require 'socket'
-require 'utilities'
+require 'isolation_utilities.rb'
 require 'db_interface'
 
 # Invariant:
