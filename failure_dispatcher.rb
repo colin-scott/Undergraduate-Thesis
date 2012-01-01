@@ -27,7 +27,7 @@ if RUBY_PLATFORM == "java"
     require 'java'
     java_import java.util.concurrent.Executors
     # TODO: HACK. Make me a platform-independant class variable
-    $executor = Executors.newFixedThreadPool(400)
+    $executor = Executors.newFixedThreadPool(200)
 end
 
 # This guy is just in charge of issuing measurements and logging/emailing results
