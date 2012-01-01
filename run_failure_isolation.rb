@@ -52,7 +52,7 @@ Thread.abort_on_exception = true
 def allocate_modules(logger)
    db = DatabaseInterface.new(logger)
    house_cleaner = HouseCleaner.new(logger, db)
-   dispatcher = FailureDispatcher.new(logger, db, house_cleaner)
+   dispatcher = FailureDispatcher.new(db, logger, house_cleaner)
    monitor = FailureMonitor.new(dispatcher, db, logger, house_cleaner)
    monitor
 end

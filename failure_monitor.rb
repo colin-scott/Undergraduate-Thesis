@@ -15,7 +15,7 @@ require 'utilities'
 require 'filters'
 
 class FailureMonitor
-    def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), email="failures@cs.washington.edu", house_cleaner=HouseCleaner.new)
+    def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new, email="failures@cs.washington.edu")
         @dispatcher = dispatcher
         @db = db
         @logger = logger
