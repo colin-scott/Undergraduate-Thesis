@@ -113,7 +113,7 @@ class FailureMonitor
                      @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingMonitorRepo}"
 
             # NOTE: riot specific!
-            system "scp cs@riot.cs.washington.edu:~/ping_monitors/state.* #{FailureIsolation::PingMonitorRepo}"
+            system "scp cs@riot.cs.washington.edu:~/ping_monitors/#{FailureIsolation::PingMonitorRepo}*yml"
 
             node2targetstate = read_in_results()
 
@@ -148,23 +148,18 @@ class FailureMonitor
     # ================================================= #                                                                                                                                 
     
     def read_in_results
-        current_time = Time.now
         node2targetstate = {}
+
+        # Note: PL nodes are on UTC
+        current_time = Time.now
+        current_time -= current_time.gmt_offset
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
 
         Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml").each do |yaml|
-            # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
-            # TODO: don't assume that filename is correctly formatted
-            node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
-            # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
-            # TODO: put this into it's own function
-            up_to_year_index = "YYYY.HH.DD".size
-            clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
-            date = date[0..up_to_year_index]
-            mtime = Time.parse(date + " " + clock)
-
+            node, mtime = parse_filename(yaml)
+            
             seconds_difference = (current_time - mtime).abs
             if seconds_difference >= @@max_ping_lag_seconds
                 minutes_difference = seconds_difference / 60
@@ -208,6 +203,19 @@ class FailureMonitor
 
         # nodes with problems at the source are excluded from node2targetstate
         node2targetstate
+    end
+
+    def parse_filename(yaml)
+        # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
+        # TODO: don't assume that filename is correctly formatted
+        node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
+        node = File.basename node
+        # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
+        up_to_year_index = "YYYY.HH.DD".size
+        clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
+        date = date[0...up_to_year_index]
+        mtime = Time.parse(date + " " + clock)
+        [node, mtime]
     end
  
     # Update metadata at the beginning of each round
