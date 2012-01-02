@@ -138,7 +138,7 @@ class FailureAnalyzer
         @suspect_set_initializers.each do |init|
             # Gather suspects for initializer
             suspects = Set.new(init.call merged_outage)
-            initializer_name = init.to_s
+            initializer_name = init.tohs
 
             suspects.each do |s|
                 # add in the initializer to the suspect object
@@ -176,7 +176,7 @@ class FailureAnalyzer
             break if all_suspect_ips.empty?
             removed = pruner.call all_suspect_ips.clone, merged_outage
             #raise "not properly formatted pruner response #{removed.inspect}" if !removed.respond_to?(:find) or removed.find { |hop| !hop.is_a?(String) or !hop.matches_ip? }
-            pruner2incount_removed[pruner.to_s] = [all_suspect_ips.size, removed & all_suspect_ips]
+            pruner2incount_removed[pruner.to_hs] = [all_suspect_ips.size, removed & all_suspect_ips]
             all_suspect_ips -= removed
         end
 
