@@ -77,7 +77,7 @@ begin
 
        # Reallocate all of the objects
        monitor = allocate_modules(logger)
-       monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
+       monitor.start_pull_cycle()
    end
 
    Signal.trap("USR2") do
@@ -91,7 +91,7 @@ begin
    end
 
    # Loop infinitely
-   monitor.start_pull_cycle((ARGV.empty?) ? FailureIsolation::DefaultPeriodSeconds : ARGV.shift.to_i)
+   monitor.start_pull_cycle()
 rescue Exception => e
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace

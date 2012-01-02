@@ -24,7 +24,7 @@ class FailureMonitor
         @house_cleaner = house_cleaner
 
         # TODO: handle these with optparse
-        @@minutes_per_round = 2
+        @@minutes_per_round = FailureIsolation::DefaultPeriodSeconds / 60
 
         # Max allowable lag for VP ping results before a VP is ignored
         @@max_ping_lag_seconds = 605
@@ -36,10 +36,10 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
 
-        # we send out faulty_node_audit reports every
-        # @@node_audit_period_rounds rounds (twice a day)
-        # 1 / day = rounds / minutes * 60 minutes / hour * 24 hours / day
-        @@node_audit_period_rounds = 2 * ((1.0/@@minutes_per_round) * 60 * 24).to_i
+        # we send out faulty_node_audit reports twice a day 
+        # (there are 24*60/@@minutes_per_round rounds in a day -- so we want to 
+        #  perform an audit report every 24*60/@@minutes_per_round/2 rounds)
+        @@node_audit_period_rounds = 24*60/@@minutes_per_round/2 
 
         @target_set_size = FailureIsolation.TargetSet.size
 
@@ -93,7 +93,7 @@ class FailureMonitor
 
     # loop infinitely, periodically pulling state from ping monitors, and
     # sending interesting outages to FailureDispacher
-    def start_pull_cycle(period)
+    def start_pull_cycle()
         FileUtils.mkdir_p(FailureIsolation::PingMonitorRepo) 
 
         loop do
@@ -136,7 +136,7 @@ class FailureMonitor
             
             clean_the_house if (@current_round % @@node_audit_period_rounds) == 0
 
-            sleep_period = period - (Time.new - start)
+            sleep_period = FailureIsolation::DefaultPeriodSeconds - (Time.new - start)
             @logger.info "Sleeping for #{sleep_period} seconds"
 
             sleep sleep_period if sleep_period > 0
