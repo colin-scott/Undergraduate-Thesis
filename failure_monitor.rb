@@ -105,6 +105,10 @@ class FailureMonitor
             # TODO: cat directly from ssh rather than scp'ing
             # TODO: don't assume a single yml file -- need a better fetching mechanism
             # than pptasks
+            
+            # Get rid of old results
+            FileUtils.rm_r(Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml"))
+            # Get new results
             system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                      @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingMonitorRepo}"
 
@@ -148,6 +152,7 @@ class FailureMonitor
         node2targetstate = {}
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
+
 
         Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml").each do |yaml|
             # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
