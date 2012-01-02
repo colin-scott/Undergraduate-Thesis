@@ -113,7 +113,7 @@ class FailureMonitor
                      @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingMonitorRepo}"
 
             # NOTE: riot specific!
-            system "scp cs@riot.cs.washington.edu:~/ping_monitors/#{FailureIsolation::PingMonitorRepo}*yml"
+            system "scp cs@riot.cs.washington.edu:~/ping_monitors/*yml #{FailureIsolation::PingMonitorRepo}"
 
             node2targetstate = read_in_results()
 
