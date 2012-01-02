@@ -8,6 +8,7 @@ require 'date'
 require 'logger'
 require 'thread'
 require 'forwardable'
+require 'set'
 
 if RUBY_PLATFORM != 'java'
   require 'inline'
