@@ -439,17 +439,17 @@ class FailureDispatcher
         @logger.debug "traceroutes issued"
 
         ## I see empty measurements from time to time, which shouldn't happen
-        #if outage.tr.empty?
-        #    @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
-        #    restart_atd(outage.src)
-        #    sleep 10
-        #    tr_time2 = Time.new
-        #    outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
-        #    if outage.tr.empty?
-        #        @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
-        #        @node_2_failed_measurements[outage.src] += 1
-        #    end
-        #end
+        if outage.tr.empty?
+            @logger.warn "empty traceroute! #{outage.src} #{outage.dst}"
+            restart_atd(outage.src)
+            sleep 10
+            tr_time2 = Time.new
+            outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+            if outage.tr.empty?
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @node_2_failed_measurements[outage.src] += 1
+            end
+        end
 
         # Set to the # of times measurements were reissued. False of
         # measurements succeeded on the first attempt
@@ -482,16 +482,16 @@ class FailureDispatcher
         @logger.debug "non-revtr pings issued"
 
         ## Moar empty measurements!
-        #if ping_responsive.empty?
-        #    @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
-        #    restart_atd(outage.src)
-        #    sleep 10
-        #    ping_responsive, non_responsive_hops = check_reachability(outage)
-        #    if ping_responsive.empty?
-        #        @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
-        #        @node_2_failed_measurements[outage.src] += 1
-        #    end
-        #end
+        if ping_responsive.empty?
+            @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
+            restart_atd(outage.src)
+            sleep 10
+            ping_responsive, non_responsive_hops = check_reachability(outage)
+            if ping_responsive.empty?
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @node_2_failed_measurements[outage.src] += 1
+            end
+        end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
