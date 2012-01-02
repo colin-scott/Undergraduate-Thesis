@@ -143,9 +143,9 @@ module FailureIsolation
     WebDirectory = "/homes/network/revtr/www/isolation_graphs"
 
     # Ping results from VPs for most recent round
-    PingMonitorState = "~/colin/target_state.yml"
+    PingMonitorStatePath = "/home/uw_revtr2/colin/"
     PingMonitorRepo = "#{$DATADIR}/ping_monitoring_state/"
-    PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state"
+    PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state/"
 
     # Historical forward traceroutes gathered from VPS. TODO: move these to
     # the bouncer DB

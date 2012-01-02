@@ -12,6 +12,7 @@ require 'yaml'
 require 'outage'
 require 'filter_stats'
 require 'isolation_utilities.rb'
+require 'time'
 require 'filters'
 
 class FailureMonitor
@@ -102,8 +103,10 @@ class FailureMonitor
             # Grab ping state                      #
             # ==================================== #                                                                                                                                 
             # TODO: cat directly from ssh rather than scp'ing
+            # TODO: don't assume a single yml file -- need a better fetching mechanism
+            # than pptasks
             system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                     @:#{FailureIsolation::PingMonitorState} :#{FailureIsolation::PingMonitorRepo}state"
+                     @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingMonitorRepo}"
 
             # NOTE: riot specific!
             system "scp cs@riot.cs.washington.edu:~/ping_monitors/state.* #{FailureIsolation::PingMonitorRepo}"
@@ -146,13 +149,16 @@ class FailureMonitor
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
-        Dir.glob("#{FailureIsolation::PingMonitorRepo}state*").each do |yaml|
-            # is there a cleaner way to get the mtime of a file?
-            input = File.open(yaml)
-            mtime = input.mtime
-            input.close
-
-            node = yaml.split("state.")[1].strip.downcase
+        Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml").each do |yaml|
+            # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
+            # TODO: don't assume that filename is correctly formatted
+            node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
+            # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
+            # TODO: put this into it's own function
+            up_to_year_index = "YYYY.HH.DD".size
+            clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
+            date = date[0..up_to_year_index]
+            mtime = Time.parse(date + " " + clock)
 
             seconds_difference = (current_time - mtime).abs
             if seconds_difference >= @@max_ping_lag_seconds
@@ -164,7 +170,6 @@ class FailureMonitor
 
             @not_sshable.delete node
 
-            # "state.node1.pl.edu"
             begin
                 yml_hash = YAML.load_file(yaml)
 

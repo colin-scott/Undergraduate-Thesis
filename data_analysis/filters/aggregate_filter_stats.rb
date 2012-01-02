@@ -39,6 +39,8 @@ class OptsParser
             end
     
             # Hash from human readable lamda -> predicate
+            # TODO: don't foce them to type 'lambda { |tracker|'   -- just
+            # have them specify the boolean function that goes inside
             @options[:predicates] = { "'lambda { |tracker| true }'" =>  lambda { |tracker| true } }
             opts.on('-p', '--predicate LAMBDA',
                        "Only consider stats trackers LAMBDA returns true. Invokes eval on given arg. [default: #{@options[:lambda_string]}]") do |filter|
