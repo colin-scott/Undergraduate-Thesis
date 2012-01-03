@@ -56,7 +56,7 @@ module SpoofedTR
 
         dests.each_with_index do |tr, i|
             curr_iteration += 1
-            raise "found the memory leak!!!!" if curr_iteration > max_iterations
+            raise "found the memory leak #{caller}!!!!" if curr_iteration > max_iterations
 
             if tr.is_a?(Array)
                 id2dest[id] = tr[0]
@@ -83,7 +83,7 @@ module SpoofedTR
                 curr_iteration = 0
                 targets.each_with_index do |tr, i|
                     curr_iteration += 1
-                    raise "found the memory leak!!!" if curr_iteration > max_iterations
+                    raise "found the memory leak #{caller}!!!" if curr_iteration > max_iterations
                     id2srcdst[id] = [spoofer, tr]
                     targets[i] = [tr, id]
                     id += 1
@@ -103,7 +103,7 @@ module SpoofedTR
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
 
         # XXX doubtful... but....
-        raise "found the memory leak!" if results.size > 10000
+        raise "found the memory leak#{caller}!!!" if results.size > 10000
 
         results.each do |probes, receiver| 
             # We associate a spoofer id with each destination
@@ -136,7 +136,7 @@ module SpoofedTR
 
             dest2ttl2rtrs.each do |dest, ttl2rtrs|
                 curr_iteration += 1
-                raise "found the memory leak!" if curr_iteration > max_iterations
+                raise "found the memory leak#{caller}!" if curr_iteration > max_iterations
 
                 next if dest.eql? intended_target
 
@@ -145,7 +145,7 @@ module SpoofedTR
 
                 dest2ttl2rtrs[dest].each do |ttl, rtrs|
                     inner_iteration += 1
-                    raise "found the memory leak!" if inner_iteration > max_iterations
+                    raise "found the memory leak!#{caller}" if inner_iteration > max_iterations
 
                     dest2ttl2rtrs[intended_target][ttl] = Set.new unless dest2ttl2rtrs[intended_target].include? ttl
                     dest2ttl2rtrs[intended_target][ttl] |= rtrs
@@ -167,7 +167,7 @@ module SpoofedTR
 
         dest2ttl2rtrs.keys.each do |dest|
             curr_iteration += 1 
-            raise "found the memory leak!" if curr_iteration > max_iterations
+            raise "found the memory leak!#{caller}" if curr_iteration > max_iterations
             
             # convert into [ttl, rtrs] pairs
             sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
