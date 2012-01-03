@@ -133,6 +133,8 @@ class FailureDispatcher
         # Set this to false at the beginning of each round
         @have_retried_connection = false
 
+        assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+
         # ================================================================================
         # Invoke registration filters                                                    #
         # ================================================================================
@@ -146,6 +148,8 @@ class FailureDispatcher
 
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
+
+        assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
 
         # ================================================================================
         # Issue Measurements                                                             #
@@ -212,12 +216,7 @@ class FailureDispatcher
 
             srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
-            # There should always be a one-to-one mapping between trackers and outages
-            num_passed_outages = srcdst2outage.find_all { |srcdst, outage| outage.passed? }.size
-            num_passed_trackers = srcdst2filter_tracker.find_all { |srcdst, filter_tracker| filter_tracker.passed? }.size
-            if num_passed_outages != num_passed_trackers
-                raise AssertionError.new "# of passed outages (#{num_passed_outages}) != # of passed filters (#{num_passed_trackers})"
-            end
+            assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
 
             # ================================================================================
             # Merge (src, dst) outages                                                       #
@@ -226,7 +225,6 @@ class FailureDispatcher
             # id's needed later on
             merged_outage2id = assign_ids(merged_outages)
             @logger.debug "merged_outages: #{merged_outages}, merged_outage2id #{merged_outage2id}"
-
 
             merged_outage2id.each do |merged_outage, id|
                 block = lambda { process_merged_outage(merged_outage, id) }
@@ -242,6 +240,15 @@ class FailureDispatcher
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
         end
+    end
+
+    def assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+       # There should always be a one-to-one mapping between trackers and outages
+       num_passed_outages = srcdst2outage.find_all { |srcdst, outage| outage.passed? }.size
+       num_passed_trackers = srcdst2filter_tracker.find_all { |srcdst, filter_tracker| filter_tracker.passed? }.size
+       if num_passed_outages != num_passed_trackers
+           @logger.warn "# of passed outages (#{num_passed_outages}) != # of passed filters (#{num_passed_trackers}) #{caller[0..3]}"
+       end
     end
 
     # private
@@ -855,6 +862,8 @@ class FailureDispatcher
         non_responsive_hops.each do |hop|
             hop.reachable_from_other_vps = pingable_ips.include? hop.ip
         end
+
+        pingable_ips
     end
 
     # 2. In the intro, we claim that routing problems where
@@ -903,12 +912,10 @@ class FailureDispatcher
           ingress = outage.historical_tr.ingress_router_to_as(divergent_as)
           return if ingress.nil?
 
-          # ping ingress from s and d
+          # ping ingress from s and d to reach reachbilitity
           @logger.debug "splice_alternate_paths() issuing pings"
-          src2reachable = issue_pings([outage.src, outage.dst_hostname], [ingress.ip])
-          @logger.debug "src2reachable: #{src2reachable.inspect}"
-          
-          return if !(src2reachable[outage.src].include? ingress.ip and src2reachable[outage.dst_hostname].include? ingress.ip)
+          pingable_ips = check_pingability_from_other_vps!([outage.src, outage.dst_hostname], [ingress])
+          return unless pingable_ips.include? ingress.ip
 
           @logger.debug "splice_alternate_paths() ingress router reachable"
 
