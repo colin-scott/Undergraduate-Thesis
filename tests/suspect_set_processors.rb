@@ -10,7 +10,7 @@ require 'outage'
 require 'suspect_set_processors'
 require 'db_interface'
 require 'fixtures/fixtures'
-require 'utilities'
+require 'isolation_utilities'
 Thread.abort_on_exception = true
 
 describe "suspect set processors" do

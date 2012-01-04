@@ -105,7 +105,7 @@ end
 #require 'outage'
 #require 'suspect_set_processors'
 #require 'db_interface'
-#require 'utilities'
+#require 'isolation_utilities'
 #Thread.abort_on_exception = true
 #
 #require 'failure_dispatcher'

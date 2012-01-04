@@ -8,7 +8,7 @@ require 'failure_analyzer'
 require 'outage'
 require 'db_interface'
 
-require 'utilities'
+require 'isolation_utilities'
 Thread.abort_on_exception = true
 log = LoggerLog.new($stderr)
 

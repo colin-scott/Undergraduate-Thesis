@@ -9,7 +9,7 @@ require 'failure_dispatcher'
 require 'outage'
 require 'outage_correlation'
 
-require 'utilities'
+require 'isolation_utilities'
 Thread.abort_on_exception = true
 
 uri = ARGV.shift
