@@ -293,27 +293,34 @@ class FailureMonitor
     #
     # Returns [srcdst2outage, srcdst2filtertracker]
     def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+        # For debugging:
+        total_src_dsts = target2observingnode2rounds.values.reduce(0) { |sum,hash| sum + hash.size }
+
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
         srcdst2filtertracker = apply_first_lvl_filters!(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
+        if total_src_dsts != srcdst2filtertracker.size
+            @logger.warn "total_src_dsts (#{total_src_dsts}) != srcdst2filterstracker.size (#{srcdst2filtertracker.size})"
+        end
+
         now = Time.new
 
         target2observingnode2rounds.each do |target, observingnode2rounds|
-            # convert still_connected to strings of the form
-            # "#{node} [#{time of last outage}"]"
-            #
-            # TODO: encpasulate VPs into objects, so to_s automatically
-            # yields the formatted string
-            formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
-            formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
-            formatted_never_seen = target2neverseen[target]
-
             observingnode2rounds.keys.each do |src|
                srcdst = [src, target]
                filter_tracker = srcdst2filtertracker[srcdst]
 
                if filter_tracker.passed?
+                  # convert still_connected to strings of the form
+                  # "#{node} [#{time of last outage}"]"
+                  #
+                  # TODO: encpasulate VPs into objects, so to_s automatically
+                  # yields the formatted string
+                  formatted_connected = target2stillconnected[target].map { |node| "#{node} [#{@nodetarget2lastoutage[[node, target]] or "(n/a)"}]" }
+                  formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
+                  formatted_never_seen = target2neverseen[target]
+
                   srcdst2outage[srcdst] = Outage.new(src, target, target2stillconnected[target],
                                                            formatted_connected, formatted_unconnected, formatted_never_seen)
                   srcdst2outage[srcdst].measurement_times << ["passed_first_lvl_filters", now]
@@ -451,5 +458,4 @@ class FailureMonitor
         @not_sshable.delete node
     end
 end
-
 

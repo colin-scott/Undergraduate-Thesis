@@ -69,8 +69,7 @@ module FirstLevelFilters
         ISSUED_MEASUREMENTS_RECENTLY
     ])
 
-    # Run all first level filters. Mutates filter_trackers and
-    # observingnode2rounds
+    # Run all first level filters. Mutates filter_trackers 
     def self.filter!(target, filter_trackers, observingnode2rounds, neverseen, stillconnected,
                      nodetarget2lastoutage, nodetarget2lastisolationattempt, 
                      current_round, isolation_interval)
@@ -163,7 +162,6 @@ module FirstLevelFilters
         observingnode2rounds.each do |node, rounds|
             if nodetarget2lastisolationattempt.include? [node,target] and 
                         (current_round - nodetarget2lastisolationattempt[[node,target]] <= isolation_interval)
-                observingnode2rounds.delete node 
                 affected_sources.add node
             else
                 nodetarget2lastisolationattempt[[node,target]] = current_round
@@ -188,6 +186,8 @@ module RegistrationFilters
 
     # Run all registration level filters. Mutates srcdst2filter_tracker and
     # srcdst2outage (removes outages which didn't pass)
+    #
+    # Pre: all filter trackers which passed have a corresponding outage object
     def self.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps, house_cleaner)
         now = Time.new
 

@@ -133,7 +133,8 @@ class FailureDispatcher
         # Set this to false at the beginning of each round
         @have_retried_connection = false
 
-        assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+        # Note that no Outage objects are allocated for filtered (src,dst) pairs 
+        assert_no_outage_loss(srcdst2outage.size, srcdst2filter_tracker) { |srcdst2outage| srcdst2outage.size }
 
         # ================================================================================
         # Invoke registration filters                                                    #
@@ -149,7 +150,8 @@ class FailureDispatcher
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
         @logger.puts "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}"
 
-        assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+        # Not that RegistrationFilters.filter! deletes filtered srcdst2outage entries
+        assert_no_outage_loss(srcdst2outage.size, srcdst2filter_tracker)
 
         # ================================================================================
         # Issue Measurements                                                             #
@@ -216,7 +218,11 @@ class FailureDispatcher
 
             srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
-            assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+            # Note that outage.passed? is now initialized
+            total_passed_outages = srcdst2outage.find_all { |srcdst,outage| outage.passed? }.size
+            assert_no_outage_loss(total_passed_outages, srcdst2filter_tracker)
+
+            log_filter_trackers(srcdst2filter_tracker)
 
             # ================================================================================
             # Merge (src, dst) outages                                                       #
@@ -235,16 +241,13 @@ class FailureDispatcher
                 end
             end
 
-            log_filter_trackers(srcdst2filter_tracker)
-
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
         end
     end
 
-    def assert_no_outage_loss(srcdst2outage, srcdst2filter_tracker)
+    def assert_no_outage_loss(num_passed_outages, srcdst2filter_tracker)
        # There should always be a one-to-one mapping between trackers and outages
-       num_passed_outages = srcdst2outage.find_all { |srcdst, outage| outage.passed? }.size
        num_passed_trackers = srcdst2filter_tracker.find_all { |srcdst, filter_tracker| filter_tracker.passed? }.size
        if num_passed_outages != num_passed_trackers
            @logger.warn "# of passed outages (#{num_passed_outages}) != # of passed filters (#{num_passed_trackers}) #{caller[0..3]}"
