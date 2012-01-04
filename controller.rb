@@ -919,7 +919,7 @@ class Controller
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
-            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted)
+            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted,@controller_log)
         }
         max_length=hostname2targets.values.collect{|x| x.length}.max
         if not settings.include?(:timeout)
@@ -934,7 +934,7 @@ class Controller
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
-            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted)
+            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted,@controller_log)
         }
         hostname2targets.delete_if {|host,targets| targets.length == 0 }
         max_length=hostname2targets.values.collect{|x| x.length}.max
@@ -950,7 +950,7 @@ class Controller
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
-            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted)
+            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted,@controller_log)
         }
         hostname2targets.delete_if {|host,targets| targets.length == 0 }
         max_length=hostname2targets.values.collect{|x| x.length}.max
@@ -966,7 +966,7 @@ class Controller
         privates=[]
         blacklisted=[]
         hostname2targets.each{|host,targets|
-            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted)
+            hostname2targets[host],privates,blacklisted=inspect_targets(targets,privates,blacklisted,@controller_log)
         }
         hostname2targets.delete_if {|host,targets| targets.length == 0 }
         max_length=hostname2targets.values.collect{|x| x.length}.max
@@ -1055,7 +1055,7 @@ class Controller
         blacklisted=[]
         receiver2spoofer2targets.values.each {|spoofer2targets|
             spoofer2targets.each{|spoofer,targets|
-                spoofer2targets[spoofer],privates,blacklisted=inspect_targets(targets,privates,blacklisted)
+                spoofer2targets[spoofer],privates,blacklisted=inspect_targets(targets,privates,blacklisted,@controller_log)
             }
             spoofer2targets.delete_if {|spoofer,targets| targets.empty?}
         }
