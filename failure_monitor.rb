@@ -36,10 +36,10 @@ class FailureMonitor
         # node
         @@source_specific_problem_threshold = 0.35
 
-        # we send out faulty_node_audit reports twice a day 
+        # we send out faulty_node_audit reports thrice a day 
         # (there are 24*60/@@minutes_per_round rounds in a day -- so we want to 
-        #  perform an audit report every 24*60/@@minutes_per_round/2 rounds)
-        @@node_audit_period_rounds = 24*60/@@minutes_per_round/2 
+        #  perform an audit report every 24*60/@@minutes_per_round/3 rounds)
+        @@node_audit_period_rounds = 24*60/@@minutes_per_round/3 
 
         @target_set_size = FailureIsolation.TargetSet.size
 
