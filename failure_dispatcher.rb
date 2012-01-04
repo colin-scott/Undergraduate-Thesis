@@ -1,3 +1,4 @@
+$: << "./"
 
 # Coordinate measurements for detected measurements, and log/email results
 
@@ -275,12 +276,11 @@ class FailureDispatcher
        # For debugging. TODO: put me into unit tests instead of here.
        forward_src_dsts = Set.new(forward_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
        reverse_src_dsts = Set.new(reverse_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
-       all_outages = Set.new(outages.map { |o| {:src => o.src, :dst => o.dst} })
+       all_outages = Set.new(outages.find_all { |o| o.direction.is_forward? or o.direction.is_reverse? }.map { |o| {:src => o.src, :dst => o.dst} })
        if (forward_src_dsts | reverse_src_dsts).size != all_outages.size
            # forward U reverse mergings should contain every (src, dst) pair
            # TODO: raise rather than log?
-           @logger.warn "Not merging properly! #{forward_src_dsts.to_a.inspect} #{reverse_src_dsts.to_a.inspect} #{all_outages.to_a.inspect}"
-           @logger.warn "union: #{(forward_src_dsts | reverse_src_dsts).to_a.inspect}"
+           @logger.warn "Not merging properly! [#{forward_src_dsts.to_a.inspect} #{reverse_src_dsts.to_a.inspect} #{all_outages.to_a.inspect}]"
        end
        
        return forward_merged + reverse_merged
@@ -493,13 +493,13 @@ class FailureDispatcher
 
         ## Moar empty measurements!
         if ping_responsive.empty?
-            @logger.puts "empty pings! (#{outage.src}, #{outage.dst} #{ping_respsonive.size + non_responsive_hops.length} ips)"
+            @logger.puts "empty pings! (#{outage.src}, #{outage.dst} #{ping_respsonsive.size + non_responsive_hops.length} ips)"
 
             restart_atd(outage.src)
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst} #{ping_respsonive.size + non_responsive_hops.length} ips)" 
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst} #{ping_respsonsive.size + non_responsive_hops.length} ips)" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end
