@@ -160,9 +160,9 @@ class DotGenerator
         i = 0
         all_ases.each do |asn|
            next if asn.nil?     # nil asn's get assigned to black by default
-           asn2color[asn] = dotgenerator::colors[i] 
+           asn2color[asn] = DotGenerator::colors[i] 
            i += 1
-           raise "too many asns!" if i >= dotgenerator::colors.size
+           raise "too many asns!" if i >= DotGenerator::colors.size
         end
 
         node2asn.each do |node, asn|
