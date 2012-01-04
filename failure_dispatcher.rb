@@ -493,12 +493,13 @@ class FailureDispatcher
 
         ## Moar empty measurements!
         if ping_responsive.empty?
-            @logger.puts "empty pings! (#{outage.src}, #{outage.dst})"
+            @logger.puts "empty pings! (#{outage.src}, #{outage.dst} #{ping_respsonive.size + non_responsive_hops.length} ips)"
+
             restart_atd(outage.src)
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst} #{ping_respsonive.size + non_responsive_hops.length} ips)" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end

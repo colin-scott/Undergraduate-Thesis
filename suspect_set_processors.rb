@@ -231,7 +231,6 @@ class Pruner
     # pptasks directly... cp aliasprobe to a different directory?
     # TODO: move me somewhere else.
     def issue_pings_with_pptasks(sources, targets)
-        # RACE CONDITION ON /TMP/SOURCES! 
         id = Thread.current.__id__
 
         # XXX: DOESN'T WORK FOR RIOT NODES!
