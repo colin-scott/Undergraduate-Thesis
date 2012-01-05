@@ -193,7 +193,6 @@ module RegistrationFilters
 
         # list of sources that weren't registered (shouldn't ever happen)
         email_warnings = Set.new
-        all_sources = Set.new
 
         srcdst2outage.each do |srcdst, outage|
             all_sources.add srcdst[0]
@@ -217,7 +216,6 @@ module RegistrationFilters
 
         # TODO: remove me when riot is running again
         email_warnings.delete_if { |src| FailureIsolation::PoisonerNames.include? src }
-        all_sources.delete_if { |src| FailureIsolation::PoisonerNames.include? src }
 
         if not email_warnings.empty?
             message = %{
@@ -229,7 +227,7 @@ module RegistrationFilters
 
             # and swap them out while we're at it, as long as we aren't
             # swapping out everyone, which indicates that something else is wrong
-            if all_sources.size != email_warnings.size
+            if FailureIsolation.CurrentNodes.size > email_warnings.size
                 house_cleaner.swap_out_faulty_nodes(email_warnings)
             end
         end
