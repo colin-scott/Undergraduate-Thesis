@@ -42,7 +42,7 @@ class FailureDispatcher
     # results. (we assume that the size of this field is constant)
     attr_accessor :node_2_failed_measurements  
 
-    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new)
+    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new, ip_info=IpInfo.new)
         @logger = logger
         @house_cleaner = house_cleaner
         @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
@@ -66,8 +66,7 @@ class FailureDispatcher
         connect_to_drb() # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
-        @ipInfo = IpInfo.new
-
+        @ipInfo = ip_info
         @db = db
 
         @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @registrar, @db)
@@ -493,13 +492,13 @@ class FailureDispatcher
 
         ## Moar empty measurements!
         if ping_responsive.empty?
-            @logger.puts "empty pings! (#{outage.src}, #{outage.dst} #{ping_respsonsive.size + non_responsive_hops.length} ips)"
+            @logger.puts "empty pings! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)"
 
             restart_atd(outage.src)
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst} #{ping_respsonsive.size + non_responsive_hops.length} ips)" 
+                @logger.puts "still empty! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end

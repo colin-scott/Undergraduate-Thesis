@@ -5,7 +5,13 @@ require 'action_mailer'
 require 'drb'
 require 'fileutils'
 require 'ip_info'
+require 'isolation_utilities'
 require 'rspec'
+require 'set'
+require 'db_interface'
+require 'failure_monitor'
+require 'failure_dispatcher'
+require 'house_cleaner'
 
 Thread.abort_on_exception = true
 
@@ -18,13 +24,32 @@ module TestVars
     NonReachableTargetPath = "/tmp/targets_never_seen.yml"
     LastObservedOutagePath = "/tmp/targets_never_seen.yml"
 
-    FailureIsolation.remove_const(:PingStatePath)
+    FailureIsolation.module_eval("remove_const :PingStatePath")
     FailureIsolation::PingStatePath = "./ping_monitor_state"
+
+    # To make unit tests run faster, assume that targets haven't changed since
+    # last bootup
+    FailureIsolation.module_eval(%{@TargetSet = Set.new(IO.read(TargetSetPath).split("\n"))})
 
     CONTROLLER = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
     REGISTRAR = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
     VPS = CONTROLLER.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
-    IP_INFO = IpInfo.new
+    @ip_info = nil
+    def self.IP_INFO()
+       @ip_info ||= IpInfo.new 
+    end
+
+    LOGGER = LoggerLog.new($stderr)
+    DB = DatabaseInterface.new(LOGGER)
+    HOUSE_CLEANER = HouseCleaner.new(LOGGER, DB)
+    @dispatcher = nil
+    def self.DISPATCHER
+        @dispatcher ||= FailureDispatcher.new(DB, LOGGER, HOUSE_CLEANER, self.IP_INFO)
+    end
+    @monitor = nil
+    def self.MONITOR
+        @monitor ||= FailureMonitor.new(self.DISPATCHER, DB, LOGGER, HOUSE_CLEANER)
+    end
 
     # Returns [src, [reciever_1, receiver_2, ...,receiver_n-1]]
     def self.get_n_registered_vps(n=5)

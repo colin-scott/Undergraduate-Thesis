@@ -122,7 +122,7 @@ class FailureMonitor
             # ==================================== #                                                                                                                                 
             target2observingnode2rounds, target2neverseen, target2stillconnected = classify_outages(node2targetstate)
             
-            srcdst2outage, srcdst2filtertracker = send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+            srcdst2outage, srcdst2filtertracker = filter_outages(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
             # ==================================== #                                                                                                                                 
             # Send to FailureDispatcher            #
@@ -260,7 +260,7 @@ class FailureMonitor
                next if FailureIsolation.TargetBlacklist.include? target
 
                if rounds.nil?
-                   @logger.puts "#{node}: #{target} is nil..."
+                   @logger.warn "#{node}: #{target} is nil..."
                    next
                end
                 
@@ -290,7 +290,7 @@ class FailureMonitor
     # FilterTrackers for outages which passeed
     #
     # Returns [srcdst2outage, srcdst2filtertracker]
-    def send_notification(target2observingnode2rounds, target2neverseen, target2stillconnected)
+    def filter_outages(target2observingnode2rounds, target2neverseen, target2stillconnected)
         # For debugging:
         total_src_dsts = target2observingnode2rounds.values.reduce(0) { |sum,hash| sum + hash.size }
 
