@@ -44,9 +44,8 @@ class FailureMonitor
         @target_set_size = FailureIsolation.TargetSet.size
 
         # Persistent storage for { vp hostname -> [non-reachable target1, ... ]
-        @@never_seen_yml = "./targets_never_seen.yml"
         begin
-            @vps_2_targets_never_seen = YAML.load_file(@@never_seen_yml)
+            @vps_2_targets_never_seen = YAML.load_file(FailureIsolation::NonReachableTargetPath)
             raise unless @vps_2_targets_never_seen
         rescue Exception
             @vps_2_targets_never_seen = {}
@@ -56,10 +55,9 @@ class FailureMonitor
         end
         
         # Persistent storage for { [vp hostname, target] -> date of last observed outage }
-        @@last_outage_yml = "./last_outages.yml"
         begin
             # [node, target] -> last time outage was observed
-            @nodetarget2lastoutage = (File.readable? @@last_outage_yml) ? YAML.load_file(@@last_outage_yml) : {}
+            @nodetarget2lastoutage = (File.readable? FailureIsolation::LastObservedOutagePath) ? YAML.load_file(FailureIsolation::LastObservedOutagePath) : {}
             raise unless @nodetarget2lastoutage.is_a?(Hash)
         rescue Exception
             @nodetarget2lastoutage = {}
@@ -87,14 +85,14 @@ class FailureMonitor
     # Make sure metadata persists between reboots
     #  (write out @vps_2_targets_never_seen and @nodetarget2lastoutage to a YAML file to be read in later)
     def persist_state
-        File.open(@@never_seen_yml, "w") { |f| YAML.dump(@vps_2_targets_never_seen, f) }
-        File.open(@@last_outage_yml, "w") { |f| YAML.dump(@nodetarget2lastoutage, f) }
+        File.open(FailureIsolation::NonReachableTargetPath, "w") { |f| YAML.dump(@vps_2_targets_never_seen, f) }
+        File.open(FailureIsolation::LastObservedOutagePath, "w") { |f| YAML.dump(@nodetarget2lastoutage, f) }
     end
 
     # loop infinitely, periodically pulling state from ping monitors, and
     # sending interesting outages to FailureDispacher
     def start_pull_cycle()
-        FileUtils.mkdir_p(FailureIsolation::PingMonitorRepo) 
+        FileUtils.mkdir_p(FailureIsolation::PingStatePath) 
 
         loop do
             start = Time.new
@@ -107,13 +105,13 @@ class FailureMonitor
             # than pptasks
             
             # Get rid of old results
-            FileUtils.rm_r(Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml"))
+            FileUtils.rm_r(Dir.glob("#{FailureIsolation::PingStatePath}*yml"))
             # Get new results
             system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                     @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingMonitorRepo}"
+                     @:#{FailureIsolation::PingMonitorStatePath}*yml #{FailureIsolation::PingStatePath}"
 
             # NOTE: riot specific!
-            system "scp cs@riot.cs.washington.edu:~/ping_monitors/*yml #{FailureIsolation::PingMonitorRepo}"
+            system "scp cs@riot.cs.washington.edu:~/ping_monitors/*yml #{FailureIsolation::PingStatePath}"
 
             node2targetstate = read_in_results()
 
@@ -157,7 +155,7 @@ class FailureMonitor
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
 
-        Dir.glob("#{FailureIsolation::PingMonitorRepo}*yml").each do |yaml|
+        Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
             node, mtime = parse_filename(yaml)
             
             seconds_difference = (current_time - mtime).abs

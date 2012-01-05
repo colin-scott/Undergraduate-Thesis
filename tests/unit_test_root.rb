@@ -5,6 +5,9 @@ require 'action_mailer'
 require 'drb'
 require 'fileutils'
 require 'ip_info'
+require 'rspec'
+
+Thread.abort_on_exception = true
 
 module TestVars
     IsolationResults = "/tmp/isolation_results"
@@ -12,9 +15,11 @@ module TestVars
     FilterStatsPath = "/tmp/filter_stats"
     DotFiles = "/tmp/dots"
     CurrentMuxOutagesPath = "/tmp/mock_mux_log.yml"
+    NonReachableTargetPath = "/tmp/targets_never_seen.yml"
+    LastObservedOutagePath = "/tmp/targets_never_seen.yml"
 
-    # TODO: have the system grab fake ping monitor state? That would be a great
-    # end-to-end test. Would need to mock out measurements.
+    FailureIsolation.remove_const(:PingStatePath)
+    FailureIsolation::PingStatePath = "./ping_monitor_state"
 
     CONTROLLER = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
     REGISTRAR = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
@@ -37,7 +42,8 @@ module TestVars
     # private:
 
     # Re-write constants in FailureIsolation
-    ["IsolationResults", "MergedIsolationResults", "FilterStatsPath", "DotFiles"].each do |var|
+    ["IsolationResults", "MergedIsolationResults", "FilterStatsPath", "DotFiles",
+                         "NonReachableTargetPath", "LastObservedOutagePath"].each do |var|
        # Get the values (too lazy to type out a hash)
        val = TestVars.module_eval(var)
        # Re-write FailureIsolation's constant

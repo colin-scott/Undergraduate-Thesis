@@ -129,23 +129,28 @@ module FailureIsolation
     # ====================================
     #         Data Directories           #
     # ====================================
+    # Metadata for the FailureMonitor
+    NonReachableTargetPath = "#{$DATADIR}/targets_never_seen.yml"
+    LastObservedOutagePath = "#{$DATADIR}/last_outages.yml"
+
+    # Outage logs
     IsolationResults = "#{$DATADIR}/isolation_results_final"
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
+    # Log of current poisonings
     CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
 
     # Logs of filter (first level, registration, and second level) statistics
     FilterStatsPath = "#{$DATADIR}/filter_stats"
 
-    DotFiles = "#{$DATADIR}/dots"
-
+    # Web links
     WebDirectory = "/homes/network/revtr/www/isolation_graphs"
+    DotFiles = "#{$DATADIR}/dots"
 
     # Ping results from VPs for most recent round
     PingMonitorStatePath = "/home/uw_revtr2/colin/"
-    PingMonitorRepo = "#{$DATADIR}/ping_monitoring_state/"
-    PingStatePath = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state/"
+    PingStatePath = "#{$DATADIR}/ping_monitoring_state/"
 
     # Historical forward traceroutes gathered from VPS. TODO: move these to
     # the bouncer DB

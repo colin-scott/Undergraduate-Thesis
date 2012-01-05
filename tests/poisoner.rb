@@ -1,12 +1,9 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 
-Thread.abort_on_exception = true
-
+require_relative 'unit_test_root'
 require 'direction'
 require 'poisoner'
-require 'rspec'
-require_relative 'unit_test_root'
 
 describe Poisoner do
     before(:each) do
