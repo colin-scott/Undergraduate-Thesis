@@ -406,6 +406,7 @@ module PoP
 end
 
 if $0 == __FILE__
+    puts Dir.glob("#{FailureIsolation::PingStatePath}*yml").inspect
     require 'thread'
     Thread.abort_on_exception = true
 

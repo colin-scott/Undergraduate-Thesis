@@ -195,7 +195,6 @@ module RegistrationFilters
         email_warnings = Set.new
 
         srcdst2outage.each do |srcdst, outage|
-            all_sources.add srcdst[0]
             filter_tracker = srcdst2filter_tracker[srcdst]
             filter_tracker.registration_filter_time = now
             filter_tracker.registered_vps = registered_vps

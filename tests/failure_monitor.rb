@@ -4,7 +4,7 @@ require_relative 'unit_test_root'
 require_relative '../failure_monitor'
 
 describe FailureMonitor do
-    let(:node2targetstate) { debugger; TestVars.Monitor.read_in_results(Time.parse("2012.01.05 02:56:34") + Time.new.utc_offset) } 
+    let(:node2targetstate) { TestVars.Monitor.read_in_results(Time.parse("2012.01.05 02:56:34") + Time.new.utc_offset) } 
     let(:target2observingnode2rounds) { TestVars.Monitor.classify_outages(node2targetstate)[0] }
     let(:target2neverseen) { TestVars.Monitor.classify_outages(node2targetstate)[1] }
     let(:target2stillconnected) { TestVars.Monitor.classify_outages(node2targetstate)[2] }

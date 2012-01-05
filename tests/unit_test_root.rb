@@ -25,7 +25,7 @@ module TestVars
     LastObservedOutagePath = "/tmp/last_outages.yml"
 
     FailureIsolation.module_eval("remove_const :PingStatePath")
-    FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/tests/ping_monitoring_state"
+    FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/tests/ping_monitoring_state/"
 
     # To make unit tests run faster, assume that targets haven't changed since
     # last bootup
