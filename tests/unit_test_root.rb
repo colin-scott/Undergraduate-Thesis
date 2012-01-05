@@ -4,14 +4,14 @@ require 'failure_isolation_consts'
 require 'action_mailer'
 require 'drb'
 require 'fileutils'
-require 'ip_info'
+require 'IpInfo'
 require 'isolation_utilities'
 require 'rspec'
 require 'set'
 require 'db_interface'
 require 'failure_monitor'
-require 'failure_dispatcher'
-require 'house_cleaner'
+require 'failure_Dispatcher'
+require 'HouseCleaner'
 
 Thread.abort_on_exception = true
 
@@ -31,31 +31,31 @@ module TestVars
     # last bootup
     FailureIsolation.module_eval(%{@TargetSet = Set.new(IO.read(TargetSetPath).split("\n"))})
 
-    CONTROLLER = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-    REGISTRAR = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
-    VPS = CONTROLLER.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
-    @ip_info = nil
-    def self.IP_INFO()
-       @ip_info ||= IpInfo.new 
+    Controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
+    Registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
+    VPs = CONTROLLER.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
+    @IpInfo = nil
+    def self.IpInfo()
+       @IpInfo ||= IpInfo.new 
     end
 
-    LOGGER = LoggerLog.new($stderr)
-    DB = DatabaseInterface.new(LOGGER)
-    HOUSE_CLEANER = HouseCleaner.new(LOGGER, DB)
+    Logger = LoggerLog.new($stderr)
+    DB = DatabaseInterface.new(Logger)
+    HouseCleaner = HouseCleaner.new(Logger, DB)
     @dispatcher = nil
-    def self.DISPATCHER
-        @dispatcher ||= FailureDispatcher.new(DB, LOGGER, HOUSE_CLEANER, self.IP_INFO)
+    def self.Dispatcher
+        @dispatcher ||= FailureDispatcher.new(DB, Logger, HouseCleaner, self.IpInfo)
     end
     @monitor = nil
-    def self.MONITOR
-        @monitor ||= FailureMonitor.new(self.DISPATCHER, DB, LOGGER, HOUSE_CLEANER)
+    def self.Monitor
+        @monitor ||= FailureMonitor.new(self.Dispatcher, DB, Logger, HouseCleaner)
     end
 
     # Returns [src, [reciever_1, receiver_2, ...,receiver_n-1]]
-    def self.get_n_registered_vps(n=5)
-        VPS.shuffle!
-        src = VPS.first
-        receivers = VPS[1..n]
+    def self.get_n_registered_VPs(n=5)
+        VPs.shuffle!
+        src = VPs.first
+        receivers = VPs[1..n]
         [src, receivers]
     end
 
@@ -87,7 +87,7 @@ end
 #  "finished" to enable asserts
 class Emailer < ActionMailer::Base
     def isolation_results(merged_outage)
-        LOGGER.debug "Attempted to send isolation_results email"
+        Logger.debug "Attempted to send isolation_results email"
 
         @merged_outage = merged_outage
 
@@ -96,7 +96,7 @@ class Emailer < ActionMailer::Base
              :recipients => "ikneaddough@gmail.com"
     end
     def isolation_exception(exception, recipient="ikneaddough@gmail.com")
-        LOGGER.debug "Attempted to send isolation_exception email"
+        Logger.debug "Attempted to send isolation_exception email"
 
         @exception = exception
 
@@ -106,7 +106,7 @@ class Emailer < ActionMailer::Base
     end
     def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
                           bad_srcs, possibly_bad_srcs)
-        LOGGER.debug "Attempted to send faulty_node_report email"
+        Logger.debug "Attempted to send faulty_node_report email"
 
         @outdated_nodes = outdated_node
         @problems_at_the_source = problems_at_the_source
@@ -121,7 +121,7 @@ class Emailer < ActionMailer::Base
              :recipients => "ikneaddough@gmail.com"
     end
     def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
-        LOGGER.debug "Attempted to send faulty_node_report email"
+        Logger.debug "Attempted to send faulty_node_report email"
 
         @dataset2unresponsive_targets = dataset2unresponsive_targets 
         @possibly_bad_targets = possibly_bad_targets
@@ -133,7 +133,7 @@ class Emailer < ActionMailer::Base
              :recipients => "ikneaddough@gmail.com"
     end
     def poison_notification(outage)
-        LOGGER.debug "Attempted to send poison_notification email"
+        Logger.debug "Attempted to send poison_notification email"
 
         @outage = outage
         

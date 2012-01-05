@@ -59,7 +59,7 @@ end
 begin
    logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
    logger.level = Logger::INFO
-   Emailer::LOGGER = logger
+   Emailer::Logger= logger
    monitor = allocate_modules(logger)
 
    Signal.trap("TERM") { monitor.persist_state; exit }

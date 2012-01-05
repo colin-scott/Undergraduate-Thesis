@@ -30,7 +30,7 @@ ActionMailer::Base.raise_delivery_errors = true
 ActionMailer::Base.prepend_view_path("./templates")
 
 class Emailer < ActionMailer::Base
-    LOGGER = LoggerLog.new($stderr)
+    Logger = LoggerLog.new($stderr)
 
     def test_email(email)
         mail(:subject => "Ashoat is testing!", 
@@ -156,7 +156,7 @@ class Emailer < ActionMailer::Base
         end
     end
     def isolation_results(merged_outage)
-        LOGGER.info "Attempted to send isolation_results email"
+        Logger.info "Attempted to send isolation_results email"
 
         @merged_outage = merged_outage
 
@@ -167,7 +167,7 @@ class Emailer < ActionMailer::Base
         end
     end
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
-        LOGGER.info "Attempted to send isolation_exception email #{exception}"
+        Logger.info "Attempted to send isolation_exception email #{exception}"
 
         @exception = exception
 
@@ -179,7 +179,7 @@ class Emailer < ActionMailer::Base
     end
     def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
                           bad_srcs, possibly_bad_srcs)
-        LOGGER.info "Attempted to send faulty_node_report email"
+        Logger.info "Attempted to send faulty_node_report email"
 
         @outdated_nodes = outdated_node
         @problems_at_the_source = problems_at_the_source
@@ -196,7 +196,7 @@ class Emailer < ActionMailer::Base
         end
     end
     def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
-        LOGGER.info "Attempted to send faulty_node_report email"
+        Logger.info "Attempted to send faulty_node_report email"
 
         @dataset2unresponsive_targets = dataset2unresponsive_targets 
         @possibly_bad_targets = possibly_bad_targets
@@ -210,7 +210,7 @@ class Emailer < ActionMailer::Base
         end
     end
     def poison_notification(outage)
-        LOGGER.info "Attempted to send poison_notification email"
+        Logger.info "Attempted to send poison_notification email"
 
         @outage = outage
         
