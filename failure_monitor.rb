@@ -113,7 +113,7 @@ class FailureMonitor
             # NOTE: riot specific!
             system "scp cs@riot.cs.washington.edu:~/ping_monitors/*yml #{FailureIsolation::PingStatePath}"
 
-            node2targetstate = read_in_results()
+            node2targetstate = read_in_results(start)
 
             update_auxiliary_state(node2targetstate)
 
@@ -145,18 +145,17 @@ class FailureMonitor
     # Methods for retrieving ping state                 #
     # ================================================= #                                                                                                                                 
     
-    def read_in_results
+    def read_in_results(current_time)
         node2targetstate = {}
 
-        # Note: PL nodes are on UTC
-        current_time = Time.now
+        # Note: PL nodes are on UTC. Note: -= creates a new Time object
         current_time -= current_time.gmt_offset
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
-
         Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
             node, mtime = parse_filename(yaml)
+            next if node.nil?
             
             seconds_difference = (current_time - mtime).abs
             if seconds_difference >= @@max_ping_lag_seconds
@@ -204,16 +203,20 @@ class FailureMonitor
     end
 
     def parse_filename(yaml)
-        # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
-        # TODO: don't assume that filename is correctly formatted
-        node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
-        node = File.basename node
-        # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
-        up_to_year_index = "YYYY.HH.DD".size
-        clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
-        date = date[0...up_to_year_index]
-        mtime = Time.parse(date + " " + clock)
-        [node, mtime]
+        begin
+            # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
+            node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
+            node = File.basename node
+            # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
+            up_to_year_index = "YYYY.HH.DD".size
+            clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
+            date = date[0...up_to_year_index]
+            mtime = Time.parse(date + " " + clock)
+            return [node, mtime]
+        rescue Exception => e
+            Emailer.isolation_exception("unparseable filename #{yaml} #{e.backtrace}", "ikneaddough@gmail.com").deliver
+            return [nil, nil]
+        end
     end
  
     # Update metadata at the beginning of each round

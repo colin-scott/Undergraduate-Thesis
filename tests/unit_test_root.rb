@@ -4,14 +4,14 @@ require 'failure_isolation_consts'
 require 'action_mailer'
 require 'drb'
 require 'fileutils'
-require 'IpInfo'
+require 'ip_info'
 require 'isolation_utilities'
 require 'rspec'
 require 'set'
 require 'db_interface'
 require 'failure_monitor'
-require 'failure_Dispatcher'
-require 'HouseCleaner'
+require 'failure_dispatcher'
+require 'house_cleaner'
 
 Thread.abort_on_exception = true
 
@@ -22,10 +22,10 @@ module TestVars
     DotFiles = "/tmp/dots"
     CurrentMuxOutagesPath = "/tmp/mock_mux_log.yml"
     NonReachableTargetPath = "/tmp/targets_never_seen.yml"
-    LastObservedOutagePath = "/tmp/targets_never_seen.yml"
+    LastObservedOutagePath = "/tmp/last_outages.yml"
 
     FailureIsolation.module_eval("remove_const :PingStatePath")
-    FailureIsolation::PingStatePath = "./ping_monitor_state"
+    FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/tests/ping_monitoring_state"
 
     # To make unit tests run faster, assume that targets haven't changed since
     # last bootup
@@ -33,7 +33,7 @@ module TestVars
 
     Controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
     Registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
-    VPs = CONTROLLER.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
+    VPs = Controller.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
     @IpInfo = nil
     def self.IpInfo()
        @IpInfo ||= IpInfo.new 
@@ -67,8 +67,7 @@ module TestVars
     # private:
 
     # Re-write constants in FailureIsolation
-    ["IsolationResults", "MergedIsolationResults", "FilterStatsPath", "DotFiles",
-                         "NonReachableTargetPath", "LastObservedOutagePath"].each do |var|
+    ["IsolationResults", "MergedIsolationResults", "FilterStatsPath", "DotFiles"].each do |var|
        # Get the values (too lazy to type out a hash)
        val = TestVars.module_eval(var)
        # Re-write FailureIsolation's constant
@@ -80,6 +79,26 @@ module TestVars
 
     # Clear previous test case data
     FileUtils.rm_rf CurrentMuxOutagesPath
+
+    # Add fake data to node2targetneverseen.yml
+    targets_never_seen = {
+      "pl1.rcc.uottawa.ca" => [],
+      "planetlab2.tamu.edu" => [],
+      "planetlab-1.sjtu.edu.cn" => [],
+      "planetlab3-dsl.cs.cornell.edu" => [],
+      "plgmu5.ite.gmu.edu" => [],
+      "plnode-04.gpolab.bbn.com" => [],
+      "dschinni.planetlab.extranet.uni-passau.de" => [],
+      "pli1-pa-4.hpl.hp.com" => [],
+      "planet-lab1.itba.edu.ar" => [],
+      "planetlab1.csuohio.edu" => [],
+      "planetlab2.poly.edu" => [],
+      "planetlab-01.ece.uprm.edu" => [],
+      "planetlab-1.calpoly-netlab.net" => [],
+      "prin.bgpmux" => []
+    }
+    
+    File.open(FailureIsolation::NonReachableTargetPath, "w") { |f| YAML.dump(targets_never_seen, f) }
 end
 
 # Monkey Wrench email methods to go only to Colin
@@ -93,7 +112,7 @@ class Emailer < ActionMailer::Base
 
         mail :subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
              :from => "failures@cs.washington.edu",
-             :recipients => "ikneaddough@gmail.com"
+             :to => "ikneaddough@gmail.com"
     end
     def isolation_exception(exception, recipient="ikneaddough@gmail.com")
         Logger.debug "Attempted to send isolation_exception email"
@@ -102,7 +121,7 @@ class Emailer < ActionMailer::Base
 
         mail :subject => "Isolation Module Exception",
              :from => "failures@cs.washington.edu",
-             :recipients => recipient
+             :to => recipient
     end
     def faulty_node_report(outdated_nodes, problems_at_the_source, not_sshable, not_controllable, failed_measurements,
                           bad_srcs, possibly_bad_srcs)
@@ -118,7 +137,7 @@ class Emailer < ActionMailer::Base
 
         mail :subject => "faulty monitoring node report",
              :from => "failures@cs.washington.edu",
-             :recipients => "ikneaddough@gmail.com"
+             :to => "ikneaddough@gmail.com"
     end
     def isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops)
         Logger.debug "Attempted to send faulty_node_report email"
@@ -130,7 +149,7 @@ class Emailer < ActionMailer::Base
 
         mail :subject => "Isolation target status",
              :from => "failures@cs.washington.edu",
-             :recipients => "ikneaddough@gmail.com"
+             :to => "ikneaddough@gmail.com"
     end
     def poison_notification(outage)
         Logger.debug "Attempted to send poison_notification email"
@@ -139,7 +158,7 @@ class Emailer < ActionMailer::Base
         
         mail :subject => "Poison Opportunity Detected!",
              :from => "failures@cs.washington.edu",
-             :recipients => "ikneaddough@gmail.com"
+             :to => "ikneaddough@gmail.com"
     end
 end
 
