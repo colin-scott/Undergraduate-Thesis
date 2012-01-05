@@ -166,6 +166,8 @@ class Emailer < ActionMailer::Base
             format.html { render "isolation_results.text.html.erb" } 
         end
     end
+    # TODO: make a isolation_warning() message which indicates that the system
+    # hasn't crashed, but we still want to be emailed about something
     def isolation_exception(exception, recipient="failures@cs.washington.edu")
         Logger.info "Attempted to send isolation_exception email #{exception}"
 
