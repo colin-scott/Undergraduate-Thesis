@@ -23,7 +23,6 @@ describe FailureMonitor do
     
     describe("#filter_outages") do
         it "returns same # of outages as passed filters" do
-            debugger
             srcdst2outage, srcdst2filtertracker = TestVars.Monitor.filter_outages(
                                 target2observingnode2rounds, target2neverseen, target2stillconnected)
     

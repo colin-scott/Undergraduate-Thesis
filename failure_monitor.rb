@@ -215,6 +215,8 @@ class FailureMonitor
             return [node, mtime]
         rescue Exception => e
             Emailer.isolation_exception("unparseable filename #{yaml} #{e.backtrace}", "ikneaddough@gmail.com").deliver
+            hostname = File.basename(yaml).gsub(/_target_state.yml$/, "")
+            system "ssh uw_revtr2@#{hostname} pkill -9 -f ping_monitor_client.rb"
             return [nil, nil]
         end
     end
