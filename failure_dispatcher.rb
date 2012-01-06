@@ -633,7 +633,7 @@ class FailureDispatcher
 
         # encapsulate the ttlhoptuple lists into historicalforwardhop objects
         # todoc: why is this a nested array?
-        [ForwardPath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipinfo) }),
+        [ForwardPath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
             historical_trace_timestamp]
     end
 
