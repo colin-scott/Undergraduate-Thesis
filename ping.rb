@@ -30,6 +30,8 @@ module Ping
          
         results,unsuccessful_hosts,privates,blacklisted = controller.ping(hostname2targets)
 
+        controller.log.warn "Ping::sendProbe() unsuccessful_hosts!: #{unsuccessful_hosts.inspect}" unless unsuccessful_hosts.empty?
+
         return self.parse_all_pairs_results(srcs, results)
     end
 
