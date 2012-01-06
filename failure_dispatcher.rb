@@ -80,17 +80,17 @@ class FailureDispatcher
 
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
-        # Grab historical traceroutes once a day
-        Thread.new do
-            loop do
-                # TODO: put traces in the DB
-                @historical_trace_timestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
-                @node2target2trace = {}
-                node2target2trace.each do |node, target2trace|
-                   @node2target2trace[node.downcase] = target2trace 
-                end
-                sleep 60 * 60 * 24
-            end
+        # Grab historical traceroutes (also called on demand when the SIGWINCH
+        # signal is sent
+        grab_historical_traces
+    end
+
+    def grab_historical_traces
+        # TODO: put traces in the DB
+        @historical_trace_timestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+        @node2target2trace = {}
+        node2target2trace.each do |node, target2trace|
+           @node2target2trace[node.downcase] = target2trace 
         end
     end
     
@@ -230,7 +230,6 @@ class FailureDispatcher
             merged_outages = merge_outages(srcdst2outage.values)
             # id's needed later on
             merged_outage2id = assign_ids(merged_outages)
-            @logger.debug "merged_outages: #{merged_outages}, merged_outage2id #{merged_outage2id}"
 
             merged_outage2id.each do |merged_outage, id|
                 block = lambda { process_merged_outage(merged_outage, id) }
@@ -339,8 +338,6 @@ class FailureDispatcher
         # turn into a linked list ( I think? )
         outage.build
 
-        log_srcdst_outage(outage)
-
         if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker)
             # Generate a DOT graph
             outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
@@ -351,6 +348,8 @@ class FailureDispatcher
         else
             @logger.debug "Heuristic failure! measurement times: #{outage.measurement_times.inspect}"
         end
+
+        log_srcdst_outage(outage)
 
         return outage.passed_filters
     end
@@ -616,7 +615,9 @@ class FailureDispatcher
         HistoricalReversePath.new(src, dst, path)
     end
 
-    # Retrieve historical forward traceroutes issued from VPs (not the atlas)
+    # retrieve historical forward traceroutes issued from vps (not the atlas)
+    # todo: merge this with ethan's pl-pl system -- it's silly to have two.
+    # alternatively, grab trace files from the vps more than once a day ;-)
     def retrieve_historical_tr(src, dst)
         src = src.downcase
         if @node2target2trace.include? src and @node2target2trace[src].include? dst
@@ -629,9 +630,9 @@ class FailureDispatcher
 
         @logger.debug "isolate_outage(#{src}, #{dst}), historical_traceroute_results: #{historical_tr_ttlhoptuples.inspect}"
 
-        # Encapsulate the ttlhoptuple lists into HistoricalForwardHop objects
-        # TODOC: why is this a nested array?
-        [ForwardPath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
+        # encapsulate the ttlhoptuple lists into historicalforwardhop objects
+        # todoc: why is this a nested array?
+        [forwardpath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| historicalforwardhop.new(ttlhop[0], ttlhop[1], @ipinfo) }),
             historical_trace_timestamp]
     end
 
