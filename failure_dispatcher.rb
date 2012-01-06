@@ -624,6 +624,7 @@ class FailureDispatcher
             historical_tr_ttlhoptuples = @node2target2trace[src][dst]
             historical_trace_timestamp = @historical_trace_timestamp
         else
+            @logger.warn "No historical trace found for #{src},#{dst} ..."
             historical_tr_ttlhoptuples = []
             historical_trace_timestamp = nil
         end

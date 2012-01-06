@@ -321,7 +321,7 @@ module SecondLevelFilters
 
    # We're flying blind without a historical traceroute. These should always
    # be present for functioning nodes anyway
-   def self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr=false)
+   def self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr=true)
         # Hack: BGP Mux nodes didn't have historical traces
         skip_hist_tr ||= FailureIsolation::PoisonerNames.include? src
 
@@ -337,7 +337,7 @@ module SecondLevelFilters
        no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
 
        $stderr.puts "WTF? [-1] is nil, but not empty?" if historical_tr[-1].nil? and !historical_tr.empty?
-       historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace && !historical_tr[-1].nil? and historical_tr[-1].ip == "0.0.0.0"
+       historical_trace_didnt_reach = !skip_hist_tr and !no_historical_trace and !historical_tr[-1].nil? and historical_tr[-1].ip == "0.0.0.0"
    end
 
    # it's uninteresting if no measurements from the VP worked... probably the
