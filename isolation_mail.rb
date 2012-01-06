@@ -183,13 +183,13 @@ class Emailer < ActionMailer::Base
                           bad_srcs, possibly_bad_srcs)
         Logger.info "Attempted to send faulty_node_report email"
 
-        @outdated_nodes = outdated_node
+        @outdated_nodes = outdated_nodes
         @problems_at_the_source = problems_at_the_source
         @not_sshable = not_sshable
         @not_controllable = not_controllable
         @failed_measurements = failed_measurements
         @bad_srcs = bad_srcs
-        @possibly_bad_srcs = possibly_bad_src
+        @possibly_bad_srcs = possibly_bad_srcs
 
         mail(:subject => "faulty monitoring node report",
              :from => "uwfailures@gmail.com",
