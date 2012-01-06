@@ -16,7 +16,7 @@ require 'time'
 require 'filters'
 
 class FailureMonitor
-    attr_accessor dispatcher
+    attr_accessor :dispatcher
 
     def initialize(dispatcher=FailureDispatcher.new, db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new, email="failures@cs.washington.edu")
         @dispatcher = dispatcher
