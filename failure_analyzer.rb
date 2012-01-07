@@ -384,8 +384,8 @@ class FailureAnalyzer
     end
 
     # Return whether the outage passes second level filters
-    def passes_filtering_heuristics?(outage, filter_tracker, file=nil, skip_hist_tr=false)
-        SecondLevelFilters.filter!(outage, filter_tracker, @ipInfo, file, skip_hist_tr) 
+    def passes_filtering_heuristics?(outage, filter_tracker, file=nil, skip_hist_tr=true)
+        SecondLevelFilters.filter!(outage, filter_tracker, @ipInfo, file, true) 
         return outage.passed_filters
     end
 
