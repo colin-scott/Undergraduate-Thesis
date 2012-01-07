@@ -271,7 +271,7 @@ module SecondLevelFilters
 
    # Run all second level filters. Mutates filter_tracker, and sets
    # outage.passed_filters
-   def self.filter!(outage, filter_tracker, ip_info, file=nil, skip_hist_tr=false)
+   def self.filter!(outage, filter_tracker, ip_info, file=nil, skip_hist_tr=true)
        # TODO: don't declare these variables like this... it's ugly
        src = outage.src
        dst = outage.dst 
@@ -333,7 +333,7 @@ module SecondLevelFilters
    # VP /never/ reached the destination in the past! Note that historical
    # traces will always be chosen from the most recent trace that reached, and
    # only will result in a non-reaching trace if no historical trace reached.
-   def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=false)
+   def self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr=true)
        no_historical_trace = self.no_historical_trace?(historical_tr, src, skip_hist_tr)
 
        $stderr.puts "WTF? [-1] is nil, but not empty?" if historical_tr[-1].nil? and !historical_tr.empty?
