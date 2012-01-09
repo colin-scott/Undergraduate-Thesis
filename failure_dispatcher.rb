@@ -80,6 +80,8 @@ class FailureDispatcher
 
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
+	@node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
+
         # Grab historical traceroutes (also called on demand when the SIGWINCH
         # signal is sent
         grab_historical_traces
@@ -493,14 +495,24 @@ class FailureDispatcher
         if ping_responsive.empty?
             @logger.warn "empty pings! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)"
 
+            @node2emptypings[outage.src].push_empty
             restart_atd(outage.src)
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
                 @logger.warn "still empty! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" 
                 @node_2_failed_measurements[outage.src] += 1
+                @node2emptypings[outage.src].push_empty
+            else
+                    node2emptypings[outage.src].push_nonempty
             end
+	    else
+            @node2emptypings[outage.src].push_nonempty
         end
+	    # XXX in case we want to swap out problematic nodes:
+	    # if @node2emptypings[outage.src].fraction_empty > 0.8
+	    # 	# swap_out_node
+	    # end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
@@ -1007,4 +1019,29 @@ class FailureDispatcher
           end
         end
     end
+end
+
+class EmptyStats 
+	def initialize(history_size)
+		@empty = 0
+		@array = Array.new
+		@histsz = history_size
+	end
+	def push_empty
+		@empty += 1
+		@array.push(1)
+		self._check_size
+	end
+	def push_nonempty
+		@array.push(0)
+		self._check_size
+	end
+	def fraction_empty
+		return @empty.to_f / @array.length
+	end
+	def _check_size
+		while(@array.length > @histsz)
+			@empty -= @array.shift
+		end
+	end
 end
