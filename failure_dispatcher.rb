@@ -456,7 +456,7 @@ class FailureDispatcher
             tr_time2 = Time.new
             outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
             if outage.tr.empty?
-                @logger.puts "still empty! (#{outage.src}, #{outage.dst})" 
+                @logger.warn "traceroute still empty! (#{outage.src}, #{outage.dst})" 
                 @node_2_failed_measurements[outage.src] += 1
             end
         end
@@ -500,7 +500,7 @@ class FailureDispatcher
             sleep 10
             ping_responsive, non_responsive_hops = check_reachability(outage)
             if ping_responsive.empty?
-                @logger.warn "still empty! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" 
+                @logger.warn "pings still empty! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" 
                 @node_2_failed_measurements[outage.src] += 1
                 @node2emptypings[outage.src].push_empty
             else
