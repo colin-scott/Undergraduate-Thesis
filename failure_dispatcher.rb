@@ -29,7 +29,7 @@ if RUBY_PLATFORM == "java"
     require 'java'
     java_import java.util.concurrent.Executors
     # TODO: HACK. Make me a platform-independant class variable
-    $executor = Executors.newFixedThreadPool(200)
+    $executor = Executors.newFixedThreadPool(32)
 end
 
 # This guy is just in charge of issuing measurements and logging/emailing results
@@ -1010,7 +1010,8 @@ class FailureDispatcher
         # Tokyo Cabinet (handles this transparently), but support won't
         # install it on the networks cluster for us.
         today_str = t.strftime("%Y.%m.%d")
-        store = PStore.new(FailureIsolation::FilterStatsPath+"/"+today_str)
+        name = FailureIsolation::FilterStatsPath+"/"+today_str
+        store = PStore.new(name, true)
         store.transaction do
           # We assign a unique id for each of today's filter stat objects
           # For now, we use t+src+dst

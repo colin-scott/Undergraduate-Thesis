@@ -145,7 +145,7 @@ class DatabaseInterface
 
     # fetch all reverse hops from the cache
     def fetch_reverse_hops()
-        sql = "select distinct inet_ntoa(hop) from cache_hops where date < (current_timestamp()-24*60*60)"
+        sql = "select distinct inet_ntoa(hop) from cache_hops where date > (current_timestamp()-7*24*60*60)"
         
         results = Set.new(query(sql)).to_a
 

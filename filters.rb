@@ -15,7 +15,7 @@ require 'set'
 module Filters
     module Level
         CONNECTIVITY = :connectivity    # first level filters
-        REGISTRATION= :registration     # registration filters
+        REGISTRATION = :registration     # registration filters
         MEASUREMENT = :measurement      # measurement filters
     end
     
@@ -226,7 +226,7 @@ module RegistrationFilters
 
             # and swap them out while we're at it, as long as we aren't
             # swapping out everyone, which indicates that something else is wrong
-            if FailureIsolation.CurrentNodes.size > email_warnings.size
+            if email_warnings.size <= 3
                 house_cleaner.swap_out_faulty_nodes(email_warnings)
             end
         end

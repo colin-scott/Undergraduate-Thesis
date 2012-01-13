@@ -219,6 +219,30 @@ module FailureIsolation
         @HubbleTargets ||= Set.new(IO.read(HubbleTargetsPath).split("\n").map { |s| s.strip })
     end
 
+    # Helper method:
+    def self.read_in_riot_ips(remote_path)
+        tmp_path = "/tmp/riot_nodes.txt"
+        system "scp #{remote_path} #{tmp_path}"
+        ips = Set.new
+
+        File.foreach(tmp_path) do |line|
+           node, ip, device = line.chomp.split 
+           ips.add ip
+        end
+
+        ips
+    end
+
+    MuxNodesPath = "cs@riot.cs.washington.edu:~/node_name_ip_device.txt"
+    def self.MuxNodes
+        @MuxNodes ||= self.read_in_riot_ips(MuxNodesPath)
+    end
+
+    SentinelNodesPath = "cs@riot.cs.washington.edu:~/sentinel_name_ip_device.txt"
+    def self.SentinelNodes
+        @SentinelNodes ||= self.read_in_riot_ips(SentinelNodesPath)
+    end
+
     # NOTE: to add a dataset, mimick the above lines
     def self.get_dataset(dst)
         if self.HarshaPoPs.include? dst
@@ -233,6 +257,10 @@ module FailureIsolation
             return DataSets::ATTTargets
         elsif self.HubbleTargets.include? dst
             return DataSets::HubbleTargets
+        elsif self.MuxNodes.include? dst
+            return DataSets::MuxNodes
+        elsif self.SentinelNodes.include? dst
+            return DataSets::SentinelNodes
         else
             return DataSets::Unknown 
         end
@@ -261,6 +289,10 @@ module FailureIsolation
         self.ATTTargets
         @HubbleTargets = nil
         self.HubbleTargets
+        @MuxNodes = nil
+        self.MuxNodes
+        @SentinelNodes = nil
+        self.SentinelNodes
         self.UpdateTargetSet()
     end
 
@@ -371,14 +403,17 @@ module DataSets
     Unknown = :"Unknown"
     ATTTargets = :"ATT"
     HubbleTargets = :"Hubble Targets"
+    MuxNodes = :"Mux Nodes"
+    SentinelNodes = :"Sentinel Nodes"
 
     # NOTE: 
     #  to add a dataset, add an element to this array, and edit
     #  the path in FailureIsolation. Note that these are the Sets! not the
     #  symbols
     AllDataSets = [FailureIsolation.HarshaPoPs, FailureIsolation.BeyondHarshaPoPs,
-        FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets]
-    #   FailureIsolation.HubbleTargets]
+        FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets,
+        FailureIsolation.MuxNodes, FailureIsolation.SentinelNodes]
+    #   ,FailureIsolation.HubbleTargets]
 
     def self.ToPath(dataset)
         case dataset
@@ -408,18 +443,22 @@ module PoP
 end
 
 if $0 == __FILE__
-    puts Dir.glob("#{FailureIsolation::PingStatePath}*yml").inspect
-    require 'thread'
-    Thread.abort_on_exception = true
+    puts FailureIsolation.MuxNodes.inspect
+    puts FailureIsolation.SentinelNodes.inspect
+    puts FailureIsolation.TargetSet.inspect
 
-    Thread.new { sleep }
+    #puts Dir.glob("#{FailureIsolation::PingStatePath}*yml").inspect
+    #require 'thread'
+    #Thread.abort_on_exception = true
 
-    require 'time'
-    t = Time.parse("2011-09-19 11:40:43 -0700")
-    
-    puts FailureIsolation.pl_pl_path_for_date(t)
+    #Thread.new { sleep }
 
-    puts FailureIsolation.TargetSet.size
+    #require 'time'
+    #t = Time.parse("2011-09-19 11:40:43 -0700")
+    #
+    #puts FailureIsolation.pl_pl_path_for_date(t)
+
+    #puts FailureIsolation.TargetSet.size
 
 
     require 'yaml'
