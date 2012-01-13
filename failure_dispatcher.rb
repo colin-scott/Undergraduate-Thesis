@@ -80,7 +80,7 @@ class FailureDispatcher
 
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
-	@node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
+	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
 
         # Grab historical traceroutes (also called on demand when the SIGWINCH
         # signal is sent
@@ -504,11 +504,12 @@ class FailureDispatcher
                 @node_2_failed_measurements[outage.src] += 1
                 @node2emptypings[outage.src].push_empty
             else
-                    node2emptypings[outage.src].push_nonempty
+                @node2emptypings[outage.src].push_nonempty
             end
 	    else
             @node2emptypings[outage.src].push_nonempty
         end
+
 	    # XXX in case we want to swap out problematic nodes:
 	    # if @node2emptypings[outage.src].fraction_empty > 0.8
 	    # 	# swap_out_node
