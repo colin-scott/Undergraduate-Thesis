@@ -17,13 +17,15 @@ module Filters
         CONNECTIVITY = :connectivity    # first level filters
         REGISTRATION = :registration     # registration filters
         MEASUREMENT = :measurement      # measurement filters
+        SWAP = :swap                    # VPs were swappd out
     end
     
     # Ordered levels
     Levels = [
         Level::CONNECTIVITY,
         Level::REGISTRATION,
-        Level::MEASUREMENT
+        Level::MEASUREMENT, 
+        Level::SWAP
     ]
 
     def self.reason2level(reason)
@@ -33,9 +35,23 @@ module Filters
             return Level::REGISTRATION
         elsif SecondLevelFilters::TRIGGERS.include? reason
             return Level::MEASUREMENT
+        elsif SwapFilters::TRIGGERS.include? reason
+            return Level::SWAP
         else
             raise "Unknown reason #{reason}"
         end
+    end
+end
+
+module SwapFilters
+    EMPTY_PINGS = :empty_pings
+
+    TRIGGERS = Set.new([
+        EMPTY_PINGS    
+    ])
+
+    def self.empty_pings!(outage, filter_tracker)
+        filter_tracker.failure_reasons << EMPTY_PINGS
     end
 end
 

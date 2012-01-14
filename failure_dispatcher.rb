@@ -224,6 +224,8 @@ class FailureDispatcher
             total_passed_outages = srcdst2outage.find_all { |srcdst,outage| outage.passed? }.size
             assert_no_outage_loss(total_passed_outages, srcdst2filter_tracker)
 
+            swap_out_nodes_faulty_nodes(srcdst2filter_tracker)
+
             log_filter_trackers(srcdst2filter_tracker)
 
             # ================================================================================
@@ -255,7 +257,15 @@ class FailureDispatcher
        end
     end
 
-    # private
+    def swap_out_faulty_nodes(srcdst2filter_tracker)
+        sources_to_swap = Set.new
+        srcdst2filter_tracker.each do |srcdst, tracker|
+            next if (SwapFilters.TRIGGERS & tracker.failure_reasons).empty?
+            sources_to_swap.add srcdst[0]
+        end
+
+        @house_cleaner.swap_out_faulty_nodes(sources_to_swap.to_a) uness sources_to_swap.empty?
+    end
 
     # Cluster together (src, dst) outages into MergedOutage objects. A single
     # (src, dst) outage may appear in multiple MergedOutage objects if it
@@ -333,7 +343,7 @@ class FailureDispatcher
     def process_srcdst_outage(outage, filter_tracker)
         @logger.debug "process_srcdst_outage: #{outage.src}, #{outage.dst}"
 
-        gather_measurements(outage)
+        gather_measurements(outage, filter_tracker)
 
         outage.file = get_uniq_filename(outage.src, outage.dst)
 
@@ -421,7 +431,7 @@ class FailureDispatcher
     #
     # TODO: I should figure out a better way to gather data, rather
     # than this longgg method
-    def gather_measurements(outage)
+    def gather_measurements(outage, filter_tracker)
         reverse_problem = outage.pings_towards_src.empty?
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
