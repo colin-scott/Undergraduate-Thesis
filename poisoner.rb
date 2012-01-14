@@ -24,11 +24,12 @@ require 'direction'
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 class Poisoner
-    def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr))
+    def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr), unpoison_timeout_seconds=20*60)
         @failure_analyzer = failure_analyzer
         @db = db 
         @ip_info = ip_info
         @logger = logger
+        @unpoison_timeout_seconds = unpoison_timeout_seconds
 
         # TODO: threshold for outage duration! Don't want to poison outages
         # that will likely resolve themselves before poisoning is effective.
@@ -139,7 +140,7 @@ class Poisoner
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
         begin
-            previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
+            previous_outages = YAML.load_file(FailureIsolation::PoisonLogPath)
         rescue Exception
             @logger.warn "failed to load yaml file #{$!}"
         end
@@ -169,7 +170,7 @@ class Poisoner
             end
         end
 
-        File.open(FailureIsolation::CurrentMuxOutagesPath, "w") { |f| YAML.dump(previous_outages, f) }
+        File.open(FailureIsolation::PoisonLogPath, "w") { |f| YAML.dump(previous_outages, f) }
     end
 
     # ssh to riot and execute the poisoning

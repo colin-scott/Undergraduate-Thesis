@@ -129,6 +129,19 @@ module FailureIsolation
     end
 
     # ====================================
+    #         Poisoning scripts          #
+    # ====================================
+    PoisoningDashboardPath = "/homes/network/revtr/poisoning_dashboard"
+    # Script to execute a poison
+    ExecutePoisonPath = "#{PoisoningDashboardPath}/execute_poison.rb"
+    # Script to execute a poison
+    UnpoisonPath = "#{PoisoningDashboardPath}/unpoison.rb"
+    # Log of poisonings
+    PoisonLogPath = "#{PoisoningDashboardPath}/poison_log.yml"
+    # Human-readable display of current poisonings
+    CurrentPoisoningsPath = "#{PoisoningDashboardPath}/who_is_currently_poisoned?.rb"
+
+    # ====================================
     #         Data Directories           #
     # ====================================
     # Metadata for the FailureMonitor
@@ -139,9 +152,6 @@ module FailureIsolation
     IsolationResults = "#{$DATADIR}/isolation_results_final"
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results"
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
-
-    # Log of current poisonings
-    CurrentMuxOutagesPath = "/homes/network/revtr/poisoning_dashboard/current_outages.yml"
 
     # Logs of filter (first level, registration, and second level) statistics
     FilterStatsPath = "#{$DATADIR}/filter_stats"
@@ -233,12 +243,12 @@ module FailureIsolation
         ips
     end
 
-    MuxNodesPath = "cs@riot.cs.washington.edu:~/node_name_ip_device.txt"
+    MuxNodesPath = "cs@riot.cs.washington.edu:~/nodename_ip_device.txt"
     def self.MuxNodes
         @MuxNodes ||= self.read_in_riot_ips(MuxNodesPath)
     end
 
-    SentinelNodesPath = "cs@riot.cs.washington.edu:~/sentinel_name_ip_device.txt"
+    SentinelNodesPath = "cs@riot.cs.washington.edu:~/sentinelname_ip_device.txt"
     def self.SentinelNodes
         @SentinelNodes ||= self.read_in_riot_ips(SentinelNodesPath)
     end

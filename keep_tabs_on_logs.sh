@@ -16,6 +16,7 @@ new_controller=`cat controller_log_size`
 
 if [ "$old_isolation" -eq "$new_isolation" ]; then
     echo ISOLATION_NOT_LOGGING
+    ./restart_isolation.sh
 fi
 if [ "$old_controller" -eq  "$new_controller" ]; then
     echo CONTROLLER_NOT_LOGGING
