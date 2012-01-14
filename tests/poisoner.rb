@@ -54,7 +54,7 @@ describe Poisoner do
             @p.unstub(:log_outages)
 
             @p.log_outages({"mlab"=>{Direction.REVERSE=>{@outage1=>@outage1.suspected_failures[Direction.REVERSE]}}})
-            puts IO.read(TestVars::CurrentMuxOutagesPath)
+            puts IO.read(TestVars::PoisonLogPath)
         end
     end
 end

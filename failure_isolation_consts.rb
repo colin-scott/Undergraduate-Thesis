@@ -472,7 +472,6 @@ if $0 == __FILE__
 
 
     require 'yaml'
-    #previous_outages = YAML.load_file(FailureIsolation::CurrentMuxOutagesPath)
     #puts previous_outages.inspect
 
     #a = FailureIsolation.ATTTargets

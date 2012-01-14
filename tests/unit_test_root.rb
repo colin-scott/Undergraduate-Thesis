@@ -20,7 +20,7 @@ module TestVars
     MergedIsolationResults = "/tmp/merged_isolation_results"
     FilterStatsPath = "/tmp/filter_stats"
     DotFiles = "/tmp/dots"
-    CurrentMuxOutagesPath = "/tmp/mock_mux_log.yml"
+    PoisonLogPath = "/tmp/mock_mux_log.yml"
     NonReachableTargetPath = "/tmp/targets_never_seen.yml"
     LastObservedOutagePath = "/tmp/last_outages.yml"
 
