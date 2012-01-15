@@ -1,7 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
 
-require_relative 'unit_test_root'
+require File::expand_path(File::dirname(__FILE__)) + '/unit_test_root'
 require 'direction'
 require 'poisoner'
 

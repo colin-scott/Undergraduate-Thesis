@@ -3,7 +3,6 @@ $: << File.expand_path("../")
 
 require 'isolation_module'
 require 'drb'
-require 'outage_correlation'
 require 'failure_analyzer'
 require 'outage'
 require 'db_interface'
