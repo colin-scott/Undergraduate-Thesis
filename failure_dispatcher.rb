@@ -264,7 +264,7 @@ class FailureDispatcher
             sources_to_swap.add srcdst[0]
         end
 
-        @house_cleaner.swap_out_faulty_nodes(sources_to_swap.to_a) uness sources_to_swap.empty?
+        @house_cleaner.swap_out_faulty_nodes(sources_to_swap.to_a) unless sources_to_swap.empty?
     end
 
     # Cluster together (src, dst) outages into MergedOutage objects. A single
