@@ -26,8 +26,8 @@ describe Poisoner do
         @outage1.passed_filters = true
         @outage2.passed_filters = true
         
-        @outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", TestVars::IP_INFO)]
-        @outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", TestVars::IP_INFO)]
+        @outage1.suspected_failures[Direction.REVERSE] = [Hop.new("218.101.61.52", TestVars.IpInfo)]
+        @outage2.suspected_failures[Direction.FORWARD] = [Hop.new("218.101.61.52", TestVars.IpInfo)]
         
         @merged_outage = MergedOutage.new([@outage1, @outage2])
     end
