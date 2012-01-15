@@ -516,14 +516,9 @@ class FailureDispatcher
             else
                 @node2emptypings[outage.src].push_nonempty
             end
-	    else
+        else
             @node2emptypings[outage.src].push_nonempty
         end
-
-	    # XXX in case we want to swap out problematic nodes:
-	    # if @node2emptypings[outage.src].fraction_empty > 0.8
-	    # 	# swap_out_node
-	    # end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
         check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
@@ -567,6 +562,13 @@ class FailureDispatcher
             splice_alternate_paths(outage)
             @logger.debug("alternate path splicing complete")
         end
+
+	fempty = @node2emptypings[outage.src].fraction_empty
+	@logger.debug("src #{outage.src} fraction empty #{fempty}")
+        if fempty > 0.8
+		@logger.debug("scheduling #{outage.src} for swap_out")
+		SwapFilters.empty_pings!(outage, filter_tracker)
+	end
     end
 
     # One reason measurements might not be issued is that atd is stuck.
