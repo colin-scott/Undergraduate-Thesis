@@ -4,7 +4,6 @@ $: << "./"
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 
-require 'utilities'
 require 'failure_isolation_consts'
 require 'drb'
 require 'drb/acl'
