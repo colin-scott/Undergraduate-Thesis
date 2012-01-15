@@ -224,7 +224,7 @@ class FailureDispatcher
             total_passed_outages = srcdst2outage.find_all { |srcdst,outage| outage.passed? }.size
             assert_no_outage_loss(total_passed_outages, srcdst2filter_tracker)
 
-            swap_out_nodes_faulty_nodes(srcdst2filter_tracker)
+            swap_out_faulty_nodes(srcdst2filter_tracker)
 
             log_filter_trackers(srcdst2filter_tracker)
 
@@ -260,7 +260,7 @@ class FailureDispatcher
     def swap_out_faulty_nodes(srcdst2filter_tracker)
         sources_to_swap = Set.new
         srcdst2filter_tracker.each do |srcdst, tracker|
-            next if (SwapFilters.TRIGGERS & tracker.failure_reasons).empty?
+            next if (SwapFilters::TRIGGERS & tracker.failure_reasons).empty?
             sources_to_swap.add srcdst[0]
         end
 

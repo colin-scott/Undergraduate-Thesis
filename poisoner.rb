@@ -1,8 +1,10 @@
+#!/homes/network/revtr/jruby/bin/jruby
 
 $: << "./"
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 
+require 'utilities'
 require 'failure_isolation_consts'
 require 'drb'
 require 'drb/acl'
@@ -18,6 +20,7 @@ require 'reverse_traceroute_cache'
 require 'timeout'
 require 'failure_analyzer'
 require 'isolation_mail'
+require 'direction'
 require 'outage'
 require 'isolation_utilities.rb'
 require 'direction'
@@ -26,7 +29,7 @@ require 'eventmachine'
 
 EventMachine.threadpool_size = 1
 
-Struct.new("LogEntry", :start_time, :last_updated, :end_time, :src, :dst, :direction, :failures)
+LogEntry = Struct.new(:start_time, :last_updated, :end_time, :src, :dst, :direction, :failures)
 
 class PoisonLog
    # Write-through database, y'all.
@@ -49,6 +52,7 @@ class PoisonLog
     end
 
     def reload()
+        @logger.debug "Reloading poison log"
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
         begin
@@ -67,7 +71,8 @@ class PoisonLog
     def find_previous_entry(src, dst, direction)
         # see if there was already an entry with the same
         #   -  source, destination, and direction
-        already_there = @previous_outages.reverse.find do |log_entry| 
+        already_there = @previous_outages.reverse.find do |log_entry|
+            $stderr.puts log_entry.inspect
             log_entry.src == src && log_entry.dst == dst && log_entry.direction == direction
         end
     end
@@ -239,3 +244,16 @@ class Poisoner
         end
     end
 end
+
+if __FILE__ == $0
+    current_time = Time.new
+    src = "1.2.3.4"
+    dst = "4.5.5.6"
+    direction = Direction.REVERSE
+    formatted_failures = []
+
+    LogEntry.new(current_time, current_time, nil, src, dst, direction, formatted_failures)
+    p = PoisonLog.new(LoggerLog.new($stderr))
+    puts p.find_previous_entry(src, dst, direction)
+end
+
