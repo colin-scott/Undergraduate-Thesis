@@ -453,9 +453,10 @@ module PoP
 end
 
 if $0 == __FILE__
-    puts FailureIsolation.MuxNodes.inspect
-    puts FailureIsolation.SentinelNodes.inspect
-    puts FailureIsolation.TargetSet.inspect
+    puts `#{FailureIsolation::CurrentPoisoningsPath}`
+    #puts FailureIsolation.MuxNodes.inspect
+    #puts FailureIsolation.SentinelNodes.inspect
+    #puts FailureIsolation.TargetSet.inspect
 
     #puts Dir.glob("#{FailureIsolation::PingStatePath}*yml").inspect
     #require 'thread'

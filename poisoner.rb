@@ -21,6 +21,63 @@ require 'isolation_mail'
 require 'outage'
 require 'isolation_utilities.rb'
 require 'direction'
+require 'forwardable'
+require 'struct'
+require 'eventmachine'
+
+EventMachine.threadpool_size = 1
+
+Struct.new("LogEntry", :start_time, :last_updated, :end_time, :src, :dst, :direction, :failures)
+
+class PoisonLog
+   # Write-through database, y'all.
+   # TODO: use a real database
+    
+   extend Forwardable
+   def_delegators :@previous_outages,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
+       :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
+       :empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,
+       :initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,
+       :reject,:reject!,:replace,:reverse,:reverse!,:reverse_each,:rindex,:select,:shift,:size,
+       :slice,:slice!,:sort,:sort!,:to_a,:to_ary,:transpose,:uniq,:uniq!,:unshift,:values_at,:zip,
+       :|,:all?,:any?,:collect,:detect,:each_cons,:each_slice,:each_with_index,:entries,:enum_cons,
+       :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
+       :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
+
+    def initialize(logger)
+        @logger = logger
+        @previous_outages = reload
+    end
+
+    def reload()
+        # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
+        previous_outages = []
+        begin
+            previous_outages = YAML.load_file(FailureIsolation::PoisonLogPath)
+        rescue Exception
+            @logger.warn "failed to load yaml file #{$!}"
+        end
+
+        previous_outages = [] unless previous_outages
+        previous_outages
+    end
+
+    # Return nil if no entry existed
+    #
+    # If multiple entries match, return the most recent one
+    def find_previous_entry(src, dst, direction)
+        # see if there was already an entry with the same
+        #   -  source, destination, and direction
+        already_there = @previous_outages.reverse.find do |log_entry| 
+            log_entry.src == src && log_entry.dst == dst && log_entry.direction == direction
+        end
+    end
+
+    def commit()
+        # TODO: make me threadsafe
+        File.open(FailureIsolation::PoisonLogPath, "w") { |f| YAML.dump(@previous_outages, f) }
+    end
+end
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 class Poisoner
@@ -29,7 +86,10 @@ class Poisoner
         @db = db 
         @ip_info = ip_info
         @logger = logger
+        @poison_log = PoisonLog.new(logger)
+
         @unpoison_timeout_seconds = unpoison_timeout_seconds
+        @event_machine_thread = Thread.new { EventMachine::run }
 
         # TODO: threshold for outage duration! Don't want to poison outages
         # that will likely resolve themselves before poisoning is effective.
@@ -137,47 +197,46 @@ class Poisoner
             raise AssertionError.new("src2direction2outage2failures should not be empty!") 
         end
 
-        # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
-        previous_outages = []
-        begin
-            previous_outages = YAML.load_file(FailureIsolation::PoisonLogPath)
-        rescue Exception
-            @logger.warn "failed to load yaml file #{$!}"
-        end
-
-        previous_outages = [] unless previous_outages
-        
         current_time = Time.new
 
         src2direction2outage2failures.each do |src, direction2outage2failures|
             direction2outage2failures.each do |direction, outage2failures|
                 outage2failures.each do |outage, failures|
-                    # see if there was already an entry with the same
-                    #   -  source, destination, and direction
-                    already_there = previous_outages.find do |time_src_dst_dir_failures| 
-                        time, prev_src, prev_dst, prev_direction, *prev_failures = time_src_dst_dir_failures
-                        # the source, dstin
-                        (prev_src == src && prev_dst == dst && prev_direction == prev_direction)
-                    end
+                    already_there = @poison_log.find_previous_entry(src, outage.dst, outage.direction)
 
                     if already_there
-                        already_there[1] = current_time  
+                        already_there.last_updated = current_time  
                     else
                         formatted_failures = failures.map { |h| "#{h.ip} #{h.asn}" }
-                        previous_outages << [current_time, current_time, src, outage.dst, outage.direction, formatted_failures].flatten
+                        @poison_log << LogEntry.new(current_time, current_time, nil, src, outage.dst, outage.direction, formatted_failures)
                     end
                 end
             end
         end
 
-        File.open(FailureIsolation::PoisonLogPath, "w") { |f| YAML.dump(previous_outages, f) }
+        @poison_log.commit
+    end
+
+    def already_poisoning?(src)
+        `#{FailureIsolation::CurrentPoisoningsPath}`.include? src
     end
 
     # ssh to riot and execute the poisoning
     def execute_poison(src, asn, outage)
+        if already_poisoning? src
+            @logger.warn "#{src} is already poisoning... ignoring poison opportunity"
+            return 
+        end
+
         Emailer.poison_notification(outage).deliver
 
         # (logs event on riot)
         system "#{FailureIsolation::ExecutePoisonPath} #{src} #{asn}"
+        EventMachine::add_timer(@unpoison_timeout_seconds) do
+            system "#{FailureIsolation::UnpoisonPath} #{src} #{asn}"
+            t = Time.new
+            @poison_log.find_previous_entry(src, outage.dst, outage.direction).end_time = t
+            @poison_log.commit
+        end
     end
 end
