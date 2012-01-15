@@ -78,7 +78,7 @@ module TestVars
     end
 
     # Clear previous test case data
-    FileUtils.rm_rf CurrentMuxOutagesPath
+    FileUtils.rm_rf PoisonLogPath
 
     # Add fake data to node2targetneverseen.yml
     targets_never_seen = {

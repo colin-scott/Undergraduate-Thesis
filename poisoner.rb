@@ -22,7 +22,6 @@ require 'outage'
 require 'isolation_utilities.rb'
 require 'direction'
 require 'forwardable'
-require 'struct'
 require 'eventmachine'
 
 EventMachine.threadpool_size = 1
