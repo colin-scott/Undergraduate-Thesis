@@ -2,6 +2,7 @@
 
 # Module for iterating over isolation logs. 
 
+require 'file_utils'
 require 'yaml'
 require 'ip_info'
 require 'hops'
@@ -33,7 +34,24 @@ module LogIterator
 
     # Iterate over all src, dst outage logs in the snapshot
     def self.iterate_snapshot(&block)
-        self.iterate(nil, FailureIsolation::Snapshot, files, self.method(:read_log), &block)
+        self.iterate(nil, FailureIsolation::Snapshot, self.method(:read_log), &block)
+    end
+
+    # Iterate over all src, dst outages, and invoke the block on it. The block
+    # must return another outage object which may have been modified (useful
+    # for ensuring backwards compatibility of old log entries). Overwrite the
+    # log entry with the new one, using dispatcher.log_outage()
+    def self.replace_logs(dispatcher, &block)
+        # We need a wrapper block to ensure that the input file is closed before we
+        # open the output file
+        block_wrapper = lambda(log_file, &nop_block) do
+            # Yay for closures: call wth original &block arg
+            new_outage = self.read_log(log_file, &block)
+            dispatcher.log_isolation_results(new_outage) if new_outage
+        end
+
+        # Silly that we need the nop lambda at the end...
+        self.iterate(nil, FailureIsolation::IsolationResults, block_wrapper, lambda)
     end
 
     # Iterate of logs. By default, just the snapshot
@@ -57,26 +75,13 @@ module LogIterator
         end
     end
 
-    def LogIterator::replace_logs(dispatcher, &block)
-        Dir.chdir FailureIsolation::Snapshot do
-            files = Dir.glob("*bin").sort
-            total = files.size
-            curr = 0
-            files.each do |file|
-                begin
-                    curr += 1
-                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
-                    new_outage = self.read_log(file, &block)
-                    $stderr.puts new_outage.class
-                    dispatcher.log_isolation_results(new_outage) if new_outage
-                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
-                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
-                end
-            end
-        end
+    # Copy all log entries up to now to the snapshot directory (for consistent
+    # data analysis)
+    def self.take_snapshot
+        # TODO: take an end_time arg?
+        # Note that Dir.glob yields full pathnames
+        FileUtils.cp(Dir.glob(FailureIsolation::IsolationResults+"/*"),  FailureIsolation::Snapshot)
     end
-
-    # TODO: snapshot method
     
     private
 
@@ -126,6 +131,8 @@ module MergedLogIterator
     end
 
     # TODO: make a separate snapshot dir for merged outages
+    
+    # TODO: need a replace_logs method
 
     def self.read_log(file, &block)
         yield Marshal.load(IO.read(file))
@@ -157,7 +164,4 @@ module FilterTrackerIterator
         end
     end
 end
-
-   
-   end
 
