@@ -223,6 +223,7 @@ class FailureMonitor
                                 100 100 "if [ -f colin/target_state.yml ]; then hostname --fqdn; fi"`.split("\n").first
             end
             system "ssh uw_revtr2@#{hostname} pkill -9 -f ping_monitor_client.rb; rm colin/*rb"
+            system "ssh cs@toil ~/colin/ping_monitoring/cloudfront_monitoring/restart_hosts.sh"
             return [nil, nil]
         end
     end

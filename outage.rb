@@ -219,15 +219,14 @@ class Outage
    def dst_as()
    end
 
-   # For compatibility with log_iterator.rb TODO: remove me
-   def self.parse_time(filename, measurements)
+   def parse_time
         # heuristic 1: if this was after I started logging measurement times, just 
         # take the timestamp of the first measurement
-        if !measurement_times.nil? and !measurement_times.empty?
-            return measurement_times[0][1]
+        if !@measurement_times.nil? and !@measurement_times.empty?
+            return @measurement_times[0][1]
         end
 
-        timestamp = filename.split('_')[-1].split('.')[0]
+        timestamp = @filename.split('_')[-1].split('.')[0]
     
         # heuristic 4: guess based on the timestamp
         year = timestamp[0..3]
@@ -252,7 +251,7 @@ class Outage
   
    # Return the time measurements were initiated for this outage
    def time
-        @time = self.parse_time(@file, @measurement_times) if @time.nil?
+        @time = parse_time if @time.nil?
         @time = false if @time.nil? # TODO: need a better way to distinguish nil from "not able to parse time"
         @time
    end
