@@ -1,7 +1,7 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
 require_relative 'aggregate_filter_stats'
-require_relative '../../log_iterator'
+require_relative '../log_iterator'
 
 $stderr.puts "Note: invoke with --help to see more options"
 
