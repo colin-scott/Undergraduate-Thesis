@@ -1,6 +1,8 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../../")
 
+# SEEMS HIGHLY REDUNDANT WITH OTHER SCRIPTS IN THIS DIR
+
 require 'isolation_module'
 require 'utilities'
 require 'failure_analyzer'
