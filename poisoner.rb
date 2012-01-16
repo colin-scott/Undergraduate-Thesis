@@ -84,7 +84,7 @@ end
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 class Poisoner
-    def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr), unpoison_timeout_seconds=20*60)
+    def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr), unpoison_timeout_seconds=6*60*60)
         @failure_analyzer = failure_analyzer
         @db = db 
         @ip_info = ip_info
