@@ -2,7 +2,9 @@
 
 # Module for iterating over isolation logs. 
 
-require 'file_utils'
+$: << "../"
+
+require 'fileutils'
 require 'yaml'
 require 'ip_info'
 require 'hops'
@@ -44,14 +46,14 @@ module LogIterator
     def self.replace_logs(dispatcher, &block)
         # We need a wrapper block to ensure that the input file is closed before we
         # open the output file
-        block_wrapper = lambda(log_file, &nop_block) do
-            # Yay for closures: call wth original &block arg
-            new_outage = self.read_log(log_file, &block)
-            dispatcher.log_isolation_results(new_outage) if new_outage
-        end
+        #block_wrapper = lambda(log_file, &nop_block) do
+        #    # Yay for closures: call wth original &block arg
+        #    new_outage = self.read_log(log_file, &block)
+        #    dispatcher.log_isolation_results(new_outage) if new_outage
+        #end
 
-        # Silly that we need the nop lambda at the end...
-        self.iterate(nil, FailureIsolation::IsolationResults, block_wrapper, lambda)
+        ## Silly that we need the nop lambda at the end...
+        #self.iterate(nil, FailureIsolation::IsolationResults, block_wrapper, lambda)
     end
 
     # Iterate of logs. By default, just the snapshot
