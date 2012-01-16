@@ -51,7 +51,7 @@ class PoisonLog
     end
 
     def reload()
-        @logger.debug "Reloading poison log"
+        @logger.debug "Reloading poison log #{FailureIsolation::PoisonLogPath}"
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
         begin

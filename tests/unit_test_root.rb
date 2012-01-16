@@ -21,12 +21,18 @@ module TestVars
     MergedIsolationResults = "/tmp/merged_isolation_results"
     FilterStatsPath = "/tmp/filter_stats"
     DotFiles = "/tmp/dots"
-    PoisonLogPath = "/tmp/mock_mux_log.yml"
     NonReachableTargetPath = "/tmp/targets_never_seen.yml"
     LastObservedOutagePath = "/tmp/last_outages.yml"
 
+    # TODOC: why not use the remove_const method below? Because it calls
+    # mkdir_p? TODO: refactor
     FailureIsolation.module_eval("remove_const :PingStatePath")
     FailureIsolation::PingStatePath = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/tests/ping_monitoring_state/"
+
+    FailureIsolation.module_eval("remove_const :PoisonLogPath")
+    FailureIsolation::PoisonLogPath = "/tmp/mock_mux_log.yml"
+    # Clear previous test case data
+    FileUtils.rm_rf FailureIsolation::PoisonLogPath
 
     # To make unit tests run faster, assume that targets haven't changed since
     # last bootup
@@ -78,8 +84,6 @@ module TestVars
        self.make_fake_log_dir(val)
     end
 
-    # Clear previous test case data
-    FileUtils.rm_rf PoisonLogPath
 
     # Add fake data to node2targetneverseen.yml
     targets_never_seen = {

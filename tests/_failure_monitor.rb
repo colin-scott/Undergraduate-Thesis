@@ -30,6 +30,15 @@ describe FailureMonitor do
             total_passed_filters.should eq(srcdst2outage.size)
         end
     end
+
+    describe("#parse_filename") do 
+        it "recovers from target_state.yml input" do
+            input = "/homes/network/revtr/spoofed_traceroute/data/ping_monitoring_state/target_state.yml"
+            #Object.any_instance.stub(:`)
+            #Object.any_instance.stub(:system)
+            TestVars.Monitor.parse_filename(input)
+        end
+    end
 end
 
 # TODO: turn this into a real unit test rather than printing out stdout
