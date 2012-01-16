@@ -564,9 +564,9 @@ class FailureDispatcher
         end
 
 	fempty = @node2emptypings[outage.src].fraction_empty
-	@logger.debug("src #{outage.src} fraction empty #{fempty}")
+	@logger.info("src #{outage.src} fraction empty #{fempty}")
         if fempty > 0.8
-		@logger.debug("scheduling #{outage.src} for swap_out")
+		@logger.info("scheduling #{outage.src} for swap_out")
 		SwapFilters.empty_pings!(outage, filter_tracker)
 	end
     end
