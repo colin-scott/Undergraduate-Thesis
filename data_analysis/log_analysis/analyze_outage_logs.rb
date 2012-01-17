@@ -16,9 +16,13 @@ require 'optparse'
 require 'forwardable'
 
 
-module Filters
-    # Commonly used, pre-defined filters
-     
+module Predicates
+    # Commonly used predicates
+    
+    # We store them as strings so that we can print a human readable display
+    # of what the filters are. We later eval them to get the lambda itself.
+
+    NoPoisoners = "lambda { |outage| not FailureIsolation::PoisonerNames.include? outage.src }"  
 end
 
 class OptsParser
@@ -46,16 +50,11 @@ class OptsParser
             # Hash from human readable lamda -> predicate
             # TODO: don't foce them to type 'lambda { |tracker|'   -- just
             # have them specify the boolean function that goes inside
-            @options[:predicates] = { "'lambda { |tracker| true }'" =>  lambda { |tracker| true } }
+            predicate_str = "lambda { |outage| true }"
+            @options[:predicates] = { predicate_str => eval(predicate_str) }
             opts.on('-p', '--predicate LAMBDA',
                        "Only consider stats trackers LAMBDA returns true. Invokes eval on given arg. [default: #{@options[:lambda_string]}]") do |filter|
-                @options[:predicates] = { "'#{filter}'" => eval(filter) }
-            end
-    
-            opts.on('-n', '--no-poisoners',
-                       "Set pre-defined predicate for exluding BGP Mux nodes") do |t|
-                @options[:predicates][ "'lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }'"] = \
-                                         lambda { |tracker| not FailureIsolation::PoisonerNames.include? tracker.source }
+                @options[:predicates][filter] = eval(filter)
             end
         end
     end
@@ -75,7 +74,7 @@ class OptsParser
        self
     end
 
-    def passes_predicates?(filter_tracker)
+    def passes_predicates?(outage)
         @options[:predicates].each do |string, predicate|
            return false unless predicate.call filter_tracker
         end
