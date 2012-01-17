@@ -1,19 +1,19 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-# Module for iterating over isolation logs. 
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 
-$: << "../"
+# Module for iterating over isolation logs. 
 
 require 'fileutils'
 require 'yaml'
-require 'ip_info'
-require 'hops'
-require 'isolation_module'
+require_relative '../ip_info'
+require_relative '../hops'
+require_relative '../isolation_module'
 require 'set'
 require 'time'
-require 'filter_stats'
-require 'outage'
-require 'direction'
+require_relative '../filter_stats'
+require_relative '../outage'
+require_relative '../direction'
 require 'failure_isolation_consts'
 require 'time'
 require 'pstore'

@@ -1,19 +1,16 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-$: << File.expand_path("../../")
-$: << File.expand_path("../")
-
 # Aggregate Filter statistics and display them to stdout. Filters all outages
 # before the given date.
 #
 # You can also call this method from another scripts, passing in a predicate.
 # See ./no_poisoners.rb for an example
 
-require 'log_iterator'
-require 'log_filterer'
-require 'filter_stats'
-require 'filters'
-require 'data_analysis'
+require_relative '../log_iterator'
+require_relative '../log_filterer'
+require_relative '../data_analysis'
+require_relative '../../filter_stats'
+require_relative '../../filters'
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that
@@ -78,11 +75,6 @@ end
 
 if __FILE__ == $0
     $stderr.puts "Note: invoke with --help to see more options"
-    options = OptsParser.new
-    options.on('-n', '--no-poisoners', "Exclude poisoners") do |t|
-        options[:predicates].merge!(Predicates.NoPoisoners)
-    end
-
-    options.parse!.display
+    options = OptsParser.new.parse!.display
     filter_and_aggregate(options)
 end
