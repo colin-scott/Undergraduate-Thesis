@@ -6,14 +6,14 @@ $: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 
 require 'fileutils'
 require 'yaml'
-require_relative '../ip_info'
-require_relative '../hops'
-require_relative '../isolation_module'
+require 'ip_info'
+require 'hops'
+require 'isolation_module'
 require 'set'
 require 'time'
-require_relative '../filter_stats'
-require_relative '../outage'
-require_relative '../direction'
+require 'filter_stats'
+require 'outage'
+require 'direction'
 require 'failure_isolation_consts'
 require 'time'
 require 'pstore'
@@ -125,6 +125,8 @@ module LogIterator
             input.close if input
         end
 
+        # More backwards compatibility...
+        outage.file ||= file
         return outage 
     end
 end

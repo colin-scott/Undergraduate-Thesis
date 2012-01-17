@@ -6,11 +6,14 @@
 # You can also call this method from another scripts, passing in a predicate.
 # See ./no_poisoners.rb for an example
 
-require_relative '../log_iterator'
-require_relative '../log_filterer'
-require_relative '../data_analysis'
-require_relative '../../filter_stats'
-require_relative '../../filters'
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/data_analysis"
+
+require 'log_iterator'
+require 'log_filterer'
+require 'data_analysis'
+require 'filter_stats'
+require 'filters'
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that

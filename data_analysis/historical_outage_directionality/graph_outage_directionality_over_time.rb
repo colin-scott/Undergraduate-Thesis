@@ -1,30 +1,33 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
-$: << File.expand_path("../../")
+
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 
 require 'isolation_module'
 require 'failure_isolation_consts.rb'
 require 'failure_analyzer'
 require 'failure_dispatcher'
-require 'log_iterator'
 require 'ip_info'
 require 'set'
 require 'yaml'
 require 'time'
+require_relative '../log_iterator.rb'
+require_relative '../log_filterer.rb'
+
+options = OptsParser.new
+options.set_predicates([Predicates.PassedFilters])
+options[:time_start] = Time.at(0)
 
 # per week, per day, per month?
-#
 # Let's go with per week
-
-
 week2forward = Hash.new(0)
 week2reverse = Hash.new(0)
 week2bi = Hash.new(0)
 week2total = Hash.new(0)
 
-LogIterator::iterate_all_logs() do |o|
-    next unless o.passed_filters
+LogIterator::iterate_all_logs(options) do |o|
     time = o.time
-    next unless time
+    #next unless time
+    
     o.direction = (o.direction.is_a?(String)) ? BackwardsCompatibleDirection.convert_to_new_direction(o.direction) : o.direction
 
     # Year, week number of current year

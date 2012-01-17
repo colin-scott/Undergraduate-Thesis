@@ -1,8 +1,11 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 
-require_relative '../log_iterator'
-require_relative '../log_filterer'
-require_relative '../ascii_log_dumper.rb'
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/data_analysis"
+
+require 'log_iterator'
+require 'log_filterer'
+require 'ascii_log_dumper.rb'
 
 options = parse_options()
 
