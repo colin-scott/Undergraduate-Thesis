@@ -22,10 +22,9 @@ def filter_and_aggregate(options)
     level2num_failed = Hash.new(0)
     level2reason2count = Hash.new { |h,k| h[k] = Hash.new(0) }
     
-    FilterTrackerIterator.iterate(options[:time_start]) do |filter_tracker|
+    # TODO: merge with display_filter_stats_tracker's iterate loop
+    FilterTrackerIterator.iterate(options) do |filter_tracker|
         # Each filter_tracker is a single (src, dst) outage
-        next unless options.passes_predicates?(filter_tracker)
-
         total_records += 1
         if filter_tracker.passed?
             num_passed += 1 

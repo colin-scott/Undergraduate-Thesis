@@ -25,18 +25,23 @@ $debugging = false
 
 module LogIterator
     # Iterate over the given log files, with fully specified paths
-    def iterate_over_files(files, &block)
-        self.iterate(files, FailureIsolation::IsolationResults, self.method(:read_log), &block)
+    # Takes a block with outage as arg
+    def iterate_over_files(predicates, files, &block)
+        self.iterate(predicates, files, FailureIsolation::IsolationResults, self.method(:read_log), &block)
     end
 
     # Iterate over all src, dst outage logs (not just the snapshot)
-    def self.iterate_all_logs(&block)
-        self.iterate(nil, FailureIsolation::IsolationResults, self.method(:read_log), &block)
+    # Takes a block with outage as arg
+    def self.iterate_all_logs(predicates, &block)
+        # TODO: get rid of nil arg. Use an options hash instead
+        self.iterate(predicates, nil, FailureIsolation::IsolationResults, self.method(:read_log), &block)
     end
 
     # Iterate over all src, dst outage logs in the snapshot
-    def self.iterate_snapshot(&block)
-        self.iterate(nil, FailureIsolation::Snapshot, self.method(:read_log), &block)
+    # Takes a block with outage as arg
+    def self.iterate_snapshot(predicates, &block)
+        # TODO: get rid of nil arg. Use an options hash instead
+        self.iterate(predicates, nil, FailureIsolation::Snapshot, self.method(:read_log), &block)
     end
 
     # Iterate over all src, dst outages, and invoke the block on it. The block
@@ -56,8 +61,8 @@ module LogIterator
         #self.iterate(nil, FailureIsolation::IsolationResults, block_wrapper, lambda)
     end
 
-    # Iterate of logs. By default, just the snapshot
-    def self.iterate(files, data_dir, unpack_method, &block)
+    # Iterate over logs.
+    def self.iterate(predicates, files, data_dir, unpack_method)
         Dir.chdir data_dir do
             files ||= Dir.glob("*bin").sort
 
@@ -68,7 +73,9 @@ module LogIterator
                     curr += 1
                     $stderr.puts file if $debugging
                     $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
-                    unpack_method.call(file, &block)
+                    outage = unpack_method.call(file)
+                    next unless predicates.passes_predicates?(outage)
+                    yield outage
                     $stderr.print ".." if $debugging
                 rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
                     $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
@@ -87,8 +94,8 @@ module LogIterator
     
     private
 
-    # Read a single log file
-    def self.read_log(file, &block)
+    # Read a single log file, and return the unmarshalled outage
+    def self.read_log(file)
         new_outage = nil
         begin
             input = File.new(file)
@@ -103,9 +110,9 @@ module LogIterator
 
             if src.is_a?(Outage) # we changed over to only logging outage objects at some point. BLLARRRGGGHHH
                outage = src
-               new_outage = yield outage
             else
-               new_outage = yield Outage.new(file, src, dst, dataset, direction, formatted_connected, 
+               # This branch is only for backwards compatibility
+               outage = Outage.new(file, src, dst, dataset, direction, formatted_connected, 
                                               formatted_unconnected, pings_towards_src,
                                               tr, spoofed_tr,
                                               historical_tr, historical_trace_timestamp,
@@ -118,38 +125,42 @@ module LogIterator
             input.close if input
         end
 
-        return new_outage
+        return outage 
     end
 end
 
 module MergedLogIterator
-    def self.iterate_over_files(files, &block)
-        LogIterator.iterate(files, FailureIsolation::MergedIsolationResults, self.method(:read_log), &block)
+    # Takes a block with outage as arg
+    def self.iterate_over_files(predicates, files, &block)
+        LogIterator.iterate(predicates, files, FailureIsolation::MergedIsolationResults, self.method(:read_log), &block)
     end
 
     # Iterate over all src, dst outage logs (not just the snapshot)
-    def self.iterate_all_logs(&block)
-        LogIterator.iterate(nil, FailureIsolation::MergedIsolationResults, self.method(:read_log), &block)
+    # Takes a block with outage as arg
+    def self.iterate_all_logs(predicates, &block)
+        # TODO: get rid of nil arg. Use an options hash instead
+        LogIterator.iterate(predicates, nil, FailureIsolation::MergedIsolationResults, self.method(:read_log), &block)
     end
 
     # TODO: make a separate snapshot dir for merged outages
     
     # TODO: need a replace_logs method
 
-    def self.read_log(file, &block)
-        yield Marshal.load(IO.read(file))
+    # Read a single log file, and return the unmarshalled MergedOutage
+    def self.read_log(file)
+        Marshal.load(IO.read(file))
     end
 end
 
 module FilterTrackerIterator
-    def self.iterate(start_date=nil, &block)
+    # Takes a block with filter tracker as arg
+    def self.iterate(options)
         Dir.chdir FailureIsolation::FilterStatsPath do
             files = Dir.glob("*").sort
-            if not start_date.nil?
-                start_date_str = start_date.strftime("%Y.%m.%d")
-                files.delete_if { |file| file < start_date_str }
-            end
-
+            
+            start_time = options[:time_start].strftime("%Y.%m.%d")
+            files.delete_if { |file| file < start_time }
+            
             total = files.size
             files.each do |file|
                 $stderr.puts "Processing #{file}"
@@ -161,7 +172,11 @@ module FilterTrackerIterator
                         stats << store[key]
                     end
                 end
-                stats.each { |stat| yield stat }
+
+                stats.each do |stat|
+                    next unless options.passes_predicates?(stat)
+                    yield stat
+                end
             end
         end
     end
