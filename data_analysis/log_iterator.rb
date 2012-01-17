@@ -142,7 +142,7 @@ module MergedLogIterator
 end
 
 module FilterTrackerIterator
-    def self.filter_tracker_iterate(start_date=nil, &block)
+    def self.iterate(start_date=nil, &block)
         Dir.chdir FailureIsolation::FilterStatsPath do
             files = Dir.glob("*").sort
             if not start_date.nil?

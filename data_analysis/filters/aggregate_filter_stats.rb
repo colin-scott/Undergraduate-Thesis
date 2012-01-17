@@ -89,7 +89,7 @@ def filter_and_aggregate(options)
     level2num_failed = Hash.new(0)
     level2reason2count = Hash.new { |h,k| h[k] = Hash.new(0) }
     
-    LogIterator::filter_tracker_iterate(options[:time_start]) do |filter_tracker|
+    FilterTrackerIterator.iterate(options[:time_start]) do |filter_tracker|
         # Each filter_tracker is a single (src, dst) outage
         next if filter_tracker.first_lvl_filter_time < options[:time_start]
         next if filter_tracker.first_lvl_filter_time > options[:time_end]
