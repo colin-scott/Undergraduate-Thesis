@@ -10,12 +10,16 @@ $: << File.expand_path("../")
 # See ./no_poisoners.rb for an example
 
 require 'log_iterator'
-require 'filter_stats'
-require 'filters'
 require 'time'
 require 'data_analysis'
 require 'optparse'
 require 'forwardable'
+
+
+module Filters
+    # Commonly used, pre-defined filters
+     
+end
 
 class OptsParser
     extend Forwardable
