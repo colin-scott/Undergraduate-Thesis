@@ -118,7 +118,7 @@ module FailureIsolation
     def self.Host2Site()
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
-        system "cut -d ' ' -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.rb"
+        system "cut -d ' ' -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hosts.txt`\
                                           .split("\n").map { |line| line.split }.custom_to_hash)
     end
@@ -234,7 +234,7 @@ module FailureIsolation
     # Helper method:
     def self.read_in_riot_ips(remote_path)
         tmp_path = "/tmp/riot_nodes.txt"
-        system "scp #{remote_path} #{tmp_path}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.rb"
+        system "scp #{remote_path} #{tmp_path}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         ips = Set.new
 
         File.foreach(tmp_path) do |line|
@@ -320,13 +320,13 @@ module FailureIsolation
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
         # push out targets to monitoring nodes! 
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                    #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.rb"
+                    #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         # also push out target set to toil in case it restarts nodes
-        system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.rb"
+        system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         # ============================== #
         #      riot specific!            #
         # ============================== #
-        system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.rb"
+        system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
     end
 
     # ====================================
