@@ -25,6 +25,7 @@ class FilterTracker
    alias :src :source
    alias :dst :target
    alias :receivers :connected
+   alias :time :first_lvl_filter_time
 
    def initialize(source, target, connected, first_lvl_filter_time)
        @source = source

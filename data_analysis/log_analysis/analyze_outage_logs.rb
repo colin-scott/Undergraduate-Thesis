@@ -9,78 +9,9 @@ $: << File.expand_path("../")
 # You can also call this method from another scripts, passing in a predicate.
 # See ./no_poisoners.rb for an example
 
+require 'log_filterer'
 require 'log_iterator'
-require 'time'
 require 'data_analysis'
-require 'optparse'
-require 'forwardable'
-
-
-module Predicates
-    # Commonly used predicates
-    
-    # We store them as strings so that we can print a human readable display
-    # of what the filters are. We later eval them to get the lambda itself.
-
-    NoPoisoners = "lambda { |outage| not FailureIsolation::PoisonerNames.include? outage.src }"  
-end
-
-class OptsParser
-    extend Forwardable
-    def_delegators :@options, :[], :[]=
-    def_delegators :@options_parser, :on
-
-    # Note: To add more option definitions, make additional invocations to
-    # on() before invoking parse!
-    def initialize()
-        @options = {}
-        @options_parser = OptionParser.new("Usage: #{$0} [options] (make sure to wrap all options in quotes)") do |opts|
-            @options[:time_start] = Time.now - (24 * 60 * 60)
-            opts.on( '-t', '--time_start TIME',
-                       "Filter outages before TIME (of the form 'YYYY.MM.DD [HH.MM.SS]'). [default last 24 hours]") do |time|
-                @options[:time_start] = Time.parse time
-            end
-    
-            @options[:time_end] = Time.now
-            opts.on( '-e', '--time_end TIME',
-                       "Filter outages after TIME (of the form 'YYYY.MM.DD [HH.MM.SS]'). [default now]") do |time|
-                @options[:time_end] = Time.parse time
-            end
-    
-            # Hash from human readable lamda -> predicate
-            # TODO: don't foce them to type 'lambda { |tracker|'   -- just
-            # have them specify the boolean function that goes inside
-            predicate_str = "lambda { |outage| true }"
-            @options[:predicates] = { predicate_str => eval(predicate_str) }
-            opts.on('-p', '--predicate LAMBDA',
-                       "Only consider stats trackers LAMBDA returns true. Invokes eval on given arg. [default: #{@options[:lambda_string]}]") do |filter|
-                @options[:predicates][filter] = eval(filter)
-            end
-        end
-    end
-
-    def parse!()
-        @options_parser.parse!
-        self
-    end
-
-    def display()
-       $stderr.puts "Filtering outages before #{@options[:time_start]}"
-       $stderr.puts "Filtering outages after  #{@options[:time_end]}"
-       $stderr.puts "Applying predicates:"
-       @options[:predicates].each do |name, predicate|
-            $stderr.puts "       #{name}"
-       end
-       self
-    end
-
-    def passes_predicates?(outage)
-        @options[:predicates].each do |string, predicate|
-           return false unless predicate.call filter_tracker
-        end
-        return true
-    end
-end
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that

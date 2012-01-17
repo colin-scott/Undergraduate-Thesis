@@ -7,7 +7,6 @@ class Array
     end
 end
 
-
 class Tier
     attr_accessor :name, :rank
 
@@ -45,7 +44,6 @@ class Range
         Range.new(self.begin, self.end + 1)
     end
 end
-
 
 class Average
     attr_accessor :total, :sum

@@ -61,6 +61,10 @@ class MergedOutage
         return @outages.find { |outage| outage.passed_filters }
     end
 
+    def passed?()
+        return is_interesting?
+    end
+
     # Return all outages where the destination was under our control
     def symmetric_outages()
         @outages.find_all { |outage| outage.symmetric }
