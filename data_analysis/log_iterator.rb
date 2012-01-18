@@ -17,9 +17,17 @@ require 'direction'
 require 'failure_isolation_consts'
 require 'time'
 require 'pstore'
+require 'thread'
 
 # Wouldn't protobufs have been nice :P
 # Gotta love versioning
+
+if RUBY_PLATFORM == "java"
+    require 'java'
+    java_import java.util.concurrent.Executors
+    # TODO: HACK. Make me a platform-independant class variable
+    $executor = Executors.newFixedThreadPool(32)
+end
 
 $debugging = false
 
@@ -64,24 +72,39 @@ module LogIterator
     # Iterate over logs.
     def self.iterate(predicates, files, data_dir, unpack_method)
         Dir.chdir data_dir do
-            files ||= Dir.glob("*bin").sort
+            files ||= Dir.glob(Dir.pwd+"/*bin").sort
+            lock = Mutex.new
 
             total = files.size
+            print_interval = total / 200
             curr = 0
             files.each do |file|
-                begin
-                    curr += 1
-                    $stderr.puts file if $debugging
-                    $stderr.puts (curr * 100.0 / total).to_s + "% complete" if (curr % 50) == 0
-                    outage = unpack_method.call(file)
-                    next unless predicates.passes_predicates?(outage)
-                    yield outage
-                    $stderr.print ".." if $debugging
-                rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
-                    $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                block = lambda do
+                    begin
+                        curr += 1
+                        $stderr.puts file if $debugging
+                        if (curr % print_interval) == 0
+                            percentage = curr * 100.0 / total
+                            $stderr.puts percentage.to_s + "% complete" 
+                        end
+                        outage = unpack_method.call(file)
+                        next unless predicates.passes_predicates?(outage)
+                        lock.synchronize { yield outage }
+                        $stderr.print ".." if $debugging
+                    rescue EOFError #Errno::ENOENT, ArgumentError, TypeError 
+                        $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                    end
+                end
+
+                if $executor
+                    $executor.execute(&block)
+                else
+                    block.call
                 end
             end
         end
+
+        $executor.awaitTermination
     end
 
     # Copy all log entries up to now to the snapshot directory (for consistent

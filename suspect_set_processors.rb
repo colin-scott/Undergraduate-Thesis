@@ -55,6 +55,14 @@ class Initializer
         @site2incoming_hops = direction2hash[:incoming]
     end
 
+    def historical_trs_to_dst(merged_outage)
+        historical_tr_hops = []
+        merged_outage.each do |outage|
+           outage.dst  
+           # TODO
+        end
+    end
+
     # (no correlation involved)
     def historical_revtr_dst2src(merged_outage)
         historical_revtr_suspects = []

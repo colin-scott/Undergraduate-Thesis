@@ -8,7 +8,7 @@
 
 require 'failure_isolation_consts'
 require 'ip_info'
-require 'suspect_set_processors.rb'
+require 'suspect_set_processors'
 require 'db_interface'
 require 'direction'
 

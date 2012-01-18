@@ -230,7 +230,7 @@ class Outage
             return @measurement_times[0][1]
         end
 
-        timestamp = @filename.split('_')[-1].split('.')[0]
+        timestamp = @file.split('_')[-1].split('.')[0]
     
         # heuristic 4: guess based on the timestamp
         year = timestamp[0..3]
@@ -247,7 +247,13 @@ class Outage
            minute = timestamp[4..5]
            second = timestamp[6..7]
         else
-           return nil
+           # +- 30 days. fuckit
+           begin
+               return Time.parse("#{year}.#{month}.#{timestamp[0...1]}")
+           rescue Exception
+               puts "#{year}.#{month}.#{timestamp[0...1]}"
+               raise
+           end
         end
     
         return Time.local(year, month, day, hour, minute, second)

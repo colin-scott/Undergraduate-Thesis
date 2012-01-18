@@ -1,21 +1,24 @@
-#!/homes/network/revtr/ruby-upgrade/bin/ruby
+#!/homes/network/revtr/jruby/bin/jruby
 
 $: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
+$: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/data_analysis"
 
 require 'isolation_module'
 require 'failure_isolation_consts.rb'
 require 'failure_analyzer'
 require 'failure_dispatcher'
+require 'filter_stats'
 require 'ip_info'
 require 'set'
 require 'yaml'
 require 'time'
-require_relative '../log_iterator.rb'
-require_relative '../log_filterer.rb'
+require 'log_iterator.rb'
+require 'log_filterer.rb'
 
 options = OptsParser.new
 options.set_predicates([Predicates.PassedFilters])
 options[:time_start] = Time.at(0)
+options.parse!.display
 
 # per week, per day, per month?
 # Let's go with per week

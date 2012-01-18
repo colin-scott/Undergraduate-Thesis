@@ -196,7 +196,7 @@ class FailureDispatcher
                 end
 
                 if $executor
-                    outage_threads << $executor.submit(&block)
+                    outage_threads << $executor.execute(&block)
                 else
                     outage_threads << Thread.new(&block)
                 end
@@ -238,7 +238,7 @@ class FailureDispatcher
             merged_outage2id.each do |merged_outage, id|
                 block = lambda { process_merged_outage(merged_outage, id) }
                 if $executor
-                    $executor.submit(&block)
+                    $executor.execute(&block)
                 else
                     Thread.new(&block)
                 end

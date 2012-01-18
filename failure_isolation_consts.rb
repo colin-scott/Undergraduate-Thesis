@@ -456,6 +456,7 @@ end
 
 if $0 == __FILE__
     puts `#{FailureIsolation::CurrentPoisoningsPath}`
+    puts FailureIsolation.SpooferTargets.to_a.inspect
     #puts FailureIsolation.MuxNodes.inspect
     #puts FailureIsolation.SentinelNodes.inspect
     #puts FailureIsolation.TargetSet.inspect

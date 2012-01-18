@@ -77,6 +77,14 @@ end
 
 if __FILE__ == $0
     $stderr.puts "Note: invoke with --help to see more options"
-    options = OptsParser.new.parse!.display
+    options = OptsParser.new
+    
+    options[:time_start] = Time.now - 24*60*60
+    options.on( '-t', '--time_start TIME',
+             "Filter outages before TIME (of the form 'YYYY.MM.DD [HH.MM.SS]'). [default last day]") do |time|
+        options[:time_start] = Time.parse time
+    end
+
+    options.parse!.display
     filter_and_aggregate(options)
 end

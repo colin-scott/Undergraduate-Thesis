@@ -7,7 +7,7 @@ def time2year_month_day(time)
 
     month = (week / 4) + 1
 
-    day = (week % 4) * 7
+    day = (week % 4) * 7 + 1
 
     "#{year}.#{month}.#{day}"
 end
