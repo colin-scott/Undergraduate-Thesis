@@ -93,7 +93,7 @@ begin
    Signal.trap("WINCH") do
        # NOTE: I would like to use some other signal, but they're taken by the JVM
        # SIGWINCH means new historical traces are ready to be loaded
-       monitor.dispatcher.grab_historical_traces          
+       FailureIsolation.grab_historical_traces          
     end
 
    # Loop infinitely

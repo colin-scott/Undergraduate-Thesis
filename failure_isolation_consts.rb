@@ -130,6 +130,31 @@ module FailureIsolation
         @Site2Hosts.merge!(self.Host2Site.value2keys)
     end
 
+
+    # ====================================================== 
+    # Historical traceroutes from isolation VPs -> targets #
+    # ====================================================== 
+    def self.HistoricalTraceTimestamp
+        self.grab_historical_traces unless @HistoricalTraceTimestamp
+        @HistoricalTraceTimestamp
+    end
+
+    def self.Node2Target2Trace
+        self.grab_historical_traces unless @Node2Target2Trace
+        @Node2Target2Trace
+    end
+
+    # Grab historical traceroutes (also called on demand when the SIGWINCH
+    # signal is sent
+    def self.grab_historical_traces
+        # TODO: put traces in the DB
+        @HistoricalTraceTimestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
+        @Node2Target2Trace = {}
+        node2target2trace.each do |node, target2trace|
+            @Node2Target2Trace[node.downcase] = target2trace 
+        end
+    end
+    
     # ====================================
     #         Poisoning scripts          #
     # ====================================

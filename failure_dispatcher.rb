@@ -82,20 +82,8 @@ class FailureDispatcher
 
 	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
 
-        # Grab historical traceroutes (also called on demand when the SIGWINCH
-        # signal is sent
-        grab_historical_traces
     end
 
-    def grab_historical_traces
-        # TODO: put traces in the DB
-        @historical_trace_timestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
-        @node2target2trace = {}
-        node2target2trace.each do |node, target2trace|
-           @node2target2trace[node.downcase] = target2trace 
-        end
-    end
-    
     # Connect to Dave's spoofed revtr DRB service
     def connect_to_drb()
         @drb_mutex.synchronize do
@@ -645,9 +633,9 @@ class FailureDispatcher
     # alternatively, grab trace files from the vps more than once a day ;-)
     def retrieve_historical_tr(src, dst)
         src = src.downcase
-        if @node2target2trace.include? src and @node2target2trace[src].include? dst
-            historical_tr_ttlhoptuples = @node2target2trace[src][dst]
-            historical_trace_timestamp = @historical_trace_timestamp
+        if FailureIsolation.Node2Target2Trace.include? src and FailureIsolation.Node2Target2Trace[src].include? dst
+            historical_tr_ttlhoptuples = FailureIsolation.Node2Target2Trace[src][dst]
+            historical_trace_timestamp = FailureIsolation.HistoricalTraceTimestamp
         else
             @logger.warn "No historical trace found for #{src},#{dst} ..."
             historical_tr_ttlhoptuples = []
