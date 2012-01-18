@@ -130,7 +130,6 @@ module FailureIsolation
         @Site2Hosts.merge!(self.Host2Site.value2keys)
     end
 
-
     # ====================================================== 
     # Historical traceroutes from isolation VPs -> targets #
     # ====================================================== 

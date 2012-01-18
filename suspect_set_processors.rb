@@ -55,12 +55,20 @@ class Initializer
         @site2incoming_hops = direction2hash[:incoming]
     end
 
+    # Historical traces from isolation VPs -> targets
     def historical_trs_to_dst(merged_outage)
-        historical_tr_hops = []
+        historical_tr_hops = Set.new
+        # TODO: possibly consider all isolation VPs' traces -> outage.dst?
+        # For now, only sources involved in the outage
         merged_outage.each do |outage|
-           outage.dst  
-           # TODO
+            target2trace = FailureIsolation.Node2Target2Trace[outage.src.downcase]
+            next unless target2trace
+            ttlhoptuples = target2trace[outage.dst] 
+            next unless ttlhoptuples
+            historical_tr_hops |= ttlhoptuples.map { |ttlhop| ttlhop[1] }
         end
+
+        return historical_tr_hops
     end
 
     # (no correlation involved)
