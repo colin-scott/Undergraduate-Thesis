@@ -444,7 +444,7 @@ class ForwardPath < Path
    end
 
    def valid?()
-      return !@invalid_reason && !@hops.empty? && !@hops[0].is_a?(MockHop)
+      return !@invalid_reason && @hops.size > 1
    end
 end
 

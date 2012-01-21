@@ -50,10 +50,12 @@ class DotGenerator
         direction = outage.direction
         dataset = outage.dataset
         tr = outage.tr
+        spoofed_tr = outage.spoofed_tr
         historic_tr = outage.historic_tr
         revtr = outage.revtr
         historic_revtr = outage.historic_revtr
         additional_traces = outage.additional_traces
+        upstream_reverse_paths = outage.upstream_reverse_paths
 
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
@@ -103,6 +105,8 @@ class DotGenerator
 
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
+
+        require 'ruby-debug/debugger'
 
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
         # one-time-use object? Orrrrrrr... fill in all of the node attributes

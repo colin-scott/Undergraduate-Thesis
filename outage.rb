@@ -141,6 +141,8 @@ class Outage
   alias :normal_forward_path :tr
   alias :spoofed_forward_path :spoofed_tr
   alias :historical_forward_path :historical_tr
+  alias :historic_tr :historical_tr
+  alias :historic_revtr :historical_revtr
   alias :historical_fpath_timestamp :historical_trace_timestamp
   alias :source :src 
   alias :dest :dst
