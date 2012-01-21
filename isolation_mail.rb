@@ -27,7 +27,8 @@ ActionMailer::Base.smtp_settings = {
 
 ActionMailer::Base.perform_deliveries = true
 ActionMailer::Base.raise_delivery_errors = true
-ActionMailer::Base.prepend_view_path("./templates")
+ActionMailer::Base.prepend_view_path("~revtr/spoofed_traceroute/reverse_traceroute/templates")
+ActionMailer::Base.append_view_path("~revtr/spoofed_traceroute/reverse_traceroute/templates/emailer")
 
 class Emailer < ActionMailer::Base
     Logger = LoggerLog.new($stderr)
@@ -235,7 +236,12 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    mail = Emailer.isolation_exception("FYI, sendmail was acting up again -- this time for jruby. smtp seems to work though -- so I made a new Gmail account. You might want to update your filters")
+    require 'outage'
+    require 'failure_isolation_consts'
+    input_file = "#{FailureIsolation::MergedIsolationResults}/1_1_20120119220643.bin"
+    merged_outage = Marshal.load(File.open(input_file.chomp))
+    mail = Emailer.isolation_results(merged_outage, "ikneaddough@gmail.com")
+    #mail = Emailer.isolation_exception("hi!", "ikneaddough@gmail.com")
     puts mail
     mail.deliver!
 end
