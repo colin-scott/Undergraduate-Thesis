@@ -16,7 +16,8 @@ require 'log_iterator.rb'
 require 'log_filterer.rb'
 
 options = OptsParser.new
-options.set_predicates([Predicates.PassedFilters])
+#options.set_predicates!([Predicates.PassedFilters])
+options.set_predicates!([Predicates.PassedFilters, Predicates.PL_PL])
 options[:time_start] = Time.at(0)
 options.parse!.display
 
@@ -52,4 +53,3 @@ week2forwardoutput = File.open("forward.txt", "w") { |f| f.puts week2forward.to_
 week2reverseoutput = File.open("reverse.txt", "w") { |f| f.puts week2reverse.to_a.sort_by {|elt| elt[0] }.map { |elt| elt.join ' '}.join "\n" } 
 week2bioutput = File.open("bidirectional.txt", "w") { |f| f.puts week2bi.to_a.sort_by {|elt| elt[0] }.map { |elt| elt.join ' '}.join "\n" } 
 week2totaloutput = File.open("total.txt", "w") { |f| f.puts week2total.to_a.sort_by {|elt| elt[0] }.map { |elt| elt.join ' '}.join "\n" } 
-

@@ -28,6 +28,11 @@ rescue Exception
 
 end
 
+class MockVP
+    def method_missing(m, *args, &block)
+    end
+end
+
 begin 
 
    
@@ -71,6 +76,12 @@ begin
         IsolationVantagePoint.find(:all, :conditions => {:active => 1}).each { |vp| 
             $vps[vp.vantage_point] = vp
         }
+
+        # HACK for testing spoofed pings. Have crash run a VP. For all
+        # spoofed traceroute and spoofed ping attempts, inject toil as a
+        # target with pl05 as the receiver. Log how often those measurements
+        # go through.
+        $vps["crash.cs.washington.edu"] = MockVP.new
     end
 
     # Get the Slice object

@@ -71,6 +71,8 @@ module LogIterator
 
     # Iterate over logs.
     def self.iterate(predicates, files, data_dir, unpack_method)
+        threads = []
+
         Dir.chdir data_dir do
             files ||= Dir.glob(Dir.pwd+"/*bin").sort
             lock = Mutex.new
@@ -97,14 +99,14 @@ module LogIterator
                 end
 
                 if $executor
-                    $executor.execute(&block)
+                    threads << $executor.submit(&block)
                 else
                     block.call
                 end
             end
         end
 
-        $executor.awaitTermination
+        threads.each { |thread| thread.get }
     end
 
     # Copy all log entries up to now to the snapshot directory (for consistent

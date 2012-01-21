@@ -33,6 +33,8 @@ module FailureIsolation
     PPTASKS = "~ethan/scripts/pptasks"
 
     TestPing = "128.208.4.49" # crash.cs.washington.edu
+    TestSpoofPing = "169.229.49.105" # c5.millennium.berkeley.edu
+    TestSpoofReceiver = "crash.cs.washington.edu"
 
     MonitorSlice = "uw_revtr2"
     IsolationSlice = "uw_revtr" # TODOC: why do we separate the slices?

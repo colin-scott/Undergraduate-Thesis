@@ -288,6 +288,12 @@ module SecondLevelFilters
    # Run all second level filters. Mutates filter_tracker, and sets
    # outage.passed_filters
    def self.filter!(outage, filter_tracker, ip_info, file=nil, skip_hist_tr=true)
+       # Temporary hack
+       if FailureIsolation.SpooferTargets.include? outage.dst 
+           outage.passed_filters = true
+           return
+       end
+
        # TODO: don't declare these variables like this... it's ugly
        src = outage.src
        dst = outage.dst 

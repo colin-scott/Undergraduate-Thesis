@@ -81,7 +81,6 @@ class FailureDispatcher
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
 	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
-
     end
 
     # Connect to Dave's spoofed revtr DRB service
@@ -184,7 +183,7 @@ class FailureDispatcher
                 end
 
                 if $executor
-                    outage_threads << $executor.execute(&block)
+                    outage_threads << $executor.submit(&block)
                 else
                     outage_threads << Thread.new(&block)
                 end
@@ -665,6 +664,47 @@ class FailureDispatcher
         end
     end
 
+    def insert_sanity_check_spoofed_pings!(srcdst2receivers)
+        all_receivers = srcdst2receivers.value_set.to_a
+
+        srcdst2receivers.keys.each do |srcdst|
+            src = srcdst[0]
+            sanity_check_src_dst = [src, FailureIsolation::TestSpoofPing]
+
+            # To sanity check the lack of reverse path outages, insert
+            # c5.millennium.berkeley.edu as a target and pl05 as a receiver,
+            # and log how often those spoofed pings go through.
+            srcdst2receivers[sanity_check_src_dst] = [FailureIsolation::TestSpoofReceiver] + all_receivers.clone
+        end
+    end
+
+    def log_sanity_check_spoofed_pings(srcdst2receivers, results, type)
+        srcdst2receivers.keys.each do |srcdst|
+            src, dst = srcdst
+			
+			successful = false
+            if type == :ping
+            	next if dst == FailureIsolation::TestSpoofPing
+                successful = (results.include?(FailureIsolation::TestSpoofPing) and
+                              results[FailureIsolation::TestSpoofPing].include?(src))
+            elsif type == :spooftr
+            	if dst == FailureIsolation::TestSpoofPing
+					successful = (results.include?(srcdst) and not results[srcdst].nil? and
+								  results[srcdst][-1][1].include?(FailureIsolation::TestSpoofPing))
+				else
+					successful = results.include?(srcdst) and not results[srcdst].nil?
+				end
+            end
+
+            if successful
+                @logger.info("Successful spoofed #{type} for #{src} #{dst}")
+            else
+                @logger.info("Failed spoofed #{type} for #{src} #{dst}")
+				@logger.info("#{results[srcdst].inspect}")
+            end
+        end
+    end
+
     # Issue spoofed pings from all receivers towards the destination spoofing
     # as the source. If any of
     # them get through, the reverse path is working
@@ -672,6 +712,8 @@ class FailureDispatcher
         srcdst2receivers = srcdst2outage.map_values { |outage| outage.receivers }
 
         replace_receivers_for_riot!(srcdst2receivers)
+
+        insert_sanity_check_spoofed_pings!(srcdst2receivers)
         
         # hash is target2receiver2succesfulvps
         spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
@@ -686,6 +728,8 @@ class FailureDispatcher
                 outage.pings_towards_src = spoofed_ping_results[dst][src]
             end
         end
+            
+        log_sanity_check_spoofed_pings(srcdst2receivers, spoofed_ping_results, :ping)
     end
 
     # Issue spoofed traceroutes from all sources to all respective
@@ -697,8 +741,13 @@ class FailureDispatcher
             # control over it?
             merged_srcdst2outage = dstsrc2outage.merge(srcdst2outage)
             
+            # TODO: send spoofed pings to all receivers?
             srcdst2stillconnected = merged_srcdst2outage.map_values { |outage| outage.receivers }
             replace_receivers_for_riot!(srcdst2stillconnected)
+
+            # TODO: this isn't just a ping to the test IP -- it's a full
+            # spoofed traceroute...
+            insert_sanity_check_spoofed_pings!(srcdst2stillconnected)
 
             # Issue spoofed trs all at once to ensure unique spoofer ids
             srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
@@ -710,6 +759,8 @@ class FailureDispatcher
             dstsrc2outage.each do |dstsrc, outage|
                 outage.dst_spoofed_tr = retrieve_spoofed_tr(dstsrc, srcdst2sortedttlrtrs)
             end
+
+            log_sanity_check_spoofed_pings(srcdst2stillconnected, srcdst2sortedttlrtrs, :spooftr)
         end
     end
 

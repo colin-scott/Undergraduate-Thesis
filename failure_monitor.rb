@@ -153,6 +153,9 @@ class FailureMonitor
         # Note: PL nodes are on UTC. Note: -= creates a new Time object
         current_time -= current_time.gmt_offset
 
+        num_behind_problems = 0
+        num_source_problems = 0
+
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
         Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
@@ -164,6 +167,7 @@ class FailureMonitor
                 minutes_difference = seconds_difference / 60
                 @outdated_nodes[node] = minutes_difference
                 @logger.puts "#{node}'s data is #{minutes_difference} minutes out of date"
+                num_behind_problems += 1
                 next
             end
 
@@ -191,13 +195,19 @@ class FailureMonitor
             if (!FailureIsolation::PoisonerNames.include? node and failure_percentage > @@source_specific_problem_threshold) or
                     (FailureIsolation::PoisonerNames.include? node and failure_percentage == 1.0)
                 @problems_at_the_source[node] = failure_percentage * 100
-                @logger.puts "Problem at the source: #{node}"
+                @logger.puts "Problem at the source: #{node} #{@problems_at_source[node]}"
+                num_source_problems += 1
                 next
             end
 
             @outdated_nodes.delete node
             @problems_at_the_source.delete node
             node2targetstate[node] = hash
+        end
+
+
+        if num_behind_nodes == FailureIsolation::CurrentNodes.size or num_source_problems == FailureIsolation::CurrentNodes.size 
+            Emailer.isolation_exception("Warning: all VPs were skipped due out of date ping state or high # of reported outages")
         end
 
         # nodes with problems at the source are excluded from node2targetstate
