@@ -155,14 +155,14 @@ class Emailer < ActionMailer::Base
             format.html { render "check_up_vps_issue.text.html.erb" } 
         end
     end
-    def isolation_results(merged_outage)
+    def isolation_results(merged_outage, recipient="failures@cs.washington.edu")
         Logger.info "Attempted to send isolation_results email"
 
         @merged_outage = merged_outage
 
         mail(:subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
              :from => "uwfailures@gmail.com",
-             :to => "failures@cs.washington.edu") do |format|
+             :to => recipient) do |format|
             format.html { render "isolation_results.text.html.erb" } 
         end
     end
@@ -211,14 +211,14 @@ class Emailer < ActionMailer::Base
             format.html { render "isolation_status.text.html.erb" } 
         end
     end
-    def poison_notification(outage)
+    def poison_notification(outage, recipient="failures@cs.washington.edu")
         Logger.info "Attempted to send poison_notification email"
 
         @outage = outage
         
         mail(:subject => "Poison Opportunity Detected!",
              :from => "uwfailures@gmail.com",
-             :to => "failures@cs.washington.edu") do |format|
+             :to => recipient) do |format|
             format.html { render "poison_notification.text.html.erb" } 
         end
     end

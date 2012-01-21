@@ -106,8 +106,6 @@ class DotGenerator
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
 
-        require 'ruby-debug/debugger'
-
         # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
         # one-time-use object? Orrrrrrr... fill in all of the node attributes
         # separately from add_path(). Satan
