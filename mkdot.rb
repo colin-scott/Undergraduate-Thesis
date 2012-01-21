@@ -34,17 +34,27 @@ class DotGenerator
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
     # Top level method for generating a DOT graph
-    def generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces,
-                         upstream_reverse_paths, output)
+    def generate_jpg(outage, output="/tmp/t.jpg")
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
-        create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, dot_output)
+        create_dot_file(outage, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
         # locally rather than pushing the bits across the wire to toil
         File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
     end
 
-    def create_dot_file(src, dst, direction, dataset, tr, spoofed_tr, historic_tr, revtr, historic_revtr, additional_traces, upstream_reverse_paths, output)
+    def create_dot_file(outage, output)
+        # TODO: fix the references so we don't have to type this out
+        src = outage.src
+        dst = outage.dst
+        direction = outage.direction
+        dataset = outage.dataset
+        tr = outage.tr
+        historic_tr = outage.historic_tr
+        revtr = outage.revtr
+        historic_revtr = outage.historic_revtr
+        additional_traces = outage.additional_traces
+
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct
         # TODO: find a better way to keep 0.0.0.0's distinct

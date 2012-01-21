@@ -339,9 +339,7 @@ class FailureDispatcher
 
         if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker)
             # Generate a DOT graph
-            outage.jpg_output = generate_jpg(outage.log_name, outage.src, outage.dst, outage.direction, outage.dataset, 
-                             outage.tr, outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr,
-                             outage.historical_revtr, outage.additional_traceroutes, outage.upstream_reverse_paths)
+            outage.jpg_output = generate_jpg(outage)
 
             outage.graph_url = generate_web_symlink(outage.jpg_output)
         else
@@ -567,13 +565,11 @@ class FailureDispatcher
     end
 
     # Generate a DOT graph for a given (src, dst) outage 
-    def generate_jpg(log_name, src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths)
+    def generate_jpg(outage)
         # TODO: put this into its own function
-        jpg_output = "#{FailureIsolation::DotFiles}/#{log_name}.jpg"
+        jpg_output = "#{FailureIsolation::DotFiles}/#{outage.log_name}.jpg"
 
-        @dot_generator.generate_jpg(src, dst, direction, dataset, tr, spoofed_tr, historical_tr, spoofed_revtr,
-                             historical_revtr, additional_traceroutes, upstream_reverse_paths, jpg_output)
+        @dot_generator.generate_jpg(outage, jpg_output)
 
         jpg_output
     end
