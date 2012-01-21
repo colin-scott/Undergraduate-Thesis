@@ -7,6 +7,10 @@ cd /tmp
 rm -rf spoofed_traceroute
 svn co svn+ssh://revtr@slider.cs.washington.edu/homes/network/revtr/ugrad_svn/spoofed_traceroute
 cd spoofed_traceroute
+rm -rf data_analysis/
+rm -rf templates/
+rm -rf tests
+
 
 ~revtr/ruby-upgrade/bin/depgraph -type ruby_requires -trans
 mv dependency_graph.png ~revtr/www/rdoc/
