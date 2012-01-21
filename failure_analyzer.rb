@@ -138,7 +138,7 @@ class FailureAnalyzer
         @suspect_set_initializers.each do |init|
             # Gather suspects for initializer
             suspects = Set.new(init.call merged_outage)
-            initializer_name = init.tohs
+            initializer_name = init.to_hs
 
             suspects.each do |s|
                 # add in the initializer to the suspect object
