@@ -613,12 +613,6 @@ class HistoricalForwardHop < Hop
 
     def to_s()
        s = "#{@ttl}.  #{@formatted} (pingable from S?: #{@ping_responsive}) [historically pingable?: #{@last_responsive.inspect}]"
-       s << "\n  <ul type=none>\n"
-       reverse_path.each do |hop|
-           s << "    <li> #{hop}</li>\n"
-       end
-       s << "  </ul>\n"
-       s
     end
 
     def inspect

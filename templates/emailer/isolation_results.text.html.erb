@@ -120,6 +120,15 @@
             <% if outage.historical_forward_path.valid? %>
                 <% outage.historical_forward_path.each do |hop| %>
                     <li><%= hop %></li>
+                    <ul type=none>
+                    <% if not hop.reverse_path.empty? and hop.reverse_path.valid? %>
+                            <% hop.reverse_path.each do |rev_hop| %>
+                                <li><%= rev_hop %></li>
+                            <% end %>
+                    <% else %>
+                        <li><%= hop.reverse_path.invalid_reason %></li>
+                    <% end %>
+                    </ul>
                 <% end %>
             <% else %>
                 <li><%= outage.historical_forward_path.invalid_reason %></li>
