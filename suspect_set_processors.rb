@@ -267,8 +267,7 @@ class Pruner
             @logger.warn "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}"
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
-            processes = `#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux"`
-            File.open("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux", "w") { |f| f.puts processes }
+            system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
             @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}"
         end
 

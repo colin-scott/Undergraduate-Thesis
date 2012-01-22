@@ -477,7 +477,7 @@ class Controller
         vp=@vp_lock.synchronize{@hostname2vp[hostname.downcase]}
 
         if vp.nil?
-            log("no matching vp for #{hostname}")
+            log("no matching vp for #{hostname} #{caller}")
             raise UnknownVPError.new(hostname), "UNKNOWN VP #{hostname} in controller.get_vp", caller
         end
         return vp
