@@ -230,7 +230,7 @@ class Pruner
             responsive_targets = src2pingable.value_set.to_a
         end
 
-        if !suspect_set.empty? and responsive_targets.empty?
+        if !suspect_set.empty? and (responsive_targets.nil? or responsive_targets.empty?)
             @logger.warn "responsive targets #{responsive_targets.inspect} was empty?!" 
             @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
         else
@@ -268,6 +268,8 @@ class Pruner
             File.open("#{FailureIsolation::EmptyPingsLogDir}#{uuid}/ps-aux", "w") { |f| f.puts processes }
             @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}#{uuid}"
         end
+
+        results
     end
 end
 
