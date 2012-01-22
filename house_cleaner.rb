@@ -24,6 +24,50 @@ class HouseCleaner
     # Methods for cleaning up unresponsive targets      #
     # ================================================= #                                                                                                                                 
     
+    def get_unmeasureable_targets()
+        good_file = "/homes/network/revtr/revtr_logs/cache_logs/good_revtr_pairs_sorted.txt" 
+        bad_file = "/homes/network/revtr/revtr_logs/cache_logs/bad_revtr_pairs.txt" 
+
+        #
+        dataset2unresponsive_targets = Hash.new{|h,k| h[k] = Set.new}
+        dataset2substitute_targets = Hash.new{|h,k| h[k] = Set.new}
+
+        # get good ones
+        good_targs = Set.new
+        targ2set2count = Hash.new{|h,k| h[k] = {:good=>0,:bad=>0}} # map of target to number of good/bad srcs
+        File.open(good_file, "r"){|f| f.each_line{|line|
+            parts = line.split(" ")
+            targ = parts[1]
+            next if FailureIsolation::get_dataset(targ)==:Unknown
+            targ2set2count[targ][:good]+=1
+            dataset2substitute_targets[FailureIsolation::get_dataset(targ)] << targ
+            good_targs << targ
+        }}
+
+        # get bad targs, and make sure they aren't in the good set (since good/bad was
+        # done per src
+        bad_targ_count = 0
+        File.open(bad_file, "r"){|f| f.each_line{|line|
+            parts = line.split(" ")
+            #puts parts.to_s
+            targ = parts[1]
+            next if FailureIsolation::get_dataset(targ)==:Unknown
+            targ2set2count[targ][:bad]+=1
+            #if targ2set2count[targ][:good]>2 then next end
+            #next if good_targs.include?(targ)
+            bad_targ_count+=1
+            dataset2unresponsive_targets[FailureIsolation::get_dataset(targ)] << targ
+        }}
+
+        @logger.info("Found #{bad_targ_count} bad targs!")
+
+        # delete cases where the target is measurement from more sources than it is
+        # not
+        dataset2unresponsive_targets.each{|ds,targs| targs.delete_if{|targ| targ2set2count[targ][:good]>=targ2set2count[targ][:bad]}}
+
+        return dataset2unresponsive_targets
+    end
+
     # Top-level method for cleaning up unresponsive targets.
     #
     # Returns [dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops]
@@ -36,7 +80,7 @@ class HouseCleaner
         # TODO: do something with bad_hops
         @logger.debug "bad_hops: #{bad_hops}"
         @logger.debug "bad_targets: #{bad_targets}"
-        
+
         dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
 
         bad_targets.each do |target|
@@ -51,6 +95,10 @@ class HouseCleaner
             dataset2unresponsive_targets[dataset] << target
         end
 
+        # get bad targets in terms of how often they are successfully measured
+        dataset2bad_measure_targets = get_unmeasureable_targets()
+        dataset2bad_measure_targets.each{|ds, targs| targs.each{|targ| dataset2unresponsive_targets[ds] << targ}}
+
         @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
 
         find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
@@ -63,7 +111,7 @@ class HouseCleaner
     end
 
     # -----   Harsha's PoPs ---------
-    
+
     # Top level method for computing Top PoPs and replacing unresponsive
     # routers
     def find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
@@ -71,11 +119,11 @@ class HouseCleaner
 
         # (see utilities.rb for .categorize())
         core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
-                                        .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+            .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
-                                                                             FailureIsolation::CoreRtrsPerPoP,
-                                                                             pop2corertrs, sorted_replacement_pops)
+                                                                       FailureIsolation::CoreRtrsPerPoP,
+                                                                       pop2corertrs, sorted_replacement_pops)
         @logger.debug "Harsha PoPs substituted"
         
         # (see utilities.rb for .categorize())
@@ -163,7 +211,7 @@ class HouseCleaner
                 # XXX
             end
             
-            num_needed_replacements = unresponsive.targets.size
+            num_needed_replacements = unresponsivetargets.size
             if num_needed_replacements < num_rtrs_per_pop && pop2replacements[pop].size > num_needed_replacements
                 # for those pops that are partially gone,
                 # add targets from new generation

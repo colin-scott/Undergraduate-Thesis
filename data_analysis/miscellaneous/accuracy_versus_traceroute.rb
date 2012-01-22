@@ -1,10 +1,11 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
+$: << File.expand_path("../../")
 $: << File.expand_path("../")
 
-require 'failure_analyzer'
-require 'failure_dispatcher'
-require 'log_iterator'
-require 'ip_info'
+require 'failure_analyzer.rb'
+require 'failure_dispatcher.rb'
+require 'log_iterator.rb'
+require 'ip_info.rb'
 require 'set'
 
 we_win = 0

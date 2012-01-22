@@ -271,7 +271,7 @@ class Pruner
             @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}"
         end
 
-        result
+        results
     end
 end
 
