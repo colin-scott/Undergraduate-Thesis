@@ -30,6 +30,7 @@
 require 'isolation_utilities.rb'
 require 'db_interface'
 require 'failure_isolation_consts'
+require 'file_utils'
 
 class Suspect
     attr_accessor :ip, :outage
@@ -260,13 +261,15 @@ class Pruner
         results = Set.new(`#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
                     "cd colin/Scripts; sudo 2>/dev/null ./aliasprobe 40 /tmp/targets#{id} eth0 | cut -d ' ' -f1 | sort | uniq"`.split("\n"))
 
-        if results.empty? 
+        # TODO: I suspect that this block of code may be the cause of the
+        # heap overflows....
+        if results.empty?
             @logger.warn "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}"
             uuid = (0...36).map { (97 + rand(25)).chr }.join
-            Dir::mkdir("#{FailureIsolation::EmptyPingsLogDir}#{uuid}")
-            processes = `#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "echo $(hostname) ; ps aux"`
-            File.open("#{FailureIsolation::EmptyPingsLogDir}#{uuid}/ps-aux", "w") { |f| f.puts processes }
-            @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}#{uuid}"
+            FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
+            processes = `#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux"`
+            File.open("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux", "w") { |f| f.puts processes }
+            @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}"
         end
 
         results

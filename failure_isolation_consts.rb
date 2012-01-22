@@ -51,7 +51,7 @@ module FailureIsolation
 
     CurrentPLPLTracesPath = "/homes/network/ethan/failures/pl_pl_traceroutes/logs/currentlogdir/probes"
 
-    EmptyPingsLogDir = "~revtr/revtr_logs/isolation_logs/empty_pings_logs/"
+    EmptyPingsLogDir = "/homes/network/revtr/revtr_logs/isolation_logs/empty_pings_logs"
 
     # Return all hops observed on most recent traceroutes from all PL nodes to
     # the given site
