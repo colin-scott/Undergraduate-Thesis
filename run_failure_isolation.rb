@@ -101,6 +101,10 @@ begin
 rescue Exception => e
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
+   if logger
+        Thread.list.each { |t| logger.warn t.backtrace }
+   end
+
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
    $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
