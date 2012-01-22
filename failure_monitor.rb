@@ -132,9 +132,11 @@ class FailureMonitor
             @dispatcher.isolate_outages(srcdst2outage, srcdst2filtertracker)
 
             @logger.puts "round #{@current_round} completed"
+
+            # Clean up targets + vps ~twice a day, or after the first round
+            clean_the_house if (@current_round % @@node_audit_period_rounds) == 0 or @current_round == 0
+
             @current_round += 1
-            
-            clean_the_house if (@current_round % @@node_audit_period_rounds) == 0
 
             sleep_period = FailureIsolation::DefaultPeriodSeconds - (Time.new - start)
             @logger.info "Sleeping for #{sleep_period} seconds"
