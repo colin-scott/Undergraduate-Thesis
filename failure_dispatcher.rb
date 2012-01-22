@@ -379,10 +379,6 @@ class FailureDispatcher
         #object 
         @failure_analyzer.identify_faults(merged_outage)
 
-        #outage.as_hops_from_src = @failure_analyzer.as_hops_from_src(outage.suspected_failure, outage.tr, outage.spoofed_tr, outage.historical_tr)
-        #outage.as_hops_from_dst = @failure_analyzer.as_hops_from_dst(outage.suspected_failure, outage.historical_revtr, outage.spoofed_revtr,
-        #                                        outage.spoofed_tr, outage.tr, outage.as_hops_from_src)
-
         merged_outage.each do |outage|
             outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
                                                         outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
@@ -390,24 +386,6 @@ class FailureDispatcher
             outage.measured_working_direction = @failure_analyzer.measured_working_direction?(outage.direction, outage.spoofed_revtr)
 
             outage.path_changed = @failure_analyzer.path_changed?(outage.historical_tr, outage.tr, outage.spoofed_tr, outage.direction)
-
-            # now... if we found any pingable hops beyond the failure... send
-            # traceroutes to them... their paths must differ somehow
-            # TODO: put me back in?:
-            #
-            #outage.additional_traces = measure_traces_to_pingable_hops(outage.src, outage.suspected_failure, outage.direction, outage.historical_tr, 
-            #                                                           outage.spoofed_revtr, outage.historical_revtr)
-            #
-            # TODO: an upstream router in a reverse traceroute at the reachability
-            # horizon: was there a path change? Issue spoofed reverse traceroute,
-            # and compare to historical reverse traceroute.
-            #if(outage.direction == Direction.REVERSE && outage.historical_revtr.valid? && !outage.suspected_failure.nil? &&
-            #       !outage.suspected_failure.next.nil? && outage.suspected_failure.next.ping_responsive)
-            #    # TODO: should the key be the ip, or the Hop object?
-            #   upstream_revtr = issue_revtr(outage.src, outage.suspected_failure.next.ip) # historical traceroute?
-            #   outage.upstream_reverse_paths = {outage.suspected_failure.next.ip => upstream_revtr}
-            #   @logger.debug("upstream revtr issued")
-            #end
         end
     end
 

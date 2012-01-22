@@ -30,7 +30,7 @@
 require 'isolation_utilities.rb'
 require 'db_interface'
 require 'failure_isolation_consts'
-require 'file_utils'
+require 'fileutils'
 
 class Suspect
     attr_accessor :ip, :outage
