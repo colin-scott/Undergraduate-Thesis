@@ -1,5 +1,5 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
-#
+
 # These modules encapsulate the code for Arvind + Colin's "correlation"
 # algorithm.
 #
@@ -271,7 +271,7 @@ class Pruner
             @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}"
         end
 
-        results
+        result
     end
 end
 

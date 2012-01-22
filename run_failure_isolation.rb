@@ -104,9 +104,9 @@ rescue Exception => e
    if logger
         Thread.list.each do |t|
             begin
-                t.raise("trying to get backtrace")
-            rescue Exception => e
-                logger.warn "Thread #{t} backtrace: #{e.backtrace.join("\n")}"
+                t.raise(Exception.new("trying to get backtrace"))
+            rescue Exception => r
+                logger.warn "Thread #{t} backtrace: #{r.backtrace.join("\n")}"
             end
         end
    end
