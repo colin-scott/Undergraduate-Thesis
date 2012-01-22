@@ -108,6 +108,7 @@ rescue Exception => e
             rescue Exception => r
                 logger.warn "Thread #{t} backtrace: #{r.backtrace.join("\n")}"
             end
+            logger.close
         end
    end
 

@@ -850,7 +850,7 @@ class Controller
                 begin
                     Thread.current[:success]=false # until proven true
                     Thread.current[:host] = my_hostname
-                    
+
                     # may raise UnknownVPError
                     my_vp=get_vp(my_hostname)
                     Timeout::timeout(timeout, SockTimeout.new("#{my_hostname} timed out after #{timeout} while issuing command")) {
@@ -858,7 +858,7 @@ class Controller
                         Thread.current[:results]=method_return
                         Thread.current[:success]=true
                     }
-				rescue Exception
+				rescue Exception => e
                     if my_retry_command
                         my_retry_command=false
                         sleep 2
@@ -868,6 +868,10 @@ class Controller
                             $!.set_backtrace($!.backtrace + settings[:backtrace])
                         end
                         quarantine(my_hostname,maxalert,$!)
+                    end
+
+                    if my_hostname =~ /[^\s]*\s+\[.*\]/
+                        raise e
                     end
                 end
 #                 rescue UnknownVPError
