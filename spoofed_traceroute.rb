@@ -1,6 +1,8 @@
 # TODO: re-write this whole thing:
 #   - Use hops.rb objects to encapsulate return results rather than [ttl, rtrs]
 #   - Make it much more readable
+#   - Move it into the isolation process, not the controller process
+#   (shouldn't go through the registrar)
 
 require 'set'
 

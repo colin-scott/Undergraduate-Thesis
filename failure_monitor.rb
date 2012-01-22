@@ -34,9 +34,9 @@ class FailureMonitor
         # if a VP returns empty measurement results for more than 10 requests, swap it out
         @@failed_measurement_threshold = 10  
 
-        # if more than 70% of a node's targets are unreachable, we ignore the
+        # if more than 40% of a node's targets are unreachable, we ignore the
         # node
-        @@source_specific_problem_threshold = 0.35
+        @@source_specific_problem_threshold = 0.60
 
         # we send out faulty_node_audit reports thrice a day 
         # (there are 24*60/@@minutes_per_round rounds in a day -- so we want to 
