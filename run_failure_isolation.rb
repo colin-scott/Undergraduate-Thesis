@@ -102,7 +102,13 @@ rescue Exception => e
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
    if logger
-        Thread.list.each { |t| logger.warn t.backtrace }
+        Thread.list.each do |t|
+            begin
+                t.raise("trying to get backtrace")
+            rescue Exception => e
+                logger.warn "Thread #{t} backtrace: #{e.backtrace.join("\n")}"
+            end
+        end
    end
 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
