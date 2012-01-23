@@ -207,7 +207,7 @@ class FailureMonitor
         end
 
         if num_behind_nodes == FailureIsolation.CurrentNodes.size or num_source_problems == FailureIsolation.CurrentNodes.size 
-            Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state or high # of reported outages")
+            Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state or high # of reported outages").deliver
         end
 
         # nodes with problems at the source are excluded from node2targetstate

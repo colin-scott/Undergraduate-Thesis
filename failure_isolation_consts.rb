@@ -262,6 +262,7 @@ module FailureIsolation
     end
 
     # Helper method:
+    # TODO: for some reason, scp output shows up (twice)
     def self.read_in_riot_ips(remote_path)
         tmp_path = "/tmp/riot_nodes.txt"
         system "scp #{remote_path} #{tmp_path}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
@@ -352,8 +353,10 @@ module FailureIsolation
         # push out targets to monitoring nodes! 
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                     #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+        
         # also push out target set to toil in case it restarts nodes
         system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+
         # ============================== #
         #      riot specific!            #
         # ============================== #
@@ -486,8 +489,8 @@ module PoP
 end
 
 if $0 == __FILE__
-    puts `#{FailureIsolation::CurrentPoisoningsPath}`
-    puts FailureIsolation.SpooferTargets.to_a.inspect
+    #puts `#{FailureIsolation::CurrentPoisoningsPath}`
+    #puts FailureIsolation.SpooferTargets.to_a.inspect
     #puts FailureIsolation.MuxNodes.inspect
     #puts FailureIsolation.SentinelNodes.inspect
     #puts FailureIsolation.TargetSet.inspect
@@ -503,7 +506,7 @@ if $0 == __FILE__
     #
     #puts FailureIsolation.pl_pl_path_for_date(t)
 
-    #puts FailureIsolation.TargetSet.size
+    puts FailureIsolation.TargetSet.size
 
 
     require 'yaml'
