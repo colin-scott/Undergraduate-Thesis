@@ -14,6 +14,9 @@ require 'log_filterer'
 require 'data_analysis'
 require 'filter_stats'
 require 'filters'
+require 'set'
+
+all_merged_outages = Set.new
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that
@@ -27,6 +30,7 @@ def filter_and_aggregate(options)
     
     # TODO: merge with display_filter_stats_tracker's iterate loop
     FilterTrackerIterator.iterate(options) do |filter_tracker|
+        all_merged_outages |= filter_tracker.merged_outage_ids
         # Each filter_tracker is a single (src, dst) outage
         total_records += 1
         if filter_tracker.passed?
