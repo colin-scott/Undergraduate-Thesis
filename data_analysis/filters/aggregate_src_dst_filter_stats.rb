@@ -31,6 +31,7 @@ def filter_and_aggregate(options)
     # TODO: merge with display_filter_stats_tracker's iterate loop
     FilterTrackerIterator.iterate(options) do |filter_tracker|
         all_merged_outages |= filter_tracker.merged_outage_ids
+
         # Each filter_tracker is a single (src, dst) outage
         total_records += 1
         if filter_tracker.passed?
@@ -77,6 +78,8 @@ def filter_and_aggregate(options)
     end   
     
     puts 
+
+    # TODO: do something with merged outages here
 end
 
 if __FILE__ == $0

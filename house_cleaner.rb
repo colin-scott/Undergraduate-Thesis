@@ -431,7 +431,6 @@ class HouseCleaner
     # Write out new VP list to disk
     def update_current_nodes(current_nodes)
         File.open(FailureIsolation::CurrentNodesPath, "w") { |f| f.puts current_nodes.to_a.join("\n") }
-        system "scp #{FailureIsolation::CurrentNodesPath} cs@toil:#{FailureIsolation::ToilNodesPath}"
     end
 
     # Write out new blacklisted VPs to disk

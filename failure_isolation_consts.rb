@@ -206,7 +206,6 @@ module FailureIsolation
     # ====================================
     #         Target Sets                #
     # ====================================
-    ToilTargetSetPath = "/home/cs/colin/ping_monitoring/cloudfront_targets/current_target_set.txt"
     MonitorTargetSetPath = "/home/uw_revtr2/colin/current_target_set.txt"
 
     TargetSetPath = "/homes/network/revtr/spoofed_traceroute/current_target_set.txt"
@@ -350,13 +349,11 @@ module FailureIsolation
         raise "Invalid IP address in targets! #{not_valid_ip}" if not_valid_ip
 
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
+
         # push out targets to monitoring nodes! 
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                     #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         
-        # also push out target set to toil in case it restarts nodes
-        system "scp #{TargetSetPath} cs@toil.cs.washington.edu:#{ToilTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
-
         # ============================== #
         #      riot specific!            #
         # ============================== #
@@ -384,8 +381,6 @@ module FailureIsolation
     def self.CurrentNodes()
         @CurrentNodes ||= Set.new(IO.read(CurrentNodesPath).split("\n"))
     end
-
-    ToilNodesPath = "/home/cs/colin/ping_monitoring/cloudfront_monitoring/cloudfront_spoofing_monitoring_nodes.txt"
 
     # Signal to failure_monitor to update it's metadata for a removed VP
     NodeToRemovePath = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
@@ -507,7 +502,6 @@ if $0 == __FILE__
     #puts FailureIsolation.pl_pl_path_for_date(t)
 
     puts FailureIsolation.TargetSet.size
-
 
     require 'yaml'
     #puts previous_outages.inspect

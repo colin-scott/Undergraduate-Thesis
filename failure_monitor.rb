@@ -192,11 +192,16 @@ class FailureMonitor
                 next
             end
 
+            if not (hash.keys - FailureIsolation.TargetSet).empty?
+                Emailer.isolation_exception("Node #{node} has an out-of-date target list").deliver
+                next
+            end
+
             failure_percentage = hash.size * 1.0 / @target_set_size
             if (!FailureIsolation::PoisonerNames.include? node and failure_percentage > @@source_specific_problem_threshold) or
                     (FailureIsolation::PoisonerNames.include? node and failure_percentage == 1.0)
                 @problems_at_the_source[node] = failure_percentage * 100
-                @logger.puts "Problem at the source: #{node} #{@problems_at_the_source[node]}"
+                @logger.warn "Problem at the source: #{node} #{@problems_at_the_source[node]}"
                 num_source_problems += 1
                 next
             end
