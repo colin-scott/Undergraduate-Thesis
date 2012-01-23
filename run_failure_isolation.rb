@@ -108,8 +108,8 @@ rescue Exception => e
             rescue Exception => r
                 logger.warn "Thread #{t} backtrace: #{r.backtrace.join("\n")}"
             end
-            logger.close
         end
+        logger.close
    end
 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
