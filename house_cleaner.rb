@@ -371,7 +371,7 @@ class HouseCleaner
         return if faulty_nodes.empty?
 
         # TODO: create a "isolation_warning" email template
-        Emailer.isolation_exception("Swapping out faulty nodes: #{faulty_nodes}").deliver
+        Emailer.isolation_exception("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes}").deliver
         @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
