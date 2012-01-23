@@ -190,6 +190,8 @@ end
 
 # Filters out nodes that aren't registered with the controller, 
 module RegistrationFilters
+    @@node2num_rounds_unregistered = Hash.new(0)
+
     # Filter names
     SRC_NOT_REGISTERED = :source_not_registered 
     NO_REGISTERED_RECEIVERS = :no_receivers_registered
@@ -222,10 +224,11 @@ module RegistrationFilters
                 srcdst2outage.delete srcdst
             end
 
-            if RegistrationFilters.src_not_registered?(srcdst[0], registered_vps)
+            src = srcdst[0]
+            if RegistrationFilters.src_not_registered?(src, registered_vps)
                 filter_tracker.failure_reasons << SRC_NOT_REGISTERED
                 srcdst2outage.delete srcdst
-                email_warnings << srcdst[0]
+                email_warnings << src
             end
         end
 
@@ -240,9 +243,16 @@ module RegistrationFilters
             
             Emailer.isolation_exception(message, "ikneaddough@gmail.com").deliver
 
+            # Swap out nodes, but only if they have been unresponsive for more
+            # than 5 rounds. check_up_and_restart_vps.rb is run every half
+            # hour, so wait at least on iteration of that before swapping out.
+            email_warnings.each { |node| @@node2num_rounds_unregistered[node] += 1 }
+            (FailureIsolation.CurrentNodes - email_warnings).each { |node| @@node2num_rounds_unregistered[node] = 0 }
+            email_warnings.delete_if { |node| @@node2num_rounds_unregistered[node] <= FailureIsolation::UnregisteredRoundsThreshold }
+
             # and swap them out while we're at it, as long as we aren't
             # swapping out everyone, which indicates that something else is wrong
-            if email_warnings.size <= 3
+            if email_warnings.size <= FailureIsolation::SwapOutThreshold
                 house_cleaner.swap_out_faulty_nodes(email_warnings)
             end
         end

@@ -28,6 +28,12 @@ module FailureIsolation
     # Length of each isolation round
     DefaultPeriodSeconds = 360
 
+    # Number of rounds a VP is allowed to be unregsitered before it is swapped out
+    UnregisteredRoundsThreshold = 5
+    # Maximum number of VPs to swap out at any time. Greater than this
+    # indicates that something is very wrong...
+    SwapOutThreshold = 3
+
     PPTASKS = "~ethan/scripts/pptasks"
 
     TestPing = "128.208.4.49" # crash.cs.washington.edu
