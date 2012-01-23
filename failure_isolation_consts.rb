@@ -304,6 +304,7 @@ module FailureIsolation
         elsif self.SentinelNodes.include? dst
             return DataSets::SentinelNodes
         else
+            $stderr.puts "Unknown dataset: #{dst.inspect}"
             return DataSets::Unknown 
         end
     end
