@@ -109,11 +109,11 @@ rescue Exception => e
                 logger.warn "Thread #{t} backtrace: #{r.backtrace.join("\n")}"
             end
         end
-        logger.close
    end
 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
    $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
+   logger.close
    throw e
 end
