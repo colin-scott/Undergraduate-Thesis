@@ -225,12 +225,10 @@ class FailureDispatcher
 
             swap_out_faulty_nodes(srcdst2filter_tracker)
 
-            log_filter_trackers(srcdst2filter_tracker)
-
             # ================================================================================
             # Merge (src, dst) outages                                                       #
             # ================================================================================
-            merged_outages = merge_outages(srcdst2outage.values)
+            merged_outages = merge_outages(srcdst2outage, srcdst2filter_tracker)
             merged_outage_threads = []
 
             merged_outages.each do |merged_outage|
@@ -244,6 +242,8 @@ class FailureDispatcher
 
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
+
+            log_filter_trackers(srcdst2filter_tracker)
         end
     end
 
@@ -270,19 +270,42 @@ class FailureDispatcher
     # satifisfies multiple clustering algorithms.
     # 
     # TODO: use smarter merging heuristics?
-    def merge_outages(outages)
+    def merge_outages(srcdst2outage, srcdst2filter_tracker)
        # unique id for log filenames
        id = 0
 
+       outages = srcdst2outage.values
+
+       # nested helper closure
+       allocate_merged_outage = lambda do |outage_list, merging_method|
+           merged_outage_id = id
+           id += 1
+           merged_outage = MergedOutage.new(merged_outage_id, outage_list, merging_method)
+           outage_list.each do |outage|
+                src = outage.src
+                dst = outage.dst
+                srcdst2filter_tracker[[src,dst]].merged_outage_ids << merged_outage.file
+           end
+
+           # last statement is the map value
+           merged_outage
+       end
+       
        # Note: bidirectional will appear twice, in forward mergings and reverse
        # mergings
        only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
        dst2outages = only_forward.categorize_on_attr(:dst) 
-       forward_merged = dst2outages.values.map { |outage_list| MergedOutage.new((id+=1), outage_list, MergingMethod::FORWARD) }
+       # Abuse of map... 
+       forward_merged = dst2outages.values.map do |outage_list|
+           allocate_merged_outage.call(outage_list, MergingMethod::FORWARD)
+       end
 
        only_reverse = deep_copy(outages).find_all { |o| o.direction.is_reverse? }
        src2outages = only_reverse.categorize_on_attr(:src)
-       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new((id+=1), outage_list, MergingMethod::REVERSE) }
+       # Abuse of map... 
+       reverse_merged = src2outages.values.map do |outage_list|
+           allocate_merged_outage.call(outage_list, MergingMethod::REVERSE)
+       end
 
        # For debugging. TODO: put me into unit tests instead of here.
        forward_src_dsts = Set.new(forward_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
@@ -1001,12 +1024,12 @@ class FailureDispatcher
 
     # see outage.rb
     def log_srcdst_outage(outage)
-        log_outage(outage, FailureIsolation::IsolationResults)
+        log_outage(outage, IsolationResults)
     end
 
     # see outage.rb
     def log_merged_outage(outage)
-        log_outage(outage, FailureIsolation::MergedIsolationResults)
+        log_outage(outage, FailureIsolation::MergedIsolationResult)
     end
 
     # Helper method

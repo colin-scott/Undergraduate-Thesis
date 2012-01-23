@@ -182,8 +182,6 @@ class Outage
             @src, @dst, @connected, @formatted_connected, @formatted_unconnected, @formatted_never_seen = args
 
             @dataset = FailureIsolation.get_dataset(@dst)
-
-            return
         when 22
             @file, @src, @dst, @dataset, @direction, @formatted_connected, 
                                           @formatted_unconnected, @pings_towards_src,
@@ -218,17 +216,17 @@ class Outage
             raise "unknown # of args!"
         end
    
-        if @tr.nil? or @spoofed_tr.nil? or @historical_tr.nil? or @spoofed_revtr.nil? or @historical_revtr.nil?
-            # Shouldn't happen
-            $stderr.puts file
-        end
+        #if @tr.nil? or @spoofed_tr.nil? or @historical_tr.nil? or @spoofed_revtr.nil? or @historical_revtr.nil?
+        #    # Shouldn't happen
+        #    $stderr.puts file
+        #end
 
         #@alternate_paths ||= $analyzer.find_alternate_paths(src, dst, direction, tr, spoofed_tr, historical_tr,
         #                              spoofed_revtr, historical_revtr)
 
         #link_listify!
         
-        @file = get_uniq_filename
+        @file = get_uniq_filename(@src, @dst)
    end
 
    # Log filenames should be unique.
