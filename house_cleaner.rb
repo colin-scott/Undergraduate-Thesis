@@ -59,9 +59,7 @@ class HouseCleaner
             dataset2unresponsive_targets[FailureIsolation::get_dataset(targ)] << targ
         }}
 
-        # TODO: are these targets, or hops? I see a message in my logs "Found 1975 bad targs!",
-        # which is somewhat frightneing..
-        @logger.info("Found #{bad_targ_count} bad targs!")
+        @logger.info("Found #{bad_targ_count} bad <src,targ> paris!")
 
         # delete cases where the target is measurement from more sources than it is
         # not

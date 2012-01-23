@@ -198,7 +198,19 @@ class FailureDispatcher
             # TODO: this barrier might take arbitrarily long. Mostly needed
             # for merging pruposes, but we might consider instrumenting this
             # and doing something smarter if it's a bottleneck
-            outage_threads.each { |thread| ($executor) ? thread.get : thread.join }
+            outage_threads.each do |thread|
+                begin 
+                    ($executor) ? thread.get : thread.join
+                rescue Exception => e
+                    if $executor
+                        # Two levels of nesting to get at the real exception!
+                        # jruby, sometimes you do weird things...
+                        raise e.cause.cause
+                    else
+                        raise e
+                    end
+                end
+            end
 
             t_prime = Time.new
             @logger.info("Took #{t_prime - t} seconds to join on measurement threads")

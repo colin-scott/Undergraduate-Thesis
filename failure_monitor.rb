@@ -387,7 +387,8 @@ class FailureMonitor
     # them, and send out a summary email
     def clean_the_house()
         Thread.new do
-            swap_out_faulty_nodes
+            # TODO: the memory leak seems to occur on this line!
+            #swap_out_faulty_nodes
             swap_out_unresponsive_targets
         end
     end
