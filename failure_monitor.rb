@@ -132,11 +132,10 @@ class FailureMonitor
             @dispatcher.isolate_outages(srcdst2outage, srcdst2filtertracker)
 
             @logger.puts "round #{@current_round} completed"
-
-            # Clean up targets + vps ~twice a day, or after the first round
-            clean_the_house if (@current_round % @@node_audit_period_rounds) == 0 or @current_round == 0
-
             @current_round += 1
+
+            # Clean up targets + vps ~twice a day, or after the third round
+            clean_the_house if (@current_round % @@node_audit_period_rounds) == 0 or @current_round == 3
 
             sleep_period = FailureIsolation::DefaultPeriodSeconds - (Time.new - start)
             @logger.info "Sleeping for #{sleep_period} seconds"
@@ -440,8 +439,8 @@ class FailureMonitor
         not_controllable_hostname2ip = @db.uncontrollable_isolation_vantage_points()
         not_controllable = not_controllable_hostname2ip.keys
 
-        # remove from target list
-        # substitutes implemented separately
+        # remove unsshable nodes from /target/ list
+        # substitutes for unsshable nodes themselves executed later
         @house_cleaner.swap_out_unresponsive_targets(not_controllable_hostname2ip.values, {})
         to_swap_out |= not_controllable
 
@@ -450,7 +449,7 @@ class FailureMonitor
         to_swap_out |= failed_measurements.map { |k,v| k }
 
         bad_srcs, possibly_bad_srcs = @db.check_source_probing_status()
-        to_swap_out += bad_srcs
+        to_swap_out |= bad_srcs.find_all { |node| FailureIsolation.CurrentNodes.include? node }
 
         to_swap_out -= already_blacklisted
 

@@ -59,6 +59,8 @@ class HouseCleaner
             dataset2unresponsive_targets[FailureIsolation::get_dataset(targ)] << targ
         }}
 
+        # TODO: are these targets, or hops? I see a message in my logs "Found 1975 bad targs!",
+        # which is somewhat frightneing..
         @logger.info("Found #{bad_targ_count} bad targs!")
 
         # delete cases where the target is measurement from more sources than it is
@@ -78,8 +80,8 @@ class HouseCleaner
         bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops
-        @logger.debug "bad_hops: #{bad_hops}"
-        @logger.debug "bad_targets: #{bad_targets}"
+        @logger.debug "bad_hops (#{bad_hops.size}): #{bad_hops}"
+        @logger.debug "bad_targets (#{bad_targets.size}): #{bad_targets}"
 
         dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
 
@@ -328,7 +330,6 @@ class HouseCleaner
         bad_targets = dataset2unresponsive_targets.is_a?(Hash) ? \
                        dataset2unresponsive_targets.value_set : \
                        dataset2unresponsive_targets 
-
         @logger.debug "swapping out unresponsive targets: #{bad_targets}"
 
         update_target_blacklist(bad_targets.to_set | FailureIsolation.TargetBlacklist)

@@ -14,8 +14,6 @@ require 'yaml'
 $REV_TR_TOOL_DIR ||= "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 $DATADIR ||= "/homes/network/revtr/spoofed_traceroute/data"
 
-
-
 # Constants for the entire isolation system
 module FailureIsolation
     # ====================================
