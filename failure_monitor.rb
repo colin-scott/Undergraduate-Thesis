@@ -341,8 +341,10 @@ class FailureMonitor
                   formatted_unconnected = observingnode2rounds.to_a.map { |x| "#{x[0]} [#{x[1] / @@minutes_per_round} minutes]"}
                   formatted_never_seen = target2neverseen[target]
 
-                  srcdst2outage[srcdst] = Outage.new(src, target, target2stillconnected[target],
+                  outage = Outage.new(src, target, target2stillconnected[target],
                                                            formatted_connected, formatted_unconnected, formatted_never_seen)
+                  srcdst2outage[srcdst] = outage
+                  filter_tracker.outage_id = outage.file
                   srcdst2outage[srcdst].measurement_times << ["passed_first_lvl_filters", now]
                end
             end

@@ -36,13 +36,21 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-    def initialize(outages, merging_method=MergingMethod::REVERSE)
+    def initialize(id, outages, merging_method=MergingMethod::REVERSE)
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages
         @suspected_failures = {}
         @initializer2suspectset = {}
         @pruner2incount_removed = {}
         @merging_method = merging_method
+        @file = get_uniq_filename(id)
+    end
+
+    # Log filenames should be unique for any given round
+    def get_uniq_filename(id)
+        t = Time.new
+        t_str = t.strftime("%Y%m%d%H%M%S")
+        @file = "#{id}_#{t_str}"
     end
 
     # Convert @pruner2incount_removed to just pruner2removed
@@ -219,6 +227,16 @@ class Outage
         #                              spoofed_revtr, historical_revtr)
 
         #link_listify!
+        
+        @file = get_uniq_filename
+   end
+
+   # Log filenames should be unique.
+   # Precondition: (src,dst) outage are unique for a given round
+   def get_uniq_filename(src, dst)
+       t = Time.new
+       t_str = t.strftime("%Y%m%d%H%M%S")
+       "#{src}_#{dst}_#{t_str}"
    end
 
    # Deprecated

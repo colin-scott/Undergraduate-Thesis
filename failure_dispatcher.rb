@@ -231,13 +231,10 @@ class FailureDispatcher
             # Merge (src, dst) outages                                                       #
             # ================================================================================
             merged_outages = merge_outages(srcdst2outage.values)
-            # id's needed later on
-            merged_outage2id = assign_ids(merged_outages)
-
             merged_outage_threads = []
 
-            merged_outage2id.each do |merged_outage, id|
-                block = lambda { process_merged_outage(merged_outage, id) }
+            merged_outages.each do |merged_outage|
+                block = lambda { process_merged_outage(merged_outage) }
                 if $executor
                     $executor.submit(&block)
                 else
@@ -274,15 +271,18 @@ class FailureDispatcher
     # 
     # TODO: use smarter merging heuristics?
     def merge_outages(outages)
+       # unique id for log filenames
+       id = 0
+
        # Note: bidirectional will appear twice, in forward mergings and reverse
        # mergings
        only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
        dst2outages = only_forward.categorize_on_attr(:dst) 
-       forward_merged = dst2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::FORWARD) }
+       forward_merged = dst2outages.values.map { |outage_list| MergedOutage.new((id+=1), outage_list, MergingMethod::FORWARD) }
 
        only_reverse = deep_copy(outages).find_all { |o| o.direction.is_reverse? }
        src2outages = only_reverse.categorize_on_attr(:src)
-       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new(outage_list, MergingMethod::REVERSE) }
+       reverse_merged = src2outages.values.map { |outage_list| MergedOutage.new((id+=1), outage_list, MergingMethod::REVERSE) }
 
        # For debugging. TODO: put me into unit tests instead of here.
        forward_src_dsts = Set.new(forward_merged.map { |merged| merged.map { |o| {:src => o.src, :dst => o.dst}  } }.flatten)
@@ -295,21 +295,6 @@ class FailureDispatcher
        end
        
        return forward_merged + reverse_merged
-    end
-
-    # return a hash:
-    #     { merged outage -> unique id }
-    #
-    # ID's needed to ensure unique log filenames
-    def assign_ids(merged_outages)
-       merged_outage2id = {}
-       id = 0
-       merged_outages.each do |merged_outage|
-           merged_outage2id[merged_outage] = id
-           id += 1 
-       end
-
-       merged_outage2id
     end
 
     # To gather ground truth data, check for cases where the destination is
@@ -346,8 +331,6 @@ class FailureDispatcher
 
         gather_measurements(outage, filter_tracker)
 
-        outage.file = get_uniq_filename(outage.src, outage.dst)
-
         # turn into a linked list ( I think? )
         outage.build
 
@@ -367,15 +350,10 @@ class FailureDispatcher
 
     # Process a MergedOutage object. Analyze the measurements, log the
     # results, and send out an email if passed second level filters.
-    #
-    # id goes from 0 to n, where n is the number of merged_outages this round
-    # (used for unique log filenames)
-    def process_merged_outage(merged_outage, id)
+    def process_merged_outage(merged_outage)
         @logger.debug "process_merged_outage: #{merged_outage.sources}, #{merged_outage.destinations}"
-        analyze_measurements(merged_outage)    
+        analyze_measurements(merged_outage)
     
-        merged_outage.file = get_uniq_filename(id, id)
-
         log_merged_outage(merged_outage)
 
         # If one of the riot VPs, attempt to trigger a BGP poison
@@ -1021,24 +999,21 @@ class FailureDispatcher
         end
     end
 
-    # Log filenames should be unique.
-    def get_uniq_filename(src, dst)
-        t = Time.new
-        t_str = t.strftime("%Y%m%d%H%M%S")
-        "#{src}_#{dst}_#{t_str}"
+    # see outage.rb
+    def log_srcdst_outage(outage)
+        log_outage(outage, FailureIsolation::IsolationResults)
     end
 
     # see outage.rb
-    def log_srcdst_outage(outage)
-        # TODO: use pstore instead of individual files
-        filename = outage.file
-        File.open(FailureIsolation::IsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+    def log_merged_outage(outage)
+        log_outage(outage, FailureIsolation::MergedIsolationResults)
     end
 
-    def log_merged_outage(outage)
+    # Helper method
+    def log_outage(outage, path)
         # TODO: use pstore instead of individual files
         filename = outage.file
-        File.open(FailureIsolation::MergedIsolationResults+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+        File.open(path+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
 
     # Log filter statistics

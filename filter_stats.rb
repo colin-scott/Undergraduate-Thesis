@@ -20,7 +20,7 @@ class FilterTracker
    
    attr_accessor :source, :target, :connected, :registered_vps, :failure_reasons,
                  :first_lvl_filter_time, :registration_filter_time, :measurement_start_time,
-                 :end_time
+                 :end_time, :outage_id
 
    alias :src :source
    alias :dst :target
