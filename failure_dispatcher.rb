@@ -234,10 +234,12 @@ class FailureDispatcher
             # id's needed later on
             merged_outage2id = assign_ids(merged_outages)
 
+            merged_outage_threads = []
+
             merged_outage2id.each do |merged_outage, id|
                 block = lambda { process_merged_outage(merged_outage, id) }
                 if $executor
-                    $executor.execute(&block)
+                    $executor.submit(&block)
                 else
                     Thread.new(&block)
                 end
@@ -496,7 +498,7 @@ class FailureDispatcher
         end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
-        check_pingability_from_other_vps!(outage.formatted_connected, non_responsive_hops)
+        check_pingability_from_other_vps!(outage.connected, non_responsive_hops)
 
         @logger.debug "pings to non-responsive hops issued"
 
