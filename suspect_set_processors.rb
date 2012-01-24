@@ -232,8 +232,8 @@ class Pruner
         end
 
         if !suspect_set.empty? and (responsive_targets.nil? or responsive_targets.empty?)
-            @logger.warn { "responsive targets #{responsive_targets.inspect} was empty?!" } 
-            @logger.warn { "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}" }
+            @logger.warn { "responsive targets #{responsive_targets.inspect} was empty or nil?!" } 
+            @logger.warn { "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a[0..5].inspect}..." }
         else
             @logger.debug { "issued pings sucessfully!" }
         end
@@ -268,7 +268,7 @@ class Pruner
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
             system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
-            @logger.warn { "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
+            @logger.info { "empty ping logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
         end
 
         results
