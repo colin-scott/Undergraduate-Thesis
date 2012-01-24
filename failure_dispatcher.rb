@@ -1023,7 +1023,7 @@ class FailureDispatcher
 
     # see outage.rb
     def log_srcdst_outage(outage)
-        log_outage(outage, IsolationResults)
+        log_outage(outage, FailureIsolation::IsolationResults)
     end
 
     # see outage.rb
