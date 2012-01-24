@@ -129,7 +129,7 @@ class FailureDispatcher
         # Invoke registration filters                                                    #
         # ================================================================================
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
-        @logger.info { "before filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}" }
+        @logger.info { "before filtering, srcdst: #{srcdst2still_connected.keys.inspect}" }
 
         registered_vps = sanity_check_registered_vps
         # Note: filter! removes srcdst2outages where the registration filters
@@ -137,7 +137,7 @@ class FailureDispatcher
         RegistrationFilters.filter!(srcdst2outage, srcdst2filter_tracker, registered_vps, @house_cleaner)
 
         srcdst2still_connected = srcdst2outage.map_values { |o| o.connected }
-        @logger.info { "after filtering, srcdst2still_connected: #{srcdst2still_connected.inspect}" }
+        @logger.info { "after filtering, srcdst: #{srcdst2still_connected.keys.inspect}" }
 
         # Not that RegistrationFilters.filter! deletes filtered srcdst2outage entries
         assert_no_outage_loss(srcdst2outage.size, srcdst2filter_tracker)
