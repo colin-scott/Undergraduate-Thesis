@@ -195,7 +195,7 @@ class FailureDispatcher
             # have them in the future
             t = Time.new
             
-            get_thread_results(outage_threads)
+            grab_thread_results(outage_threads)
             
             t_prime = Time.new
             @logger.info("Took #{t_prime - t} seconds to join on measurement threads")
@@ -224,7 +224,8 @@ class FailureDispatcher
             end
 
             # Don't want to block the rest of the system here..
-            Thread.new { get_thread_results(merged_outage_threads }
+            # But we still want to see exceptions if they happen
+            Thread.new { grab_thread_results(merged_outage_threads) }
 
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"

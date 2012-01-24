@@ -66,7 +66,7 @@ class Initializer
             next unless target2trace
             ttlhoptuples = target2trace[outage.dst] 
             next unless ttlhoptuples
-            historical_tr_hops |= ttlhoptuples.map { |ttlhop| ttlhop[1] }
+            historical_tr_hops |= ttlhoptuples.map { |ttlhop| Suspect.new(ttlhop[1], outage) }
         end
 
         return historical_tr_hops
