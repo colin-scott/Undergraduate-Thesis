@@ -156,6 +156,7 @@ class FailureMonitor
 
         num_behind_nodes = 0
         num_source_problems = 0
+        stale_nodes = []
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
 
@@ -193,7 +194,7 @@ class FailureMonitor
             end
 
             if not (hash.keys - FailureIsolation.TargetSet).empty?
-                Emailer.isolation_exception("Node #{node} has an out-of-date target list").deliver
+                stale_nodes << node
                 next
             end
 
@@ -213,6 +214,10 @@ class FailureMonitor
 
         if num_behind_nodes == FailureIsolation.CurrentNodes.size or num_source_problems == FailureIsolation.CurrentNodes.size 
             Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state or high # of reported outages").deliver
+        end
+
+        if not stale_nodes.empty?
+            Emailer.isolation_exception(%{The following node have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
         end
 
         # nodes with problems at the source are excluded from node2targetstate
