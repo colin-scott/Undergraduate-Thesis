@@ -58,7 +58,7 @@ end
 
 begin
    logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
-   #logger.level = Logger::INFO
+   logger.level = Logger::INFO
    Emailer::Logger= logger
    monitor = allocate_modules(logger)
 
