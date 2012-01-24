@@ -223,8 +223,6 @@ class FailureDispatcher
             total_passed_outages = srcdst2outage.find_all { |srcdst,outage| outage.passed? }.size
             assert_no_outage_loss(total_passed_outages, srcdst2filter_tracker)
 
-            swap_out_faulty_nodes(srcdst2filter_tracker)
-
             # ================================================================================
             # Merge (src, dst) outages                                                       #
             # ================================================================================
@@ -243,6 +241,7 @@ class FailureDispatcher
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
 
+            swap_out_faulty_nodes(srcdst2filter_tracker)
             log_filter_trackers(srcdst2filter_tracker)
         end
     end
@@ -541,12 +540,12 @@ class FailureDispatcher
             @logger.debug("alternate path splicing complete")
         end
 
-	fempty = @node2emptypings[outage.src].fraction_empty
-	@logger.info("src #{outage.src} fraction empty #{fempty}")
-        if fempty > 0.8
-		@logger.info("scheduling #{outage.src} for swap_out")
-		SwapFilters.empty_pings!(outage, filter_tracker)
-	end
+	    fempty = @node2emptypings[outage.src].fraction_empty
+	    @logger.info("src #{outage.src} fraction empty #{fempty}")
+            if fempty > 0.8
+	    	@logger.info("scheduling #{outage.src} for swap_out")
+	    	SwapFilters.empty_pings!(outage, filter_tracker)
+	    end
     end
 
     # One reason measurements might not be issued is that atd is stuck.

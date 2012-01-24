@@ -24,8 +24,8 @@ module Filters
     Levels = [
         Level::CONNECTIVITY,
         Level::REGISTRATION,
-        Level::MEASUREMENT, 
-        Level::SWAP
+        Level::SWAP,
+        Level::MEASUREMENT
     ]
 
     def self.reason2level(reason)
