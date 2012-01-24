@@ -51,13 +51,13 @@ class PoisonLog
     end
 
     def reload()
-        @logger.debug "Reloading poison log #{FailureIsolation::PoisonLogPath}"
+        @logger.debug { "Reloading poison log #{FailureIsolation::PoisonLogPath}" }
         # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
         previous_outages = []
         begin
             previous_outages = YAML.load_file(FailureIsolation::PoisonLogPath)
         rescue Exception
-            @logger.warn "failed to load yaml file #{$!}"
+            @logger.warn { "failed to load yaml file #{$!}" }
         end
 
         previous_outages = [] unless previous_outages
@@ -156,7 +156,7 @@ class Poisoner
                 asn_to_poison, outage = asns_to_poison(outage2failures)
 
                 if asn_to_poison.nil?
-                    @logger.warn "asn_to_poison nil, reverse: #{direction2outage2failures[Direction.REVERSE]}"
+                    @logger.warn { "asn_to_poison nil, reverse: #{direction2outage2failures[Direction.REVERSE]}" }
                     next
                 end
                 execute_poison(src, asn_to_poison, outage)
@@ -166,7 +166,7 @@ class Poisoner
                 asn_to_poison, outage = asns_to_poison(outage2failures)
 
                 if asn_to_poison.nil?
-                    @logger.warn "asn_to_poison nil, both: #{direction2outage2failures[Direction.BOTH]}"
+                    @logger.warn { "asn_to_poison nil, both: #{direction2outage2failures[Direction.BOTH]}" }
                     next
                 end
 
@@ -227,7 +227,7 @@ class Poisoner
     # ssh to riot and execute the poisoning
     def execute_poison(src, asn, outage)
         if already_poisoning? src
-            @logger.warn "#{src} is already poisoning... ignoring poison opportunity"
+            @logger.warn { "#{src} is already poisoning... ignoring poison opportunity" }
             return 
         end
 

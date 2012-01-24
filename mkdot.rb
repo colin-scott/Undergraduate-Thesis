@@ -157,8 +157,8 @@ class DotGenerator
 
         assign_colors!(node2asn, node_attributes)
 
-        @logger.debug "node2pingable: #{node2pingable.inspect}"
-        @logger.debug "node2historicallypingable: #{node2historicallypingable.inspect}"
+        @logger.debug { "node2pingable: #{node2pingable.inspect}" }
+        @logger.debug { "node2historicallypingable: #{node2historicallypingable.inspect}" }
 
         output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes,
                         symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)

@@ -131,14 +131,14 @@ class FailureMonitor
             # ==================================== #                                                                                                                                 
             @dispatcher.isolate_outages(srcdst2outage, srcdst2filtertracker)
 
-            @logger.puts "round #{@current_round} completed"
+            @logger.info { "round #{@current_round} completed" }
             @current_round += 1
 
             # Clean up targets + vps ~twice a day, or after the third round
             clean_the_house if (@current_round % @@node_audit_period_rounds) == 0 or @current_round == 3
 
             sleep_period = FailureIsolation::DefaultPeriodSeconds - (Time.new - start)
-            @logger.info "Sleeping for #{sleep_period} seconds"
+            @logger.info { "Sleeping for #{sleep_period} seconds" }
 
             sleep sleep_period if sleep_period > 0
         end
@@ -168,7 +168,7 @@ class FailureMonitor
             if seconds_difference >= @@max_ping_lag_seconds
                 minutes_difference = seconds_difference / 60
                 @outdated_nodes[node] = minutes_difference
-                @logger.puts "#{node}'s data is #{minutes_difference} minutes out of date"
+                @logger.info { "#{node}'s data is #{minutes_difference} minutes out of date" }
                 num_behind_nodes += 1
                 next
             end
@@ -179,7 +179,7 @@ class FailureMonitor
                 yml_hash = YAML.load_file(yaml)
 
                 if !yml_hash.is_a?(Hash)
-                    @logger.puts "#{node}'s data was not a hash!!"
+                    @logger.info { "#{node}'s data was not a hash!!" }
                     next
                 end
 
@@ -189,7 +189,7 @@ class FailureMonitor
                    hash[k.strip] = v
                 end 
             rescue Exception
-                @logger.puts "Corrupt YAML file: #{node}"
+                @logger.info { "Corrupt YAML file: #{node}" }
                 next
             end
 
@@ -202,7 +202,7 @@ class FailureMonitor
             if (!FailureIsolation::PoisonerNames.include? node and failure_percentage > @@source_specific_problem_threshold) or
                     (FailureIsolation::PoisonerNames.include? node and failure_percentage == 1.0)
                 @problems_at_the_source[node] = failure_percentage * 100
-                @logger.warn "Problem at the source: #{node} #{@problems_at_the_source[node]}"
+                @logger.warn { "Problem at the source: #{node} #{@problems_at_the_source[node]}" }
                 num_source_problems += 1
                 next
             end
@@ -296,7 +296,7 @@ class FailureMonitor
                next if FailureIsolation.TargetBlacklist.include? target
 
                if rounds.nil?
-                   @logger.warn "#{node}: #{target} is nil..."
+                   @logger.warn { "#{node}: #{target} is nil..." }
                    next
                end
                 
@@ -309,7 +309,7 @@ class FailureMonitor
                         target2neverseen[target] << node
                     end
                else 
-                   @logger.warn "node #{node} not known by monitor.."
+                   @logger.warn { "node #{node} not known by monitor.." }
                    target2observingnode2rounds[target][node] = rounds
                end
             end
@@ -335,7 +335,7 @@ class FailureMonitor
         srcdst2filtertracker = apply_first_lvl_filters!(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
         if total_src_dsts != srcdst2filtertracker.size
-            @logger.warn "total_src_dsts (#{total_src_dsts}) != srcdst2filterstracker.size (#{srcdst2filtertracker.size})"
+            @logger.warn { "total_src_dsts (#{total_src_dsts}) != srcdst2filterstracker.size (#{srcdst2filtertracker.size})" }
         end
 
         now = Time.new
@@ -420,7 +420,7 @@ class FailureMonitor
         to_swap_out,outdated,source_problems,not_sshable,failed_measurements,
             not_controllable,bad_srcs,possibly_bad_srcs,outdated = identify_faulty_nodes
 
-        @logger.debug "finished finding substitites for vps"
+        @logger.debug { "finished finding substitites for vps" }
 
         Emailer.faulty_node_report(outdated,
                                    source_problems,
@@ -478,7 +478,7 @@ class FailureMonitor
     def swap_out_unresponsive_targets
         dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops = \
                 @house_cleaner.find_substitutes_for_unresponsive_targets()
-        @logger.debug "finished finding substitutes for targets"
+        @logger.debug { "finished finding substitutes for targets" }
 
         Emailer.isolation_status(dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops).deliver
          

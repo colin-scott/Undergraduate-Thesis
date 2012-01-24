@@ -30,7 +30,7 @@ class DatabaseInterface
         begin
             @connection = MysqlConnectionManager.new(host, usr, pwd, database)
         rescue Mysql::Error
-            @logger.puts "DB connection error " + host
+            @logger.info { "DB connection error " + host }
             throw e
         end
 
@@ -120,9 +120,9 @@ class DatabaseInterface
         only_ips = ips.map { |ip| ip.is_a?(String) ? @hostname2ip[ip] : ip }.find_all { |elt| !elt.nil? }
         raise "ips not ips! #{ips.inspect}" if only_ips.find { |ip| !ip.matches_ip? and !ip.is_a?(Integer) }
 
-        #@logger.puts "fetch_pingability(), ips=#{ips.inspect}"
+        #@logger.info { "fetch_pingability(), ips=#{ips.inspect}" }
         addrs = only_ips.map { |ip| ip.is_a?(String) ? Inet::aton(ip) : ip }
-        #@logger.puts "fetch_pingability(), addrs=#{ips.inspect}"
+        #@logger.info { "fetch_pingability(), addrs=#{ips.inspect}" }
         responsive = Hash.new { |h,k| h[k] = "N/A" }
 
         return responsive if addrs.empty?
@@ -131,10 +131,10 @@ class DatabaseInterface
         
         results = query(sql)
 
-        #@logger.puts "fetch_pingability(), results=#{results.inspect}"
+        #@logger.info { "fetch_pingability(), results=#{results.inspect}" }
 
         results.each_hash do |row|
-           #@logger.puts "fetch_pingability(), row=#{row.inspect}"
+           #@logger.info { "fetch_pingability(), row=#{row.inspect}" }
            #   see hops.rb for an explanation:
            row["last_responsive"] = false if row.include?("last_responsive") and row["last_responsive"].nil?
            responsive[Inet::ntoa(row["ip"].to_i)] = row["last_responsive"]

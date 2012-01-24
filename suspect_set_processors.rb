@@ -84,9 +84,9 @@ class Initializer
         end
 
         if historical_revtr_suspects.empty?
-            @logger.warn "historical_revtr_hops empty!" 
+            @logger.warn { "historical_revtr_hops empty!" } 
         else
-            @logger.debug "historical_revtr_hops passed!" 
+            @logger.debug { "historical_revtr_hops passed!" } 
         end
 
         return historical_revtr_suspects
@@ -112,14 +112,14 @@ class Initializer
             site = FailureIsolation.Host2Site[o.dst_hostname]
 
             if site.nil?
-                @logger.warn "site for #{o.dst_hostname} not specified!" if site.nil?
+                @logger.warn { "site for #{o.dst_hostname} not specified!" } if site.nil?
             else
                 historical_path_suspects += @site2outgoing_hops[site].map { |ip| Suspect.new(ip, o) }
 
                 if @site2outgoing_hops[site].empty?
-                    @logger.warn "no outgoing hops for site..."
+                    @logger.warn { "no outgoing hops for site..." }
                 else
-                    @logger.debug "found outgoing hops for site!" 
+                    @logger.debug { "found outgoing hops for site!" } 
                 end
             end
         end
@@ -135,14 +135,14 @@ class Initializer
             # can be liberal, since it's for initializing, not pruning
             site = FailureIsolation.Host2Site[o.src]
             if site.nil?
-                @logger.warn "site for #{o.src} not specified!" if site.nil?
+                @logger.warn { "site for #{o.src} not specified!" } if site.nil?
             else
                 all_suspects += @site2incoming_hops[site].map { |ip| Suspect.new(ip, o) } unless site.nil?
 
                 if @site2incoming_hops[site].empty?
-                    @logger.warn "no incoming hops for site..."
+                    @logger.warn { "no incoming hops for site..." }
                 else
-                    @logger.debug "found incoming hops for site!" 
+                    @logger.debug { "found incoming hops for site!" } 
                 end
             end
         end 
@@ -183,12 +183,12 @@ class Pruner
         merged_outage.each do |o|
             # select all hops on current traceroutes where destination is o.src
             site = FailureIsolation.Host2Site[o.src]
-            @logger.warn "intersecting_traces_to_src, site nil! #{o.src}" if site.nil?
+            @logger.warn { "intersecting_traces_to_src, site nil! #{o.src}" } if site.nil?
             hops_on_traces = FailureIsolation.current_hops_on_pl_pl_traces_to_site(@db, site) unless site.nil?
             if hops_on_traces.nil? or hops_on_traces.empty?
-                @logger.warn "no hops on traces to site: #{site}"
+                @logger.warn { "no hops on traces to site: #{site}" }
             else
-                @logger.debug "found intersecting hops on traces to site: #{site}"
+                @logger.debug { "found intersecting hops on traces to site: #{site}" }
             end
 
             to_remove += hops_on_traces
@@ -232,10 +232,10 @@ class Pruner
         end
 
         if !suspect_set.empty? and (responsive_targets.nil? or responsive_targets.empty?)
-            @logger.warn "responsive targets #{responsive_targets.inspect} was empty?!" 
-            @logger.warn "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}"
+            @logger.warn { "responsive targets #{responsive_targets.inspect} was empty?!" } 
+            @logger.warn { "srcs: #{srcs.inspect} suspect_set: #{suspect_set.to_a.inspect}" }
         else
-            @logger.debug "issued pings sucessfully!"
+            @logger.debug { "issued pings sucessfully!" }
         end
 
         return responsive_targets
@@ -264,11 +264,11 @@ class Pruner
         # TODO: I suspect that this block of code may be the cause of the
         # heap overflows....
         if results.empty?
-            @logger.warn "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}"
+            @logger.warn { "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}" }
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
             system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
-            @logger.warn "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}"
+            @logger.warn { "logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
         end
 
         results

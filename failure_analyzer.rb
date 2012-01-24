@@ -98,7 +98,7 @@ class FailureAnalyzer
 
             # Note: all_suspect_set_ips is modified in prune_suspect_set()
             removed_ips = initial_suspect_ips - all_suspect_ips
-            @logger.debug "removed_ips #{removed_ips.inspect}"
+            @logger.debug { "removed_ips #{removed_ips.inspect}" }
              
             # Combine suspects that are common to multiple (src, dst) outages
             merged_remaining_suspects = ip2suspects.find_all { |ip, suspects| !removed_ips.include? ip }.map { |k,v| MergedSuspect.new(v) }
@@ -155,8 +155,8 @@ class FailureAnalyzer
         all_suspect_ips = Set.new(ip2suspects.keys)
         initial_suspect_ips = all_suspect_ips.clone 
 
-        @logger.debug "all_suspect_ips size : #{all_suspect_ips.size}"
-        @logger.debug "initializer2suspectset : #{initializer2suspectset.values.map { |set| set.to_a.map { |s| s.ip }}.flatten.uniq.size}"
+        @logger.debug { "all_suspect_ips size : #{all_suspect_ips.size}" }
+        @logger.debug { "initializer2suspectset : #{initializer2suspectset.values.map { |set| set.to_a.map { |s| s.ip }}.flatten.uniq.size}" }
 
         merged_outage.initializer2suspectset = initializer2suspectset
 

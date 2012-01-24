@@ -78,17 +78,17 @@ class HouseCleaner
         bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops
-        @logger.debug "bad_hops (#{bad_hops.size}): #{bad_hops}"
-        @logger.debug "bad_targets (#{bad_targets.size}): #{bad_targets}"
+        @logger.debug { "bad_hops (#{bad_hops.size}): #{bad_hops}" }
+        @logger.debug { "bad_targets (#{bad_targets.size}): #{bad_targets}" }
 
         dataset2unresponsive_targets = Hash.new { |h,k| h[k] = [] }
 
         bad_targets.each do |target|
-            @logger.debug ". #{target} identifying"
+            @logger.debug { ". #{target} identifying" }
             # identify which dataset it came from
             dataset = FailureIsolation.get_dataset(target) 
             if dataset == DataSets::Unknown
-                @logger.warn "unknown target #{target}" 
+                @logger.warn { "unknown target #{target}" } 
                 next
             end
 
@@ -99,7 +99,7 @@ class HouseCleaner
         dataset2bad_measure_targets = get_unmeasureable_targets()
         dataset2bad_measure_targets.each{|ds, targs| targs.each{|targ| dataset2unresponsive_targets[ds] << targ}}
 
-        @logger.debug "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}"
+        @logger.debug { "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}" }
 
         find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
 
@@ -124,7 +124,7 @@ class HouseCleaner
         dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
                                                                        FailureIsolation::CoreRtrsPerPoP,
                                                                        pop2corertrs, sorted_replacement_pops)
-        @logger.debug "Harsha PoPs substituted"
+        @logger.debug { "Harsha PoPs substituted" }
         
         # (see utilities.rb for .categorize())
         edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
@@ -133,7 +133,7 @@ class HouseCleaner
                                                                                    FailureIsolation::EdgeRtrsPerPoP,
                                                                                    pop2edgertrs, sorted_replacement_pops)
 
-        @logger.debug "Edge PoPs substituted"
+        @logger.debug { "Edge PoPs substituted" }
     end
 
     # Generate the most highly connected PoPs on the Internet according to iPlane data, 
@@ -147,7 +147,7 @@ class HouseCleaner
     #   Third, pop2edgertrs
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
-        @logger.debug "generating top pops..."
+        @logger.debug { "generating top pops..." }
         @logger.debug FailureIsolation::HarshaPoPsPath
         system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
 
@@ -160,7 +160,7 @@ class HouseCleaner
             pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation.TargetBlacklist.include?(ip)
         end
 
-        @logger.debug "core routers generated"
+        @logger.debug { "core routers generated" }
 
         # generate pop, edge mappings
         popsrcdsts = IO.read(FailureIsolation::SourceDests).split("\n")\
@@ -180,7 +180,7 @@ class HouseCleaner
             pop2edgertrs[pop] << dst unless FailureIsolation.TargetBlacklist.include? dst
         end
 
-        @logger.debug "edge routers generated"
+        @logger.debug { "edge routers generated" }
 
         currently_used_pops = Set.new(FailureIsolation.HarshaPoPs.map { |ip| FailureIsolation.IPToPoPMapping[ip] })
 
@@ -194,7 +194,7 @@ class HouseCleaner
             pop2edgertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
         }
         rescue Exception
-            @logger.puts "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}"
+            @logger.info { "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}" }
         end
 
         [sorted_replacement_pops, pop2corertrs, pop2edgertrs]
@@ -328,10 +328,10 @@ class HouseCleaner
         bad_targets = dataset2unresponsive_targets.is_a?(Hash) ? \
                        dataset2unresponsive_targets.value_set : \
                        dataset2unresponsive_targets 
-        @logger.debug "swapping out unresponsive targets: #{bad_targets}"
+        @logger.debug { "swapping out unresponsive targets: #{bad_targets}" }
 
         update_target_blacklist(bad_targets.to_set | FailureIsolation.TargetBlacklist)
-        @logger.debug "blacklist updated"
+        @logger.debug { "blacklist updated" }
 
         dataset2substitute_targets.each do |dataset, substitute_targets|
             update_data_set(dataset, substitute_targets, bad_targets)
@@ -340,7 +340,7 @@ class HouseCleaner
         # update 
         FailureIsolation.ReadInDataSets()
 
-        @logger.debug "target lists updated"
+        @logger.debug { "target lists updated" }
 
         # need to push out new target list to VPs!
     end
@@ -372,7 +372,7 @@ class HouseCleaner
 
         # TODO: create a "isolation_warning" email template
         Emailer.isolation_exception("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes.join "\n"}").deliver
-        @logger.debug "swapping out faulty nodes: #{faulty_nodes}"
+        @logger.debug { "swapping out faulty nodes: #{faulty_nodes}" }
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
         blacklist = FailureIsolation.NodeBlacklist
@@ -382,7 +382,7 @@ class HouseCleaner
         
         faulty_nodes.each do |broken_vp|
             if !current_nodes.include? broken_vp
-                @logger.warn "#{broken_vp} not in current node set..."
+                @logger.warn { "#{broken_vp} not in current node set..." }
                 next 
             end
         
@@ -396,7 +396,7 @@ class HouseCleaner
             new_vp = available_nodes.shift
             new_vp_site = FailureIsolation.Node2Site[new_vp]
             next if current_sites.include? new_vp_site
-            @logger.debug "choosing: #{new_vp}"
+            @logger.debug { "choosing: #{new_vp}" }
             current_nodes.add new_vp
             current_sites.add new_vp_site
         end
@@ -415,7 +415,7 @@ class HouseCleaner
         # kill the monitoring processes on the old nodes
         if !system "echo #{faulty_nodes} > /tmp/faulty.txt; #{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} \
                      /tmp/faulty.txt 100 100 'killall ping_monitor_client.rb trace_monitor_client.rb dns_monitor_client.rb'"
-            @logger.warn "failed to kill monitoring process on old nodes"
+            @logger.warn { "failed to kill monitoring process on old nodes" }
         end
     end
 

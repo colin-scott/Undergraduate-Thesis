@@ -59,7 +59,7 @@ class RevtrCache
               old_dst = dst
               dst = row["last_hop"].to_i
             }
-            @logger.debug "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}"
+            @logger.debug { "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}" }
           end
     
           sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
@@ -84,11 +84,11 @@ class RevtrCache
                 reason = row["state"] + " at " + row["lastUpdate"]
               }
             rescue Exception
-              @logger.warn "Error with query: #{sql}"
+              @logger.warn { "Error with query: #{sql}" }
               @logger.puts $!
             end
     
-            @logger.debug "No matches in the past #{@@freshness_minutes} minutes!\nProbe status: #{reason}"
+            @logger.debug { "No matches in the past #{@@freshness_minutes} minutes!\nProbe status: #{reason}" }
     
             path.valid = false
             path.invalid_reason = reason
@@ -130,7 +130,7 @@ class RevtrCache
           break unless path.empty?
         end # results.each_hash
       rescue Exception
-        @logger.puts "Error with query: #{sql}"
+        @logger.info { "Error with query: #{sql}" }
         @logger.puts $!
       end # begin
     
