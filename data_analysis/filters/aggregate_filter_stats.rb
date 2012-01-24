@@ -16,12 +16,13 @@ require 'filter_stats'
 require 'filters'
 require 'set'
 
-all_merged_outages = Set.new
 
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that
 # FilterTracker is of interest
 def filter_and_aggregate(options)
+    all_merged_outages = Set.new
+
     total_records = 0
     num_passed = 0
     num_failed = 0
@@ -30,7 +31,7 @@ def filter_and_aggregate(options)
     
     # TODO: merge with display_filter_stats_tracker's iterate loop
     FilterTrackerIterator.iterate(options) do |filter_tracker|
-        all_merged_outages |= filter_tracker.merged_outage_ids
+        all_merged_outages |= filter_tracker.merged_outage_ids if filter_tracker.merged_outage_ids
 
         # Each filter_tracker is a single (src, dst) outage
         total_records += 1
@@ -39,16 +40,24 @@ def filter_and_aggregate(options)
         else
             num_failed += 1
     
-            Filters::Levels.each do |level|
-                if filter_tracker.failure_reasons.find { |r| Filters.reason2level(r) == level }
-                    level2num_failed[level] += 1
-                    break
+            # Assumes that Levels are applied in increasing order
+            last_filter_level = nil
+            Filters::Levels.each do |current_level|
+                # Skip over any outages which were filtered the round before
+                # (to accomodate overlapping filters)
+                next if last_filter_level and filter_tracker.failure_reasons.find { |r| Filters.reason2level(r) == last_filter_level }
+
+                if filter_tracker.failure_reasons.find { |r| Filters.reason2level(r) == current_level }
+                    level2num_failed[current_level] += 1
+
+                    filter_tracker.failure_reasons.each do |reason|
+                        reason_level = Filters.reason2level(reason)
+                        next if reason_level != current_level
+                        level2reason2count[reason_level][reason] += 1
+                    end                                             
                 end
-            end
-    
-            filter_tracker.failure_reasons.each do |reason|
-                level = Filters.reason2level(reason)
-                level2reason2count[level][reason] += 1
+
+                last_filter_level = current_level
             end
         end
     end
@@ -79,7 +88,20 @@ def filter_and_aggregate(options)
     
     puts 
 
-    # TODO: do something with merged outages here
+    # Should be equivalent to: all_filters.find_all { |f| f.passed? }.map { |f| f.merged_outage_ids }.uniq
+    num_merged_passed = 0
+    # Now, check how many of the merged outages passed filters
+    all_merged_outages.delete nil
+    MergedLogIterator.iterate_over_files(options, all_merged_outages) do |merged_outage|
+        num_merged_passed += 1 if merged_outage.passed?
+    end
+
+    puts "=============================="
+    puts
+    puts "Number of merged outages passing filters:"
+    Stats.print_average("total", all_merged_outages.size, all_merged_outages.size)
+    Stats.print_average("num_passed", num_merged_passed, all_merged_outages.size)
+    Stats.print_average("num_failed", all_merged_outages.size - num_merged_passed, all_merged_outages.size)
 end
 
 if __FILE__ == $0
