@@ -15,15 +15,15 @@ module SpoofedTR
         # probes later on
         id2dest = SpoofedTR::allocate_ids(dests)
 
-        controller.log.debug "SpoofedTR::sendProbes(), source #{hostname}, dests #{dests} receivers are #{receivers.join(',')}"
+        controller.log.debug { "SpoofedTR::sendProbes(), source #{hostname}, dests #{dests} receivers are #{receivers.join(',')}" }
         receiver2spoofer2targets = {}
         spoofer2targets = { hostname => dests }
         receivers.each { |reciever| receiver2spoofer2targets[reciever] = spoofer2targets.clone }
-        controller.log.debug "SpoofedTR::sendProbes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}"
+        controller.log.debug { "SpoofedTR::sendProbes(), receiver2spoofer2targets: #{receiver2spoofer2targets.inspect}" }
         results,unsuccessful_receivers,privates,blacklisted = controller.spoof_tr(receiver2spoofer2targets)
 
-        controller.log.debug "SpoofedTR::sendProbes(#{hostname} #{dests.inspect}), results,unsuccessful_receivers,privates,blacklisted"
-        controller.log.debug "#{results.inspect},#{unsuccessful_receivers.inspect},#{privates.inspect},#{blacklisted.inspect}"
+        controller.log.debug { "SpoofedTR::sendProbes(#{hostname} #{dests.inspect}), results,unsuccessful_receivers,privates,blacklisted" }
+        controller.log.debug { "#{results.inspect},#{unsuccessful_receivers.inspect},#{privates.inspect},#{blacklisted.inspect}" }
         SpoofedTR::parse_path(results, id2dest, controller)
     end
 
@@ -98,8 +98,8 @@ module SpoofedTR
 
     # results is [[probes, reciever], [probes, receiever], ...] 
     def SpoofedTR::parse_path(results, id2dest, controller)
-        controller.log.debug "parse_path(), results: #{results.inspect}"
-        controller.log.debug "parse_path(), id2dest: #{id2dest.inspect}"
+        controller.log.debug { "parse_path(), results: #{results.inspect}" }
+        controller.log.debug { "parse_path(), id2dest: #{id2dest.inspect}" }
 
         # DRb can't unmarshall hashes initialized with blocks...
         dest2ttl2rtrs = {} # or srcdst2ttl2rtrs....
@@ -124,8 +124,8 @@ module SpoofedTR
             end
         end
 
-        controller.log.debug "parse_path(), id2dest #{id2dest.inspect}"
-        controller.log.debug "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}"
+        controller.log.debug { "parse_path(), id2dest #{id2dest.inspect}" }
+        controller.log.debug { "parse_path(), dest2ttl2rtrs before merge #{dest2ttl2rtrs.inspect}" }
 
         # why would dest ever be nil?  id2dest didn't include the id...
         # We saw one case where one of the hops was attached to a nil key, not
@@ -155,7 +155,7 @@ module SpoofedTR
             end
         end
 
-        controller.log.debug "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}"
+        controller.log.debug { "parse_path(), dest2ttl2rtrs after merge #{dest2ttl2rtrs.inspect}" }
         
         dest2sortedttlrtrs = {}
 
@@ -165,7 +165,7 @@ module SpoofedTR
 
         # turn sets into arrays
         dest2ttl2rtrs = dest2ttl2rtrs.map_values { |ttl2rtrs| ttl2rtrs.map_values { |rtrs| rtrs.to_a.map { |h| h.strip } } }
-        controller.log.debug "parse_path(), dest2ttl2rtrs to arrays: #{dest2ttl2rtrs.inspect}"
+        controller.log.debug { "parse_path(), dest2ttl2rtrs to arrays: #{dest2ttl2rtrs.inspect}" }
 
         dest2ttl2rtrs.keys.each do |dest|
             curr_iteration += 1 
@@ -175,21 +175,21 @@ module SpoofedTR
             sortedttlrtrs = dest2ttl2rtrs[dest].to_a.sort_by { |ttlrtrs| ttlrtrs[0] }
 
             # get rid of redundant destination ttls at the end
-            controller.log.debug "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}"
+            controller.log.debug { "parse_path(#{dest}): sortedttlrtrs: #{sortedttlrtrs.inspect}" }
             target = dest.is_a?(Array) ? dest[1] : dest   # sometimes dest is really srcdst.... XXX
             while sortedttlrtrs.size > 1 and sortedttlrtrs[-1][1].include? target and sortedttlrtrs[-2][1].include? target 
                 sortedttlrtrs = sortedttlrtrs[0..-2]
             end
 
-            controller.log.debug "parse_path(#{dest}): sortedttlrtrs after removing dest: #{sortedttlrtrs.inspect}"
+            controller.log.debug { "parse_path(#{dest}): sortedttlrtrs after removing dest: #{sortedttlrtrs.inspect}" }
 
             # NOW!!! IF there were a bunch of zeroes before the last hop, but
             # the last hop was responsive, we likely have a problem with our
             # tools (riot). So get rid of it!
-            controller.log.debug "parse path, sortedttlrtrs.size: #{sortedttlrtrs.size}"
+            controller.log.debug { "parse path, sortedttlrtrs.size: #{sortedttlrtrs.size}" }
             if sortedttlrtrs.size > 2
-                controller.log.debug "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-1][0].to_i}"
-                controller.log.debug "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-2][0].to_i}"
+                controller.log.debug { "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-1][0].to_i}" }
+                controller.log.debug { "parse path, sortedttlrtrs.last ttl: #{sortedttlrtrs[-2][0].to_i}" }
             end
 
             if sortedttlrtrs.size > 2 and (sortedttlrtrs[-1][0].to_i - sortedttlrtrs[-2][0].to_i) > 4
@@ -202,7 +202,7 @@ module SpoofedTR
             dest2sortedttlrtrs[dest] = sortedttlrtrs
         end
 
-        controller.log.debug "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}"
+        controller.log.debug { "parse_path(), dest2sortedttlrtrs converting to arrays #{dest2sortedttlrtrs.inspect}" }
 
         dest2sortedttlrtrs
    end

@@ -356,7 +356,7 @@ class Controller
 
     def set_max_alert_level(newlevel)
         @controller_log.set_max_alert_level(newlevel)
-        @controller_log.puts "Changing alert level from " + @controller_log.max_alert.to_s + " to " + newlevel.to_s
+        @controller_log.info { "Changing alert level from " + @controller_log.max_alert.to_s + " to "  + newlevel.to_s }
     end
 
     # is this used, or is $LOG log used?
@@ -1328,7 +1328,7 @@ end
 
 if options[:actual_test]
     controller_log = LoggerLog.new($stderr)
-    controller_log.debug("the controller log is working")
+    controller_log.debug { "the controller log is working" }
 else
 
     controller_log = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/controller.log')

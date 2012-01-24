@@ -9,7 +9,7 @@ module SpoofedPing
     # dests is an array of destinations
     def SpoofedPing::receiveProbes(hostname, dests, spoofers, controller)
         SpoofedPing::format_destinations!(dests)      
-        controller.log.debug "SpoofedPing::receiveProbe(): source #{hostname}, dests #{dests.inspect} spoofers are #{spoofers.join(',')}"
+        controller.log.debug { "SpoofedPing::receiveProbe(): source #{hostname}, dests #{dests.inspect} spoofers are #{spoofers.join(',')}" }
 
         receiver2spoofer2targets = {}
         spoofer2targets = {}
@@ -27,7 +27,7 @@ module SpoofedPing
     # dests is an array of destinations
     def SpoofedPing::sendProbes(hostname, dests, receivers, controller)
         SpoofedPing::format_destinations!(dests)      
-        controller.log.debug "SpoofedPing::sendProbe(): source #{hostname}, dests #{dests.inspect} receivers are #{receivers.join(',')}"
+        controller.log.debug { "SpoofedPing::sendProbe(): source #{hostname}, dests #{dests.inspect} receivers are #{receivers.join(',')}" }
 
         receiver2spoofer2targets = {}
         spoofer2targets = { hostname => dests }
