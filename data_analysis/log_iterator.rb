@@ -95,6 +95,8 @@ module LogIterator
                         $stderr.print ".." if $debugging
                     rescue EOFError #Errno::ENOENT, ArgumentError, TypeError 
                         $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
+                    rescue Errno::ENOENT
+                        $stderr.puts "#{file} #{$!}"
                     end
                 end
 

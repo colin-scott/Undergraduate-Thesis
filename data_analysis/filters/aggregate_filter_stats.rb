@@ -16,7 +16,6 @@ require 'filter_stats'
 require 'filters'
 require 'set'
 
-
 # Takes an optional predicate, which is a block that takes a reference to a
 # FilterTracker object, and returns true or false for whether that
 # FilterTracker is of interest

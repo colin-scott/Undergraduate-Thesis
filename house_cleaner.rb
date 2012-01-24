@@ -59,7 +59,7 @@ class HouseCleaner
             dataset2unresponsive_targets[FailureIsolation::get_dataset(targ)] << targ
         }}
 
-        @logger.info("Found #{bad_targ_count} bad <src,targ> paris!")
+        @logger.info { "Found #{bad_targ_count} bad <src,targ> paris!" }
 
         # delete cases where the target is measurement from more sources than it is
         # not
@@ -74,7 +74,7 @@ class HouseCleaner
     def find_substitutes_for_unresponsive_targets()
         dataset2substitute_targets = Hash.new { |h,k| h[k] = Set.new }
 
-        @logger.info("find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}")
+        @logger.info { "find_substitue_targets: FailureIsolation.TargetSet: #{FailureIsolation.TargetSet}" }
         bad_hops, possibly_bad_hops, bad_targets, possibly_bad_targets = @db.check_target_probing_status(FailureIsolation.TargetSet)
 
         # TODO: do something with bad_hops

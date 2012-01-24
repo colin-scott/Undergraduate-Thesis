@@ -157,17 +157,17 @@ class FailureDispatcher
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
         issue_pings_towards_srcs(srcdst2outage)
-        @logger.debug("pings towards source issued")
+        @logger.debug { "pings towards source issued" }
 
         # if we control one of the targets, (later) send out spoofed traceroutes in
         # the opposite direction for ground truth information
         dstsrc2outage = check4targetswecontrol(srcdst2outage, registered_vps)
-        @logger.debug("dstsrc2outage: " + dstsrc2outage.inspect)
+        @logger.debug { "dstsrc2outage: " + dstsrc2outage.inspect }
 
         # we check the forward direction by issuing spoofed traceroutes (which subsume spoofed pings)
         measurement_times << ["spoof_tr", Time.new]
         issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage)
-        @logger.debug("spoofed traceroute issued")
+        @logger.debug { "spoofed traceroute issued" }
 
         # Now thread out on each src,dst pair, and issue the remaining
         # measurements in parallel
@@ -198,9 +198,9 @@ class FailureDispatcher
             grab_thread_results(outage_threads)
             
             t_prime = Time.new
-            @logger.info("Took #{t_prime - t} seconds to join on measurement threads")
+            @logger.info { "Took #{t_prime - t} seconds to join on measurement threads" }
             # TODO: use a thread pool to keep # threads constant
-            @logger.info("Total threads in the system after join: #{Thread.list.size}")
+            @logger.info { "Total threads in the system after join: #{Thread.list.size}" }
 
             srcdst2filter_tracker.each { |srcdst, filter_tracker| filter_tracker.end_time = t_prime } 
 
@@ -428,7 +428,7 @@ class FailureDispatcher
         forward_problem = !outage.spoofed_tr.reached?(outage.dst)
 
         outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
-        @logger.debug("direction: #{outage.direction}")
+        @logger.debug { "direction: #{outage.direction}" }
 
         # HistoricalForwardHop objects
         outage.historical_tr, outage.historical_trace_timestamp = retrieve_historical_tr(outage.src, outage.dst)
@@ -549,16 +549,16 @@ class FailureDispatcher
         # Issue ground truth measurements (forward path from dst -> src)
         if outage.symmetric
             outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
-            @logger.debug("destination's tr issued. valid?:#{outage.dst_tr.valid?}")
+            @logger.debug { "destination's tr issued. valid?:#{outage.dst_tr.valid?}" }
 
             splice_alternate_paths(outage)
-            @logger.debug("alternate path splicing complete")
+            @logger.debug { "alternate path splicing complete" }
         end
 
 	    fempty = @node2emptypings[outage.src].fraction_empty
-	    @logger.info("src #{outage.src} fraction empty #{fempty}")
+	    @logger.info { "src #{outage.src} fraction empty #{fempty}" }
             if fempty > 0.8
-	    	@logger.info("scheduling #{outage.src} for swap_out")
+	    	@logger.info { "scheduling #{outage.src} for swap_out" }
 	    	SwapFilters.empty_pings!(outage, filter_tracker)
 	    end
     end
@@ -700,10 +700,10 @@ class FailureDispatcher
             end
 
             if successful
-                @logger.info("Successful spoofed #{type} for #{src} #{dst}")
+                @logger.info { "Successful spoofed #{type} for #{src} #{dst}" }
             else
-                @logger.info("Failed spoofed #{type} for #{src} #{dst}")
-				@logger.info("#{results[srcdst].inspect}")
+                @logger.info { "Failed spoofed #{type} for #{src} #{dst}" }
+				@logger.info { "#{results[srcdst].inspect}" }
             end
         end
     end
