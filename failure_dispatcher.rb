@@ -553,7 +553,7 @@ class FailureDispatcher
     #
     # TODO: move me into a VP object
     def restart_atd(vp)
-        system "ssh uw_revtr2@#{vp} 'killall atd; sleep 1; sudo /sbin/service atd start > /dev/null 2>&1'"
+        system "ssh uw_revtr2@#{vp} 'sudo /etc/init.d/atd restart > /dev/null 2>&1'"
     end
 
     # Generate a DOT graph for a given (src, dst) outage 
