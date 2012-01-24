@@ -115,6 +115,6 @@ rescue Exception => e
    $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
    logger.close
-   sleep 25
+   sleep 1
    throw e
 end

@@ -159,6 +159,7 @@ end
 module MergedLogIterator
     # Takes a block with outage as arg
     def self.iterate_over_files(predicates, files, &block)
+        files = files.map { |f|  FailureIsolation::MergedIsolationResults + "/" + f + ".bin" } 
         LogIterator.iterate(predicates, files, FailureIsolation::MergedIsolationResults, self.method(:read_log), &block)
     end
 

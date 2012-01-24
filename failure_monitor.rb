@@ -212,12 +212,16 @@ class FailureMonitor
             node2targetstate[node] = hash
         end
 
-        if num_behind_nodes == FailureIsolation.CurrentNodes.size or num_source_problems == FailureIsolation.CurrentNodes.size 
-            Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state or high # of reported outages").deliver
+        if num_behind_nodes == FailureIsolation.CurrentNodes.size 
+            Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state").deliver
+        end
+
+        if num_source_problems == FailureIsolation.CurrentNodes.size 
+            Emailer.isolation_exception("Warning: all VPs were skipped due to high # of reported outages").deliver
         end
 
         if not stale_nodes.empty?
-            Emailer.isolation_exception(%{The following node have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
+            Emailer.isolation_exception(%{The following nodes have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
         end
 
         # nodes with problems at the source are excluded from node2targetstate
@@ -398,11 +402,11 @@ class FailureMonitor
     # Every day, identify broken monitor VPs and unresponsive targets, replace
     # them, and send out a summary email
     def clean_the_house()
-        #Thread.new do
-        #    # TODO: the memory leak seems to occur on this line!
-        #    swap_out_faulty_nodes
-        #    swap_out_unresponsive_targets
-        #end
+        Thread.new do
+            # TODO: the memory leak seems to occur on this line!
+            swap_out_faulty_nodes
+            swap_out_unresponsive_targets
+        end
     end
 
     # Identify and swap out broken monitor VPs

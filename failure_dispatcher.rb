@@ -194,24 +194,9 @@ class FailureDispatcher
             # aren't more measurement issued for MergedOutages, but we might
             # have them in the future
             t = Time.new
-
-            # TODO: this barrier might take arbitrarily long. Mostly needed
-            # for merging pruposes, but we might consider instrumenting this
-            # and doing something smarter if it's a bottleneck
-            outage_threads.each do |thread|
-                begin 
-                    ($executor) ? thread.get : thread.join
-                rescue Exception => e
-                    if $executor
-                        # Two levels of nesting to get at the real exception!
-                        # jruby, sometimes you do weird things...
-                        raise e.cause.cause
-                    else
-                        raise e
-                    end
-                end
-            end
-
+            
+            get_thread_results(outage_threads)
+            
             t_prime = Time.new
             @logger.info("Took #{t_prime - t} seconds to join on measurement threads")
             # TODO: use a thread pool to keep # threads constant
@@ -232,11 +217,14 @@ class FailureDispatcher
             merged_outages.each do |merged_outage|
                 block = lambda { process_merged_outage(merged_outage) }
                 if $executor
-                    $executor.submit(&block)
+                    merged_outage_threads << $executor.submit(&block)
                 else
-                    Thread.new(&block)
+                    merged_outage_threads << Thread.new(&block)
                 end
             end
+
+            # Don't want to block the rest of the system here..
+            Thread.new { get_thread_results(merged_outage_threads }
 
             measurement_end = Time.new
             @logger.info "Measurments took #{measurement_end - measurement_start} seconds"
@@ -244,6 +232,27 @@ class FailureDispatcher
             swap_out_faulty_nodes(srcdst2filter_tracker)
             log_filter_trackers(srcdst2filter_tracker)
         end
+    end
+
+    def grab_thread_results(threads)
+      # TODO: this barrier might take arbitrarily long. Mostly needed
+      # for merging pruposes, but we might consider instrumenting this
+      # and doing something smarter if it's a bottleneck
+      threads.each do |thread|
+          begin 
+              ($executor) ? thread.get : thread.join
+          rescue Exception => e
+              if $executor
+                  # Two levels of nesting to get at the real exception!
+                  # jruby, sometimes you do weird things...
+                  e = e.cause if e.cause
+                  e = e.cause if e.cause
+                  raise e
+              else
+                  raise e
+              end
+          end
+      end
     end
 
     def assert_no_outage_loss(num_passed_outages, srcdst2filter_tracker)
@@ -274,6 +283,8 @@ class FailureDispatcher
        id = 0
 
        outages = srcdst2outage.values
+
+       # TODO: possibly broken?
 
        # nested helper closure
        allocate_merged_outage = lambda do |outage_list, merging_method|
@@ -376,11 +387,14 @@ class FailureDispatcher
         @logger.debug "process_merged_outage: #{merged_outage.sources}, #{merged_outage.destinations}"
         analyze_measurements(merged_outage)
     
+        @logger.debug "got_past_analyze: #{merged_outage.sources}, #{merged_outage.destinations}"
         log_merged_outage(merged_outage)
+        @logger.debug "got_past_log: #{merged_outage.sources}, #{merged_outage.destinations}"
 
         # If one of the riot VPs, attempt to trigger a BGP poison
         @poisoner.check_poisonability(merged_outage)
-        
+        @logger.debug "got_past_poisonability: #{merged_outage.sources}, #{merged_outage.destinations}"
+
         if(merged_outage.is_interesting?)
             # at least one of the inside outages passed filters, so email
             Emailer.isolation_results(merged_outage).deliver
@@ -1028,7 +1042,7 @@ class FailureDispatcher
 
     # see outage.rb
     def log_merged_outage(outage)
-        log_outage(outage, FailureIsolation::MergedIsolationResult)
+        log_outage(outage, FailureIsolation::MergedIsolationResults)
     end
 
     # Helper method
