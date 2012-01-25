@@ -169,7 +169,7 @@ module FailureIsolation
     # Script to execute a poison
     UnpoisonPath = "#{PoisoningDashboardPath}/unpoison.rb"
     # Log of poisonings
-    PoisonLogPath = "#{PoisoningDashboardPath}/poison_log.yml"
+    PoisonLogPath = "#{PoisoningDashboardPath}/poison_log.bin"
     # Human-readable display of current poisonings
     CurrentPoisoningsPath = "#{PoisoningDashboardPath}/who_is_currently_poisoned?.rb"
 

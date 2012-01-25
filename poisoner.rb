@@ -1,4 +1,4 @@
-#!/homes/network/revtr/jruby/bin/jruby
+#!/usr/bin/ruby
 
 $: << "./"
 
@@ -24,10 +24,64 @@ require 'outage'
 require 'isolation_utilities.rb'
 require 'direction'
 require 'forwardable'
-require 'eventmachine'
 require 'pstore'
+require 'thread'
 
-EventMachine.threadpool_size = 1
+Thread.abort_on_exception = true
+
+class Timer
+    @@default_sleep_period = 10
+
+    def initialize()
+        @offset2callback = {}
+        @mutex = Mutex.new
+         
+        Thread.new do
+            # would be simpler to just spin, but oh well...
+            while true
+                before_sleep = Time.now
+                period = calculate_sleep_period
+                sleep period
+                after_sleep = Time.now
+                @offset2callback = update_times(after_sleep.to_i - before_sleep.to_i)
+            end
+        end
+    end
+
+    def update_times(seconds_passed)
+        new_offset2callback = {}
+
+        @mutex.synchronize do
+            @offset2callback.each do |seconds, callback|
+                new_seconds = seconds - seconds_passed
+                if new_seconds <= 0
+                    callback.call 
+                else
+                    new_offset2callback[new_seconds] = callback
+                end
+            end
+        end
+
+        new_offset2callback 
+    end
+
+    def calculate_sleep_period()
+        sleep_period = nil
+        @mutex.synchronize do
+            sleep_period = @offset2callback.keys.min
+            sleep_period ||= @@default_sleep_period 
+        end
+        sleep_period
+    end
+    
+    def add_callback(seconds_later, &block)
+        @mutex.synchronize do
+            @offset2callback[seconds_later] = block
+            # simpler to just let the loop to its thing rather than updating
+            # now
+        end
+    end
+end
 
 LogEntry = Struct.new(:start_time, :last_updated, :end_time, :src, :dst, :direction, :failures)
 
@@ -67,7 +121,7 @@ class PoisonLog
             @store = PStore.new(FailureIsolation::PoisonLogPath, true)
             @store.transaction(true) do
                 @store.roots.each do |key|
-                   previous_outages[key] = store[key]
+                   previous_outages[key] = @store[key]
                 end
             end
         rescue Exception
@@ -100,7 +154,7 @@ class PoisonLog
         # We assign a unique id for each of today's filter stat objects
         # For now, we use t+src+dst
         @entry_queue.each do |id, entry|
-            store[id] = entry
+            @store[id] = entry
         end
       end
 
@@ -111,15 +165,16 @@ end
 
 # In charge of initiating BGP Poisonings and logging poisoning results
 class Poisoner
+    attr_accessor :poison_log
+
     def initialize(failure_analyzer=FailureAnalyzer.new,db=DatabaseInterface.new, ip_info=IpInfo.new, logger=LoggerLog.new($stderr), unpoison_timeout_seconds=6*60*60)
         @failure_analyzer = failure_analyzer
         @db = db 
         @ip_info = ip_info
         @logger = logger
         @poison_log = PoisonLog.new(logger)
-
+        @timer_loop = Timer.new
         @unpoison_timeout_seconds = unpoison_timeout_seconds
-        @event_machine_thread = Thread.new { EventMachine::run }
 
         # TODO: threshold for outage duration! Don't want to poison outages
         # that will likely resolve themselves before poisoning is effective.
@@ -258,13 +313,18 @@ class Poisoner
             return 
         end
 
-        Emailer.poison_notification(outage).deliver
+        @logger.debug { "before poison" }
+        # Y U THRASH?
+        Emailer.isolation_exception("Poisoning #{src} #{asn}").deliver
 
+        @logger.debug { "about to poison" }
         # (logs event on riot)
         system "#{FailureIsolation::ExecutePoisonPath} #{src} #{asn}"
 
-        EventMachine::add_timer(@unpoison_timeout_seconds) do
-            system "#{FailureIsolation::UnpoisonPath} #{src} #{asn}"
+        @logger.debug { "about to add timer" }
+        @timer_loop.add_callback(@unpoison_timeout_seconds) do
+            @logger.debug { "executing timer callback" }
+            system "#{FailureIsolation::UnpoisonPath} #{src}" 
             t = Time.new
             @poison_log.find_previous_entry(src, outage.dst, outage.direction).end_time = t
             @poison_log.commit
@@ -279,8 +339,15 @@ if __FILE__ == $0
     direction = Direction.REVERSE
     formatted_failures = []
 
-    LogEntry.new(current_time, current_time, nil, src, dst, direction, formatted_failures)
-    p = PoisonLog.new(LoggerLog.new($stderr))
-    puts p.find_previous_entry(src, dst, direction)
+    puts "I live in a giant coconut"
+
+    #LogEntry.new(current_time, current_time, nil, src, dst, direction, formatted_failures)
+    #p = PoisonLog.new(LoggerLog.new($stderr))
+    #puts p.find_previous_entry(src, dst, direction)
+
+    p = Poisoner.new(FailureAnalyzer.new,DatabaseInterface.new,IpInfo.new,LoggerLog.new($stderr),1)
+    outage1 = Marshal.load(IO.read("tests/fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
+    p.execute_poison("FOOBAR", 12345, outage1)
+    sleep
 end
 

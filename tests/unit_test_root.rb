@@ -12,6 +12,7 @@ require 'set'
 require 'db_interface'
 require 'failure_monitor'
 require 'failure_dispatcher'
+require 'failure_analyzer'
 require 'house_cleaner'
 
 Thread.abort_on_exception = true
@@ -56,6 +57,10 @@ module TestVars
     @monitor = nil
     def self.Monitor
         @monitor ||= FailureMonitor.new(self.Dispatcher, DB, Logger, HouseCleaner)
+    end
+    @analyzer = nil
+    def self.Analyzer
+        @analyzer ||= FailureAnalyzer.new(IpInfo, Logger, Registrar, DB)
     end
 
     # Returns [src, [reciever_1, receiver_2, ...,receiver_n-1]]
