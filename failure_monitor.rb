@@ -168,7 +168,7 @@ class FailureMonitor
             if seconds_difference >= @@max_ping_lag_seconds
                 minutes_difference = seconds_difference / 60
                 @outdated_nodes[node] = minutes_difference
-                @logger.info { "#{node}'s data is #{minutes_difference} minutes out of date" }
+                @logger.warn { "#{node}'s data is #{minutes_difference} minutes out of date" }
                 num_behind_nodes += 1
                 next
             end
@@ -179,7 +179,7 @@ class FailureMonitor
                 yml_hash = YAML.load_file(yaml)
 
                 if !yml_hash.is_a?(Hash)
-                    @logger.info { "#{node}'s data was not a hash!!" }
+                    @logger.warn { "#{node}'s data was not a hash!!" }
                     next
                 end
 
@@ -189,7 +189,7 @@ class FailureMonitor
                    hash[k.strip] = v
                 end 
             rescue Exception
-                @logger.info { "Corrupt YAML file: #{node}" }
+                @logger.warn { "Corrupt YAML file: #{node}" }
                 next
             end
 
