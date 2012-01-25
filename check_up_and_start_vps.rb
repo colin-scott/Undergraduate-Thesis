@@ -81,7 +81,7 @@ begin
         # spoofed traceroute and spoofed ping attempts, inject toil as a
         # target with pl05 as the receiver. Log how often those measurements
         # go through.
-        $vps["crash.cs.washington.edu"] = MockVP.new
+        $vps["toil.cs.washington.edu"] = MockVP.new
     end
 
     # Get the Slice object
