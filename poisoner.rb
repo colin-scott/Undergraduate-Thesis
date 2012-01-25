@@ -25,6 +25,7 @@ require 'isolation_utilities.rb'
 require 'direction'
 require 'forwardable'
 require 'eventmachine'
+require 'pstore'
 
 EventMachine.threadpool_size = 1
 
@@ -35,7 +36,7 @@ class PoisonLog
    # TODO: use a real database
     
    extend Forwardable
-   def_delegators :@previous_outages,:&,:*,:+,:-,:<<,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
+   def_delegators :@previous_outages,:&,:*,:+,:-,:<=>,:[],:[],:[]=,:abbrev,:assoc,:at,:clear,:collect,
        :collect!,:compact,:compact!,:concat,:delete,:delete_at,:delete_if,:each,:each_index,
        :empty?,:fetch,:fill,:first,:flatten,:flatten!,:hash,:include?,:index,:indexes,:indices,
        :initialize_copy,:insert,:join,:last,:length,:map,:map!,:nitems,:pack,:pop,:push,:rassoc,
@@ -48,20 +49,38 @@ class PoisonLog
     def initialize(logger)
         @logger = logger
         @previous_outages = reload
+        @entry_queue = {}
+        if @previous_outages.empty?
+            @current_id = 0
+        else
+            @current_id = @previous_outages.keys.sort[-1] + 1
+        end
     end
 
     def reload()
         @logger.debug { "Reloading poison log #{FailureIsolation::PoisonLogPath}" }
-        # <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
-        previous_outages = []
+        # <id> <start time> <last modified time> <src> <dst> <direction> <suspected failures...>
+        
+        # id -> entry
+        previous_outages = {}
         begin
-            previous_outages = YAML.load_file(FailureIsolation::PoisonLogPath)
+            @store = PStore.new(FailureIsolation::PoisonLogPath, true)
+            @store.transaction(true) do
+                @store.roots.each do |key|
+                   previous_outages[key] = store[key]
+                end
+            end
         rescue Exception
             @logger.warn { "failed to load yaml file #{$!}" }
         end
 
-        previous_outages = [] unless previous_outages
+        previous_outages = {} unless previous_outages
         previous_outages
+    end
+
+    def <<(entry)
+        @current_id += 1
+        @entry_queue[@current_id] = entry
     end
 
     # Return nil if no entry existed
@@ -70,15 +89,23 @@ class PoisonLog
     def find_previous_entry(src, dst, direction)
         # see if there was already an entry with the same
         #   -  source, destination, and direction
-        already_there = @previous_outages.reverse.find do |log_entry|
+        already_there = @previous_outages.values.reverse.find do |log_entry|
             $stderr.puts log_entry.inspect
             log_entry.src == src && log_entry.dst == dst && log_entry.direction == direction
         end
     end
 
     def commit()
-        # TODO: make me threadsafe
-        File.open(FailureIsolation::PoisonLogPath, "w") { |f| YAML.dump(@previous_outages, f) }
+      @store.transaction do
+        # We assign a unique id for each of today's filter stat objects
+        # For now, we use t+src+dst
+        @entry_queue.each do |id, entry|
+            store[id] = entry
+        end
+      end
+
+      @previous_outages.merge!(@entry_queue)
+      @entry_queue = []
     end
 end
 
