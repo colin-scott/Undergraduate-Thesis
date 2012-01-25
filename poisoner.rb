@@ -159,7 +159,7 @@ class PoisonLog
       end
 
       @previous_outages.merge!(@entry_queue)
-      @entry_queue = []
+      @entry_queue = {}
     end
 end
 
