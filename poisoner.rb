@@ -166,7 +166,7 @@ class Poisoner
     # poisoned (not just random)
     def poison(src2direction2outage2failures, merged_outage)
         if src2direction2outage2failures.empty?
-            raise AssertionError.new("src2direction2outage2failures should not be empty!") 
+            raise "src2direction2outage2failures should not be empty!"
         end
 
         # for now, we only poison a single ASN at a time
@@ -199,7 +199,7 @@ class Poisoner
 
                 execute_poison(src, asn_to_poison, outage)
             else
-                raise AssertionError.new("poison() should not see forward outages!")
+                raise "poison() should not see forward outages!"
             end
         end
         
@@ -224,7 +224,7 @@ class Poisoner
     # TODO: this is broken!
     def log_outages(src2direction2outage2failures)
         if src2direction2outage2failures.empty?
-            raise AssertionError.new("src2direction2outage2failures should not be empty!") 
+            raise "src2direction2outage2failures should not be empty!"
         end
 
         current_time = Time.new
@@ -262,6 +262,7 @@ class Poisoner
 
         # (logs event on riot)
         system "#{FailureIsolation::ExecutePoisonPath} #{src} #{asn}"
+
         EventMachine::add_timer(@unpoison_timeout_seconds) do
             system "#{FailureIsolation::UnpoisonPath} #{src} #{asn}"
             t = Time.new
