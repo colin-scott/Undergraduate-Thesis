@@ -23,8 +23,8 @@ require 'socket'
 require 'set'
 require 'resolv'
 
-# we use crash.cs.washington.edu for test pings
-$TEST_IP = "128.208.4.49"
+# we have all VPs send a ping to 8.8.8.8 as a sanity check
+$TEST_IP = "8.8.8.8"
 
 class SockTimeout < Timeout::Error
     def initialize(extended_msg="timed out")

@@ -232,10 +232,9 @@ class Pruner
         end
 
         if !suspect_set.empty? and (responsive_targets.nil? or responsive_targets.empty?)
-            @logger.warn { "responsive targets #{responsive_targets.inspect} was empty or nil?!" } 
-            @logger.warn { "srcs (#{srcs.size}): #{srcs.inspect} suspect_set (#{suspect_set.size}): #{suspect_set.to_a[0..5].inspect}..." }
+            @logger.warn { "pings_from_source, responsive targets was empty or nil?! (#{srcs.size}): #{srcs.inspect} suspect_set (#{suspect_set.size}): #{suspect_set.to_a[0..5].inspect}..." }
         else
-            @logger.debug { "issued pings sucessfully!" }
+            @logger.debug { "issued pings_from_source sucessfully!" }
         end
 
         return responsive_targets
@@ -264,11 +263,10 @@ class Pruner
         # TODO: I suspect that this block of code may be the cause of the
         # heap overflows....
         if results.empty?
-            @logger.warn { "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}" }
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
             system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
-            @logger.info { "empty ping logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
+            @logger.warn { "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}. Logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
         end
 
         results

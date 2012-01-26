@@ -347,6 +347,10 @@ if __FILE__ == $0
 
     p = Poisoner.new(FailureAnalyzer.new,DatabaseInterface.new,IpInfo.new,LoggerLog.new($stderr),1)
     outage1 = Marshal.load(IO.read("tests/fixtures/mlab1.ath01.measurement-lab.org_193.138.215.1_20110921081833.bin"))
+
+    #require 'rubygems'
+    #require 'ruby-debug'
+    #debugger
     p.execute_poison("FOOBAR", 12345, outage1)
     sleep
 end
