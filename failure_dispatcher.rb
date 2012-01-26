@@ -557,7 +557,7 @@ class FailureDispatcher
 
 	    fempty = @node2emptypings[outage.src].fraction_empty
 	    @logger.info { "empty pings: src #{outage.src} fraction empty #{fempty}" }
-        if fempty > 0.8
+        if fempty > FailureIsolation::EmptyPingsThreshold
             @logger.info { "scheduling #{outage.src} for swap_out" }
             SwapFilters.empty_pings!(outage, filter_tracker)
         end

@@ -22,5 +22,5 @@ if [ "$old_controller" -eq  "$new_controller" ]; then
     echo CONTROLLER_NOT_LOGGING
 fi
 
-EMPTY_PINGS_LOG_DIR=~/revtr_logs/isolation_logs/empty_pings_logs
-rm -rf $EMPTY_PINGS_LOG_DIR/*
+#EMPTY_PINGS_LOG_DIR=~/revtr_logs/isolation_logs/empty_pings_logs
+#rm -rf $EMPTY_PINGS_LOG_DIR/*
