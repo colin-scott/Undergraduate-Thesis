@@ -78,7 +78,7 @@ module LogIterator
             lock = Mutex.new
 
             total = files.size
-            print_interval = total / 200
+            print_interval = (0.01 * total).to_i + 1
             curr = 0
             files.each do |file|
                 block = lambda do
