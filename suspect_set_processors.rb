@@ -257,7 +257,7 @@ class Pruner
                     /tmp/targets#{id} @:/tmp/targets#{id}"
 
         # TODO: don't assume eth0!
-        @logger.warn "there" if not system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+        @logger.warn "there" if not system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 1000 \
                     "cd colin/Scripts; sudo 2>/dev/null ./scamper -o /tmp/warts#{id} -O Warts -c 'ping -c 1' -f /tmp/targets#{id}"}
 
         FileUtils.rm_rf("/tmp/warts#{id}")
