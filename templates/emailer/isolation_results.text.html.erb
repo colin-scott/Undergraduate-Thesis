@@ -20,14 +20,9 @@
       <br />
       <li>Suspected Failure(s):
         <ul type=none>
-        <% i = 0 %>
         <% @merged_outage.suspected_failures.each do |dataset, suspected_failures| %> 
-            <li><%= dataset %> (<%= suspected_failures.size %> suspects): <%= suspected_failures.map { |s| s.to_s }.join(' ') %></li>
+            <li><%= dataset %> (<%= suspected_failures.size %> suspects): <%= suspected_failures[0..20].map { |s| s.to_s }.join(' ') %>...</li>
             <br />
-            <% if (i += 1) == 20 %>
-                <li>......</li>
-                <% break %>
-            <% end %>
         <% end %>
         </ul>
         Suspect Set Initializers:
