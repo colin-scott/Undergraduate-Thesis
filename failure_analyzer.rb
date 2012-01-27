@@ -72,10 +72,7 @@ class FailureAnalyzer
 
         # Gather pruner methods from the Pruner class
         @pruner = Pruner.new(registrar, db, logger)
-        # .public_methods(false) excludes superclass methods
-        public_methods = @pruner.public_methods(false)
-        Pruner::OrderedMethods.each { |method| public_methods.unshift method  }
-        @suspect_set_pruners = public_methods.uniq.map { |m| @pruner.method m }
+        @suspect_set_pruners = Pruner::OrderedMethods.uniq.map { |m| @pruner.method m }
     end
 
     # New isolation algorithm. Generates a suspect set and prunes that

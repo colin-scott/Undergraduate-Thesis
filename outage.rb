@@ -36,6 +36,8 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
+   # TODO the id argument should be optional -- keep a class variable @@id
+   # for ensure unique instances
     def initialize(id, outages, merging_method=MergingMethod::REVERSE)
         outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
         @outages = outages

@@ -59,6 +59,8 @@ module FailureIsolation
     EmptyPingsThreshold = 0.8
     EmptyPingsLogDir = "/homes/network/revtr/revtr_logs/isolation_logs/empty_pings_logs"
 
+    WartsDumpPath = "/homes/network/revtr/spoofed_traceroute/scamper/warts-dump"
+
     # Return all hops observed on most recent traceroutes from all PL nodes to
     # the given site
     #

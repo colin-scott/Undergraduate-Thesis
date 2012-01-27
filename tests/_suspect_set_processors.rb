@@ -1,5 +1,6 @@
 #!/homes/network/revtr/ruby-upgrade/bin/ruby
 $: << File.expand_path("../")
+$: << File.expand_path("./fixtures/")
 
 require 'rspec'
 require 'isolation_module'
@@ -26,8 +27,8 @@ describe "suspect set processors" do
         end
 
         it "should find historical revtr hops" do 
-            historical_revtr_hops = @initializer.historical_revtr_dst2src(Fixture.merged_outage)\
-                .sort.uniq
+            #historical_revtr_hops = @initializer.historical_revtr_dst2src(Fixture.merged_outage).uniq
+                
             #$stderr.puts "historical_revtr_hops #{historical_revtr_hops.inspect}"
             #$stderr.puts "Fixture hops #{Fixture.historical_revtr.inspect}"
         end
@@ -46,7 +47,7 @@ describe "suspect set processors" do
             @pruner = Pruner.new(@registrar, @database, @log)
         end
 
-        it "should issue pings" do
+        it "issue pings" do
            to_remove = @pruner.pings_from_source(Fixture.suspect_set, Fixture.merged_outage)
            to_remove.should_not be_empty
            
@@ -59,6 +60,12 @@ describe "suspect set processors" do
           
            left.should_not be_empty
            #$stderr.puts left.inspect
+        end
+
+        context "#issue_pings_with_pptasks" do
+            it "doesn't crash" do
+                @pruner.issue_pings_with_pptasks(@controller.hosts[0..5], ["8.8.8.8"]).should_not be_empty
+            end
         end
     end
 end

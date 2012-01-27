@@ -240,25 +240,42 @@ class Pruner
         return responsive_targets
     end
      
-    # private methods won't be picked up by the failure_analyzer
-    private
+    # these methods won't be picked up by the failure_analyzer:
     
     # The controller keeps returning null results, so we instead use
     # pptasks directly... cp aliasprobe to a different directory?
     # TODO: move me somewhere else.
     def issue_pings_with_pptasks(sources, targets)
         id = Thread.current.__id__
+        @logger.debug "id: #{id.inspect}"
 
         # XXX: DOESN'T WORK FOR RIOT NODES!
         File.open("/tmp/sources#{id}", "w") { |f| f.puts sources.join "\n" } 
         File.open("/tmp/targets#{id}", "w") { |f| f.puts targets.join "\n" } 
 
-        system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+        @logger.warn "here" if not system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
                     /tmp/targets#{id} @:/tmp/targets#{id}"
 
         # TODO: don't assume eth0!
-        results = Set.new(`#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
-                    "cd colin/Scripts; sudo 2>/dev/null ./aliasprobe 40 /tmp/targets#{id} eth0 | cut -d ' ' -f1 | sort | uniq"`.split("\n"))
+        @logger.warn "there" if not system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+                    "cd colin/Scripts; sudo 2>/dev/null ./scamper -o /tmp/warts#{id} -O Warts -c 'ping -c 1' -f /tmp/targets#{id}"}
+
+        FileUtils.rm_rf("/tmp/warts#{id}")
+        FileUtils.mkdir_p("/tmp/warts#{id}")
+
+        results = Set.new
+
+        Dir.chdir "/tmp/warts#{id}" do
+            @logger.warn "everywhere" if not  system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+                        @:/tmp/warts#{id} :warts"
+
+            Dir.glob("*").each do |file|
+                warts_results = `#{FailureIsolation::WartsDumpPath} #{Dir.pwd}/#{file}`.split("\n")
+                ip_addrs = warts_results.map { |str| str.split[0] } 
+                results |= ip_addrs
+            end
+        end
+
 
         # TODO: I suspect that this block of code may be the cause of the
         # heap overflows....
@@ -267,6 +284,8 @@ class Pruner
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
             system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
             @logger.warn { "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}. Logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
+        else
+            @logger.info { "pptasks issued pings successfully" }
         end
 
         results

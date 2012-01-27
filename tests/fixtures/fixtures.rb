@@ -7,15 +7,16 @@ require 'hops'
 require 'yaml'
 
 module Fixture
+    OutagePath = "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/tests/fixtures/outage.yml"
     def self.merged_outage
-        o = YAML.load_file("./outage.yml")
+        o = YAML.load_file(OutagePath)
 
-        m = MergedOutage.new([o])
+        m = MergedOutage.new(0, [o])
     end
 
     def self.historical_revtr
        #HistoricalReversePath.new(["96.7.8.189", "189.68.86.52", "220.134.106.254", "118.208.115.118", "62.152.227.42", "79.87.232.160", "98.11.85.75", "77.88.24.95"].map { |i| Hop.new(i) } )
-       YAML.load_file("./outage.yml").historical_revtr
+       YAML.load_file(OutagePath).historical_revtr
     end
 
     def self.responsive_targets
