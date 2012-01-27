@@ -265,15 +265,13 @@ class Pruner
 
         results = Set.new
 
-        Dir.chdir "/tmp/warts#{id}" do
-            @logger.warn "everywhere" if not  system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
-                        @:/tmp/warts#{id} :warts"
+        @logger.warn "everywhere" if not  system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 \
+                    @:/tmp/warts#{id} :warts"
 
-            Dir.glob("*").each do |file|
-                warts_results = `#{FailureIsolation::WartsDumpPath} #{Dir.pwd}/#{file}`.split("\n")
-                ip_addrs = warts_results.map { |str| str.split[0] } 
-                results |= ip_addrs
-            end
+        Dir.glob("/tmp/warts#{id}/*").each do |file|
+            warts_results = `#{FailureIsolation::WartsDumpPath} #{file}`.split("\n")
+            ip_addrs = warts_results.map { |str| str.split[0] } 
+            results |= ip_addrs
         end
 
 

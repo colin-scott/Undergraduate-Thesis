@@ -103,6 +103,8 @@ rescue Exception => e
    # stacktrace
    if logger
         Thread.list.each do |t|
+            next if t == Thread.current
+
             begin
                 t.raise(Exception.new("trying to get backtrace"))
             rescue Exception => r
@@ -111,6 +113,7 @@ rescue Exception => e
         end
    end
 
+   # TODO: if e has a cause, print it (until there are no more causes). 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
    $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?

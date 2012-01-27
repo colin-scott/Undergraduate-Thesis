@@ -221,7 +221,7 @@ class Emailer < ActionMailer::Base
 
         @outage = outage
         
-        mail(:subject => "Poison Opportunity Detected!",
+        mail(:subject => "Poison Opportunity!",
              :from => "uwfailures@gmail.com",
              :to => recipient) do |format|
             format.html { render "poison_notification.text.html.erb" } 

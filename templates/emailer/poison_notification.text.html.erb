@@ -6,10 +6,10 @@
   </head>
   <body>
   <p>
-  Poison opportunity! <%= @outage.direction %> 
+  Poisoning Opportunity! <%= @outage.direction %> 
   <br />
   <% if @outage.direction == Direction.REVERSE %>
-  (Isolation algorithm used historical revtr?: <%= @outage.complete_reverse_isolation %>)
+    (Isolation algorithm used historical revtr?: <%= @outage.complete_reverse_isolation %>)
   <% end %>
   <ul type=none>
         <img src="<%= @outage.graph_url %>" alt="dot" />

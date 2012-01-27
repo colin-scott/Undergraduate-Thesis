@@ -402,11 +402,11 @@ class FailureMonitor
     # Every day, identify broken monitor VPs and unresponsive targets, replace
     # them, and send out a summary email
     def clean_the_house()
-        Thread.new do
-            # TODO: the memory leak seems to occur on this line!
-            swap_out_faulty_nodes
-            swap_out_unresponsive_targets
-        end
+        #Thread.new do
+        #    # TODO: the memory leak seems to occur on this line!
+        #    swap_out_faulty_nodes
+        #    swap_out_unresponsive_targets
+        #end
     end
 
     # Identify and swap out broken monitor VPs
