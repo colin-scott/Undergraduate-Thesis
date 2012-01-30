@@ -138,7 +138,7 @@ class Outage
                                           # miscellaneous measurements +
                                           # analytics
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
-                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url
+                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url,
                                           :asn_to_poison,
                                           # Whether the historical revtr was
                                           # valid for reverse outages

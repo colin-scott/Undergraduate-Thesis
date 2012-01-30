@@ -26,7 +26,7 @@ $CONTROLLER_INFO ||= "#{$DATADIR}/uris/controller.txt"
 $TRACEROUTE_SERVER_INFO ||= "#{$DATADIR}/uris/tracerouteserver.txt"
 $ADJACENCY_SERVER_INFO ||= "#{$DATADIR}/uris/adjacencyserver.txt"
 $VP_SERVER_INFO ||= "#{$DATADIR}/uris/vpserver.txt"
-$TR_ATLAS_INFO= ||= "/homes/network/revtr/revtr/revtr_data/uris/atlas_uri"
+$TR_ATLAS_INFO ||= "/homes/network/revtr/revtr/revtr_data/uris/atlas_uri"
 $TR_ATLAS_STATE ||= "/homes/network/revtr/revtr/revtr_data/atlas_state"
 
 class Method
