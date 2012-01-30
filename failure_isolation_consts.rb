@@ -358,10 +358,9 @@ module FailureIsolation
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
                     #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         
-        # ============================== #
-        #      riot specific!            #
-        # ============================== #
-        system "scp #{TargetSetPath} cs@riot.cs.washington.edu:~/ping_monitors/", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+        # target list is pulled from toil
+        #
+        # target list is pulled from riot as well
     end
 
     # ====================================
@@ -457,8 +456,8 @@ module DataSets
     #  symbols
     AllDataSets = [FailureIsolation.HarshaPoPs, FailureIsolation.BeyondHarshaPoPs,
         FailureIsolation.CloudfrontTargets, FailureIsolation.SpooferTargets,FailureIsolation.ATTTargets,
-        FailureIsolation.MuxNodes, FailureIsolation.SentinelNodes]
-    #   ,FailureIsolation.HubbleTargets]
+        FailureIsolation.MuxNodes, FailureIsolation.SentinelNodes,
+        FailureIsolation.HubbleTargets]
 
     def self.ToPath(dataset)
         case dataset
@@ -505,9 +504,20 @@ if $0 == __FILE__
     #
     #puts FailureIsolation.pl_pl_path_for_date(t)
 
-    puts FailureIsolation.TargetSet.size
+    DataSets::AllDataSets.each do |dataset|
+        puts dataset.size
+    end
 
-    require 'yaml'
+    # 0
+    # 0
+    # 16
+    # 237
+    # 55
+    # 5
+    # 5
+    # 600
+
+     require 'yaml'
     #puts previous_outages.inspect
 
     #a = FailureIsolation.ATTTargets

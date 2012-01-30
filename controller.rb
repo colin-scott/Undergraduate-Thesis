@@ -86,20 +86,15 @@ class Registrar
     # raises the exception that 
     # note that this is different behavior than controller.register, which
     # just returns the exception
-    def register(vp, name="freddy")
-        @controller.log {"Register attempt: #{vp} #{name}"}
+    def register(vp)
 		uri=vp.uri
-        @controller.log {"Got uri: #{vp} #{uri} #{name}"}
+        @controller.log {"Register attempt: #{vp} #{uri}"}
 
-        name = nil
-        begin
-            name = vp.name
-        rescue Exception
-        end
+        name = (vp.responds_to?(:name)) ? vp.name : nil
 
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
-        result=@controller.register(uri, name)
+        result = @controller.register(uri, name)
         if not result.nil?
             raise result
         end
