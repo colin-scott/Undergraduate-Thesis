@@ -158,8 +158,6 @@ class Outage
   alias :dest :dst
   alias :additional_traceroutes :additional_traces 
   alias :log_name :file
-  alias :ping_responsive :ping_responsive_ips
-  alias :responsive_targets :ping_responsive_ips
   
   def initialize(*args)
         @additional_traces = {}
@@ -307,6 +305,9 @@ class Outage
 
        ping_responsive_ips
    end
+
+    alias :ping_responsive :ping_responsive_ips
+    alias :responsive_targets :ping_responsive_ips
 
    # Return whether the spoofed traceroute follows the same path as the normal
    # traceroute. Shouldn't happen, unless paths changed between the time the

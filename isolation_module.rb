@@ -2,7 +2,8 @@
 
 # This used to be where all constants for the isolation were stored. It was
 # taking too long to load this module, so I separated out $config from lazily
-# evaluated datasets in failure_isolation_consts.rb
+# evaluated datasets in failure_isolation_consts.rb. This file exists for
+# backwards compatibility.
 #
 # TODO: don't load this here... make loaders do it explicity for performance
 # reasons

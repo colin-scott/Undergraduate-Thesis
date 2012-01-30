@@ -3,6 +3,7 @@
 # Utilities methods, along with custom defined Monkey Wrenching to built-in
 # classes
 
+require 'isolation_module'
 require 'syslog'
 require 'date'
 require 'logger'

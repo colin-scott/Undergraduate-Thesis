@@ -39,7 +39,7 @@ class DatabaseInterface
 
         begin
             @connection = MysqlConnectionManager.new(host, usr, pwd, database)
-            @db = connection
+            @db = @connection
         rescue Mysql::Error
             @logger.info { "DB connection error " + host }
             throw e
