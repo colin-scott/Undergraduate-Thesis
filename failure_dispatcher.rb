@@ -232,12 +232,16 @@ class FailureDispatcher
         end
     end
 
+    # java Executors hide stack traces... to help with debugging, uncover
+    # the underlying stacktrace
     def grab_thread_results(threads)
       # TODO: this barrier might take arbitrarily long. Mostly needed
       # for merging pruposes, but we might consider instrumenting this
       # and doing something smarter if it's a bottleneck
       threads.each do |thread|
           begin 
+              # thread.get will throw an exception if the underlying thread
+              # threw an exception during execution
               ($executor) ? thread.get : thread.join
           rescue Exception => e
               if $executor
@@ -589,23 +593,23 @@ class FailureDispatcher
         "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
-    # For all reachable hops /beyond/ the suspected failure, issue a
-    # traceroute to them from the source to see how the paths differ
-    def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
-                                        historical_tr, spoofed_revtr, historical_revtr)
-        return {} if suspected_failure.nil?
+    ## For all reachable hops /beyond/ the suspected failure, issue a
+    ## traceroute to them from the source to see how the paths differ
+    #def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
+    #                                    historical_tr, spoofed_revtr, historical_revtr)
+    #    return {} if suspected_failure.nil?
 
-        pingable_targets = @failure_analyzer.pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
-        pingable_targets |= @failure_analyzer.pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
+    #    pingable_targets = @failure_analyzer.pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
+    #    pingable_targets |= @failure_analyzer.pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
 
-        pingable_targets.map! { |hop| hop.ip }
+    #    pingable_targets.map! { |hop| hop.ip }
 
-        @logger.debug { "pingable_targets, #{Time.now} #{pingable_targets.inspect}" }
+    #    @logger.debug { "pingable_targets, #{Time.now} #{pingable_targets.inspect}" }
 
-        targ2trace = issue_normal_traceroutes(src, pingable_targets)
+    #    targ2trace = issue_normal_traceroutes(src, pingable_targets)
 
-        targ2trace
-    end
+    #    targ2trace
+    #end
 
     # Fetch the most recent historical revtr from Dave's database
     def fetch_historical_revtr(src,dst)
