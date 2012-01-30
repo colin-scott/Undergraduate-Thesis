@@ -490,20 +490,22 @@ class FailureDispatcher
         # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
         # are pingeable from the source.
         outage.measurement_times << ["non-revtr pings", Time.new]
-        ping_responsive, non_responsive_hops = check_reachability(outage)
+        # Note that outage.ping_responsive() is computed on demand. The return
+        # value here is only used to check if need to reissue pings
+        responsive_hops, non_responsive_hops = check_reachability!(outage)
 
         @logger.debug { "non-revtr pings issued" }
 
         ## Moar empty measurements!
-        if ping_responsive.empty?
-            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" }
+        if responsive_hops.empty?
+            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{responsive_hops.size + non_responsive_hops.length} ips)" }
 
             @node2emptypings[outage.src].push_empty
             restart_atd(outage.src)
             sleep 10
-            ping_responsive, non_responsive_hops = check_reachability(outage)
-            if ping_responsive.empty?
-                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{ping_responsive.size + non_responsive_hops.length} ips)" } 
+            responsive_hops, non_responsive_hops = check_reachability!(outage)
+            if responsive_hops.empty?
+                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_hops.size + non_responsive_hops.length} ips)" } 
                 @node_2_failed_measurements[outage.src] += 1
                 @node2emptypings[outage.src].push_empty
             else
@@ -533,8 +535,7 @@ class FailureDispatcher
         if outage.spoofed_revtr.valid?
             # Issue pings to all hops on the spoofed revtr
            outage.measurement_times << ["revtr pings", Time.new]
-           revtr_ping_responsive, revtr_non_responsive_hops = check_reachbility_for_revtr(outage)
-           ping_responsive |= revtr_ping_responsive
+           check_reachbility_for_revtr!(outage)
 
            @logger.debug { "revtr pings issued" }
         end
@@ -871,7 +872,7 @@ class FailureDispatcher
     # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
     # are pingeable from the source. Send pings, update
     # hop.ping_responsive, and return the responsive pings
-    def check_reachability(outage)
+    def check_reachability!(outage)
         all_hop_sets = [[Hop.new(outage.dst), Hop.new(FailureIsolation::TestPing)], outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
 
         for hop in outage.historical_tr
@@ -883,7 +884,7 @@ class FailureDispatcher
     
     # we check reachability separately for the revtr hops, since the revtr can take an
     # excrutiatingly long time to execute sometimes
-    def check_reachbility_for_revtr(outage)
+    def check_reachbility_for_revtr!(outage)
         if outage.revtr.valid?
            return request_pings(outage, [outage.revtr]) 
         else

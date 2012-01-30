@@ -138,7 +138,7 @@ class Outage
                                           # miscellaneous measurements +
                                           # analytics
                                           :additional_traces, :upstream_reverse_paths, :category, :symmetric,
-                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url, :responsive_targets,
+                                          :measurements_reissued, :spliced_paths, :jpg_output, :graph_url
                                           :asn_to_poison,
                                           # Whether the historical revtr was
                                           # valid for reverse outages
@@ -158,13 +158,14 @@ class Outage
   alias :dest :dst
   alias :additional_traceroutes :additional_traces 
   alias :log_name :file
+  alias :ping_responsive :ping_responsive_ips
+  alias :responsive_targets :ping_responsive_ips
   
   def initialize(*args)
         @additional_traces = {}
         @upstream_reverse_paths = {}
         @spliced_paths = []
         @suspected_failures = {}
-        @responsive_targets = Set.new
         @measurement_times = []
 
         case args.size
@@ -292,19 +293,19 @@ class Outage
    end
 
    # Return all ping responsive hops for this outage
-   def ping_responsive
-       ping_responsive = Set.new
+   def ping_responsive_ips
+       ping_responsive_ips = Set.new
 
        @historical_tr.each do |hop|
-           ping_responsive |= hop.reverse_path.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if hop.reverse_path.valid?
+           ping_responsive_ips |= hop.reverse_path.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if hop.reverse_path.valid?
        end
 
-       ping_responsive |= @historical_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @historical_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @spoofed_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if spoofed_revtr.valid?
+       ping_responsive_ips |= @historical_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive_ips |= @historical_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive_ips |= @spoofed_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
+       ping_responsive_ips |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if spoofed_revtr.valid?
 
-       ping_responsive
+       ping_responsive_ips
    end
 
    # Return whether the spoofed traceroute follows the same path as the normal

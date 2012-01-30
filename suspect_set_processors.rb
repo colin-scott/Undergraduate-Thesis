@@ -207,8 +207,7 @@ class Pruner
 
     # All hops which were pingable before the suspect set processing began
     def pings_issued_before_suspect_set_processing(suspect_set, merged_outage)
-        # TODO: is responsive_targets ip addresses or hops?
-        ping_responsive_hops = merged_outage.map { |o| o.responsive_targets.to_a }.flatten.to_set.to_a
+        ping_responsive_hops = merged_outage.map { |o| o.ping_responsive_ips.to_a }.flatten.to_set.to_a
     end
 
     # After all other measurements have been leveraged to prune suspects, issue pings from the
