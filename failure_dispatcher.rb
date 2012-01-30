@@ -10,7 +10,6 @@ require 'thread'
 require 'ip_info'
 require 'db_interface'
 require 'yaml'
-require 'revtr_cache_interface'
 require 'net/http'
 require 'hops'
 require 'mkdot'
@@ -70,8 +69,6 @@ class FailureDispatcher
         @db = db
 
         @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @registrar, @db)
-
-        @revtr_cache = RevtrCache.new(@ipInfo, @db, @logger)
 
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)
@@ -616,7 +613,7 @@ class FailureDispatcher
 
         dst = dst.ip if dst.is_a?(Hop)
 
-        path = @revtr_cache.get_cached_reverse_path(src, dst)
+        path = @db.get_cached_reverse_path(src, dst)
         
         # XXX HACKKK. we want to print failed cache fetch reasons in our email. But the email is rendered
         # by iterating over each hop in the historical revtr. So for now, put

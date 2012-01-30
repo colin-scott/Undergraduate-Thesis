@@ -17,18 +17,29 @@ if RUBY_PLATFORM == "java"
 else
     require 'mysql_connection_manager'
 end
+
+require 'ip_info'
+require 'hops'
 require 'socket'
-require 'isolation_utilities.rb'
+require 'isolation_utilities'
 require 'set'
 require 'failure_isolation_consts'
 
 # TODO: make all static sql queries class variables
 class DatabaseInterface
-    def initialize(logger=LoggerLog.new($stderr), host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
+    # For the revtr_cache. TODO: encapsulate me
+    # ruby, do you have a Integer.infinity constant?:
+    @@freshness_minutes = -1
+    @@max_hops = 30
+    @@do_remapping = false
+
+    def initialize(logger=LoggerLog.new($stderr), ip_info=IpInfo.new, host="bouncer.cs.washington.edu", usr="revtr", pwd="pmep@105&rws", database="revtr")
         @logger = logger
+        @ipInfo = ip_info
 
         begin
             @connection = MysqlConnectionManager.new(host, usr, pwd, database)
+            @db = connection
         rescue Mysql::Error
             @logger.info { "DB connection error " + host }
             throw e
@@ -246,6 +257,200 @@ class DatabaseInterface
 
         hostname2ip
     end
+    
+    # Return a HistoricalReversePath for the given src, dst, pair. Finds the
+    # most recent cached reverse path. If none exist, puts failure reasons
+    # into the reverse path and returns an empty HistoricalReversePath object
+    def get_cached_reverse_path(src, dst)
+      path = HistoricalReversePath.new(src, dst)
+    
+      src = Inet::aton(@db.hostname2ip[src])
+      dst = Inet::aton(dst)
+      old_dst = dst
+      ts = 0
+    
+      # find matching revtrs
+      begin
+    
+        sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
+        if (@@freshness_minutes > 0) then
+          buffer = @@freshness_minutes
+          #if max_staleness > 0 and max_staleness > @@freshness_minutes then buffer = max_staleness else buffer=@@freshness_minutes end
+          sql += " and date > from_unixtime(#{Time.now.to_i-(buffer*60)})"
+        end
+        sql += " order by date desc limit 11"
+    
+        # no match, try remapping to next hop
+        results = @connection.query sql
+        if not results.next
+        if @@do_remapping
+          sql = "select inet_ntoa(endpoint) as e, last_hop from endpoint_mappings where src=#{src} and endpoint=#{dst} limit 1"
+          results = @connection.query sql
+          if not not results.next 
+            results.each_hash{|row|
+              old_dst = dst
+              dst = row["last_hop"].to_i
+            }
+            @logger.debug { "No matches for #{Inet::ntoa(old_dst)}, remapping endpoint to #{Inet::ntoa(dst)}" }
+          end
+    
+          sql = "select * from cache_rtrs where src=#{src} and dest=#{dst} "
+          if (@@freshness_minutes > 0) then
+            buffer = @@freshness_minutes
+            #if max_staleness > 0 and max_staleness > @@freshness_minutes then buffer = max_staleness else buffer=@@freshness_minutes end
+            sql += " and date > from_unixtime(#{Time.now.to_i-(buffer*60)})"
+          end
+          sql += " order by date desc limit 11"
+    
+          # still no match, so output the status for probing this node
+          results = @connection.query sql
+        end # end if do_remapping
+          if not results.next 
+            reason = "not yet attempted"
+            sql = "select state, lastUpdate from isolation_target_probe_state where src=" +
+            "#{src} and dst=#{dst}"
+            #          @logger.puts sql
+            begin
+              results = @connection.query sql
+              results.each_hash{|row|
+                reason = row["state"] + " at " + row["lastUpdate"]
+              }
+            rescue Exception
+              @logger.warn { "Error with query: #{sql}" }
+              @logger.puts $!
+            end
+    
+            @logger.debug { "No matches in the past #{@@freshness_minutes} minutes!\nProbe status: #{reason}" }
+    
+            path.valid = false
+            path.invalid_reason = reason
+    
+            return path
+          end
+        end # not results.next == 0
+        
+        # ok, we have results, let's start parsing them
+        results.each_hash do |row|
+          ts = row["date"]
+          1.upto(@@max_hops) do |i|
+            val = row["hop"+(i).to_s].to_i
+            type = row["type"+(i).to_s].to_i
+            case type
+            when 1..2
+              type = "rr"
+            when 3..6
+              type = "ts"
+            when 7
+              type = "sym"
+            when 8
+              type = "tr2src"
+            when 9
+              type = "dst-sym"
+            else
+              type = "unk"
+            end
+
+            reasons = nil
+
+            if i > 1 and (type=="sym" or type=="dst-sym")
+                reasons = get_symmetric_reasons(src, val)
+            end 
+                
+            path << ReverseHop.new(Inet::ntoa(val), i, type, reasons, @ipInfo) if val > 0 or !path.empty? # empty hops also represented as 0
+          end # 1.upto()
+
+          break unless path.empty?
+        end # results.each_hash
+      rescue Exception
+        @logger.info { "Error with query: #{sql}" }
+        @logger.puts $!
+      end # begin
+    
+      path.pop while !path.empty? and path[-1].ip=="0.0.0.0"
+      path.valid = true if !path.empty?
+      # all data has been generated, add it to the object for eventual return
+      path.timestamp = ts
+      return path
+   end
+
+   private
+
+   def get_symmetric_reasons(src, hop)
+      reasons = nil
+      rr_non_spoof_responsive = "unknown"
+      rr_spoof_responsive_count = 0
+      rr_spoof_attempt = 0
+      ts_non_spoof_responsive = "unknown"
+      ts_spoof_responsive_count =  0
+      ts_spoof_attempt = 0
+
+      # "dest" is actually the hop being measured
+      # in this case, we have to look from the previous hop
+      sql = "select * from vp_stats where src=#{src} and dest=#{hop}"
+      sym_results = @connection.query sql
+      if not sym_results.next
+        sym_results.each_hash{|row|
+          sym_type = nil
+          is_spoof = false
+          is_rr = false
+          case row["probe_type"].to_i
+          when 1
+            sym_type = "rr"
+            is_rr = true
+          when 2
+            sym_type = "rr-spoof"
+            is_rr = true
+            is_spoof = true
+          when 3
+            sym_type = "ts"
+          when 4
+            sym_type = "ts-spoof"
+            is_spoof = true
+          when 6
+            sym_type = "ts-spoof-ds"
+            is_spoof = true
+          else
+            sym_type = nil
+          end
+          next if sym_type.nil?
+    
+          responsive = row["responsive"].to_i > 0 ? "yes" : "no"
+          hop_count = row["hop_count"].to_i
+          no_hop_found = row["no_hop_found"].to_i
+          hops_found = row["hop_count_orig"].to_i
+    
+          if is_rr and not is_spoof then rr_non_spoof_responsive = responsive end
+          if is_rr and is_spoof then
+            if hop_count != 0 then rr_spoof_responsive_count += 1 end
+            rr_spoof_attempt += 1
+          end
+    
+          if sym_type=="ts" then
+            ts_non_spoof_responsive = responsive
+            if is_spoof then
+              if hop_count != 0 then ts_spoof_responsive_count += 1 end
+              ts_spoof_attempt += 1
+            end
+          end
+    
+          if is_rr and (row["rr_dst_unresponsive"].to_i>0) then responsive += " [dst unresponsive]" end
+    
+          ## not currently printed, but gives the complete picture
+          #reasons << "#{sym_type} from #{$pl_ip2host[Inet::ntoa(row["vp"].to_i)]} "+
+          #"responsive?: #{responsive} "+
+          #"hop count: #{hop_count} raw hops: #{hops_found}"
+
+          # let's simplify the text for output
+          rr_spoof_text = rr_spoof_responsive_count>0 ? "partial" : (rr_spoof_attempt>0 ? "no" : "unknown")
+          ts_spoof_text = ts_spoof_responsive_count>0 ? "partial" : (ts_spoof_attempt>0 ? "no" : "unknown")
+          reasons = "non-spoof reachable: rr? #{rr_non_spoof_responsive} ts? #{ts_non_spoof_responsive} | "+
+            "spoof: rr? #{rr_spoof_text} ts? #{ts_spoof_text}"
+    
+        } # end each_hash
+      end # end if sym_not results.next
+
+      return reasons
+   end
 end
 
 if $0 == __FILE__

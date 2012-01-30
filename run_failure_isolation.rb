@@ -38,7 +38,6 @@ require 'reverse_traceroute_cache'
 require 'ip_info'
 require 'mkdot'
 require 'hops'
-require 'revtr_cache_interface'
 require 'failure_analyzer'
 require 'failure_dispatcher'
 #require 'isolation_module'
@@ -49,9 +48,10 @@ $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to
 Thread.abort_on_exception = true
 
 def allocate_modules(logger)
-   db = DatabaseInterface.new(logger)
+   ip_info = IpInfo.new
+   db = DatabaseInterface.new(logger, ip_info)
    house_cleaner = HouseCleaner.new(logger, db)
-   dispatcher = FailureDispatcher.new(db, logger, house_cleaner)
+   dispatcher = FailureDispatcher.new(db, logger, house_cleaner, ip_info)
    monitor = FailureMonitor.new(dispatcher, db, logger, house_cleaner)
    monitor
 end

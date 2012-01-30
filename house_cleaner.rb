@@ -15,7 +15,7 @@ require 'db_interface'
 #    - Never monitor a site that already has a monitoring node (only the rest
 #           of the spoofer sites)
 class HouseCleaner
-    def initialize(logger=LoggerLog.new($stderr), db = DatabaseInterface.new)
+    def initialize(logger=LoggerLog.new($stderr), db=DatabaseInterface.new)
         @logger = logger
         @db = db
     end
