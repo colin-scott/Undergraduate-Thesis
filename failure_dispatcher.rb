@@ -902,8 +902,6 @@ class FailureDispatcher
         responsive ||= []
         @logger.debug { "Responsive to ping: #{responsive.inspect}" }
 
-        outage.responsive_targets |= responsive
-
         # update reachability
         all_hop_sets.each do |hop_set|
             hop_set.each { |hop| hop.ping_responsive = responsive.include? hop.ip }
