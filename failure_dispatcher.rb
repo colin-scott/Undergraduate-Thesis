@@ -493,19 +493,21 @@ class FailureDispatcher
         # Note that outage.ping_responsive() is computed on demand. The return
         # value here is only used to check if need to reissue pings
         responsive_hops, non_responsive_hops = check_reachability!(outage)
+        responsive_ips, non_responsive_ips = hops_to_uniq_ips(responsive_hops), hops_to_uniq_ips(non_responsive_hops)
 
         @logger.debug { "non-revtr pings issued" }
 
         ## Moar empty measurements!
-        if responsive_hops.empty?
-            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{responsive_hops.size + non_responsive_hops.length} ips)" }
+        if responsive_ips.empty?
+            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips)" }
 
             @node2emptypings[outage.src].push_empty
             restart_atd(outage.src)
             sleep 10
             responsive_hops, non_responsive_hops = check_reachability!(outage)
-            if responsive_hops.empty?
-                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_hops.size + non_responsive_hops.length} ips)" } 
+            responsive_ips, non_responsive_ips = hops_to_uniq_ips(responsive_hops), hops_to_uniq_ips(non_responsive_hops)
+            if responsive_ips.empty?
+                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips)" } 
                 @node_2_failed_measurements[outage.src] += 1
                 @node2emptypings[outage.src].push_empty
             else
@@ -563,6 +565,10 @@ class FailureDispatcher
             @logger.info { "scheduling #{outage.src} for swap_out" }
             SwapFilters.empty_pings!(outage, filter_tracker)
         end
+    end
+
+    def hops_to_uniq_ips(hops)
+        Set.new(hops.map { |h| h.ip })
     end
 
     # One reason measurements might not be issued is that atd is stuck.
