@@ -14,8 +14,20 @@ if RUBY_PLATFORM != 'java'
   require 'inline'
 end
 
+# We don't want to be forced to load adjacencies et. al., so in case the
+# caller hasn't already loaded spooftr_config, we re-define here.
 # ||= so we don't redefine it
+# TODO: make the revtr adjacencies lazily evaluated, so that this hack isn't
+# needed
 $LOG ||= $stderr
+$BASEDIR ||= "/homes/network/revtr/spoofed_traceroute"
+$DATADIR ||= "#{$BASEDIR}/data"
+$CONTROLLER_INFO ||= "#{$DATADIR}/uris/controller.txt"
+$TRACEROUTE_SERVER_INFO ||= "#{$DATADIR}/uris/tracerouteserver.txt"
+$ADJACENCY_SERVER_INFO ||= "#{$DATADIR}/uris/adjacencyserver.txt"
+$VP_SERVER_INFO ||= "#{$DATADIR}/uris/vpserver.txt"
+$TR_ATLAS_INFO= ||= "/homes/network/revtr/revtr/revtr_data/uris/atlas_uri"
+$TR_ATLAS_STATE ||= "/homes/network/revtr/revtr/revtr_data/atlas_state"
 
 class Method
     # Make the Method.to_s human readable
