@@ -901,25 +901,29 @@ class FailureDispatcher
     # Helper method.
     def request_pings(outage, all_hop_sets)
         source = outage.src
-        all_targets = Set.new
-        all_hop_sets.each { |hops| all_targets |= (hops.map { |hop| hop.ip }) }
+        all_hop_ips = Set.new
+        all_hop_sets.each { |hops| all_hop_ips |= (hops.map { |hop| hop.ip }) }
 
-        responsive = @registrar.ping(source, all_targets.to_a, true)
-        responsive ||= []
-        @logger.debug { "Responsive to ping: #{responsive.inspect}" }
+        responsive_ips = @ping_issuer.issue(source, all_hop_ips.to_a)
+        responsive_ips ||= []
+        @logger.debug { "Responsive to ping: #{responsive_ips.inspect}" }
 
-        # update reachability
+        responsive_hops = []
+        unresponsive_hops = []
+        
+        # update hop reachability, and gather lists of responsive/unresponsive hops
         all_hop_sets.each do |hop_set|
-            hop_set.each { |hop| hop.ping_responsive = responsive.include? hop.ip }
+            hop_set.each do |hop|
+                hop.ping_responsive = responsive_ips.include? hop.ip 
+                if hop.ping_responsive
+                    responsive_hops << hop
+                else
+                    unresponsive_hops << hop
+                end
+            end
         end
 
-        unresponsive_ips = all_targets - responsive
-        unresponsive_hops = Set.new
-        all_hop_sets.each do |hop_set|
-            unresponsive_hops |= hop_set.find_all { |hop| unresponsive_ips.include?(hop.ip) }
-        end
-
-        [responsive, unresponsive_hops]
+        [responsive_hops, unresponsive_hops]
     end
 
     # Are the hops reachable from VPs other than the source?
