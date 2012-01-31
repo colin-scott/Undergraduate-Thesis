@@ -904,7 +904,7 @@ class FailureDispatcher
         all_hop_ips = Set.new
         all_hop_sets.each { |hops| all_hop_ips |= (hops.map { |hop| hop.ip }) }
 
-        responsive_ips = @ping_issuer.issue(source, all_hop_ips.to_a)
+        responsive_ips = @registrar.ping(source, all_hop_ips.to_a)
         responsive_ips ||= []
         @logger.debug { "Responsive to ping: #{responsive_ips.inspect}" }
 
