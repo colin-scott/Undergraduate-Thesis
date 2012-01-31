@@ -6,7 +6,6 @@
 
 require 'hops'
 require 'set'
-require 'failure_analyzer'
 require 'failure_isolation_consts'
 
 # What heuristic was used to merge the Outages 

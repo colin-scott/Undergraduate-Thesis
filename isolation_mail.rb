@@ -240,8 +240,6 @@ def email_and_die
 end
 
 if __FILE__ == $0
-    require 'outage'
-    require 'failure_isolation_consts'
     input_file = "#{FailureIsolation::MergedIsolationResults}/1_1_20120119220643.bin"
     merged_outage = Marshal.load(File.open(input_file.chomp))
     mail = Emailer.isolation_results(merged_outage, "ikneaddough@gmail.com")
