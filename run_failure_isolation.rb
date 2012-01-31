@@ -40,7 +40,6 @@ require 'mkdot'
 require 'hops'
 require 'failure_analyzer'
 require 'failure_dispatcher'
-#require 'isolation_module'
 
 # TODO: move me into FailureIsolationConsts
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"

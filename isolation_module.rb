@@ -8,5 +8,3 @@
 # TODO: don't load this here... make loaders do it explicity for performance
 # reasons
 require "/homes/network/revtr/spoofed_traceroute/spooftr_config.rb"
-
-require 'failure_isolation_consts'
