@@ -39,7 +39,6 @@ class DatabaseInterface
 
         begin
             @connection = MysqlConnectionManager.new(host, usr, pwd, database)
-            @db = @connection
         rescue Mysql::Error
             @logger.info { "DB connection error " + host }
             throw e
@@ -264,7 +263,7 @@ class DatabaseInterface
     def get_cached_reverse_path(src, dst)
       path = HistoricalReversePath.new(src, dst)
     
-      src = Inet::aton(@db.hostname2ip[src])
+      src = Inet::aton(hostname2ip[src])
       dst = Inet::aton(dst)
       old_dst = dst
       ts = 0
