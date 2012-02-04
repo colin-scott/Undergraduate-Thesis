@@ -280,7 +280,7 @@ class Pruner
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")
             system %{#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} /tmp/sources#{id} 100 100 "hostname --fqdn ; ps aux" > #{FailureIsolation::EmptyPingsLogDir}/#{uuid}/ps-aux}
-            @logger.warn { "pptasks returned empty results: srcs=#{sources.length} targets=#{targets.length}. Logs at #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
+            @logger.warn { "issue_pings_with_pptasks empty results time #{Time.now.utc.strftime("%Y%m%d%H%M%S")} srcs #{sources.length} #{sources.join(",")} targets #{targets.length} #{targets.join(",")} logs #{FailureIsolation::EmptyPingsLogDir}/#{uuid}" }
         else
             @logger.info { "pptasks issued pings successfully" }
         end
