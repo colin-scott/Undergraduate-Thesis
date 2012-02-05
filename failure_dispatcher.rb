@@ -24,11 +24,13 @@ require 'pstore'
 require 'timeout'
 require 'house_cleaner'
 
+$TEST_THREADS = false
 if RUBY_PLATFORM == "java"
     require 'java'
     java_import java.util.concurrent.Executors
     # TODO: HACK. Make me a platform-independant class variable
-    $executor = Executors.newFixedThreadPool(32)
+    $executor = Executors.newFixedThreadPool(24)
+    $executor.setMaximumPoolSize(24)
 end
 
 # This guy is just in charge of issuing measurements and logging/emailing results
@@ -78,6 +80,8 @@ class FailureDispatcher
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
 	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
+
+        @max_thread_wait_time_minutes = 15 # number of minutes to wait for measurement threads to complete
     end
 
     # Connect to Dave's spoofed revtr DRB service
@@ -208,6 +212,7 @@ class FailureDispatcher
             # ================================================================================
             # Merge (src, dst) outages                                                       #
             # ================================================================================
+            # DRC confirmed that this was not the source of the leak 
             merged_outages = merge_outages(srcdst2outage, srcdst2filter_tracker)
             merged_outage_threads = []
 
@@ -238,22 +243,34 @@ class FailureDispatcher
       # TODO: this barrier might take arbitrarily long. Mostly needed
       # for merging pruposes, but we might consider instrumenting this
       # and doing something smarter if it's a bottleneck
+      start_time = Time.now.to_i
       threads.each do |thread|
+          remaining_time = (@max_thread_wait_time_minutes*60) - (Time.now.to_i-start_time)
+          if remaining_time < 1 then remaining_time = 1 end
           begin 
               # thread.get will throw an exception if the underlying thread
               # threw an exception during execution
-              ($executor) ? thread.get : thread.join
+              if $executor
+                  java_import java.util.concurrent.TimeUnit
+                  thread.get(remaining_time*1000, TimeUnit::MILLISECONDS) 
+              else 
+                  thread.join
+              end
           rescue Exception => e
               if $executor
                   # Two levels of nesting to get at the real exception!
                   # jruby, sometimes you do weird things...
+                  begin
                   e = e.cause if e.cause
                   e = e.cause if e.cause
+                  rescue Exception # catch errors this generates...
+                  end
                   raise e
               else
                   raise e
               end
           end
+          if $executor then thread.cancel(true) end # should do nothing if done, but needs to happen to free up threads otherwise
       end
     end
 
@@ -1106,4 +1123,20 @@ class EmptyStats
 			@empty -= @array.shift
 		end
 	end
+end
+
+if $TEST_THREADS
+foo = lambda do
+while true
+    puts "Foo!"
+    sleep 1
+end
+end
+    thread = $executor.submit(&foo)
+    puts #{TimeUnit.values.inspect}  
+    java_import java.util.concurrent.TimeUnit
+                  thread.get(5*1000, TimeUnit::MILLISECONDS) 
+                  thread.cancel(true) # should do nothing if done, but needs to happen to free up threads otherwise
+    
+
 end

@@ -40,7 +40,11 @@ class Timer
             while true
                 before_sleep = Time.now
                 period = calculate_sleep_period
-                sleep period
+                begin
+                sleep period if period > 0
+                rescue Exception
+                    $stderr.puts $!.message + " " + $!.backtrace.join(" ")
+                end
                 after_sleep = Time.now
                 @offset2callback = update_times(after_sleep.to_i - before_sleep.to_i)
             end

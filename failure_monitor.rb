@@ -194,6 +194,7 @@ class FailureMonitor
             end
 
             if not (hash.keys - FailureIsolation.TargetSet).empty?
+                @logger.warn("#{node} targets mismatches current target set:\n\tMonitored: #{hash.keys.length} Target set: #{FailureIsolation.TargetSet.length} Diff: #{(hash.keys-FailureIsolation.TargetSet).length}")
                 stale_nodes << node
                 next
             end
@@ -402,11 +403,11 @@ class FailureMonitor
     # Every day, identify broken monitor VPs and unresponsive targets, replace
     # them, and send out a summary email
     def clean_the_house()
-        #Thread.new do
-        #    # TODO: the memory leak seems to occur on this line!
-        #    swap_out_faulty_nodes
-        #    swap_out_unresponsive_targets
-        #end
+        Thread.new do
+            # TODO: the memory leak seems to occur on this line!
+            swap_out_faulty_nodes
+            swap_out_unresponsive_targets
+        end
     end
 
     # Identify and swap out broken monitor VPs

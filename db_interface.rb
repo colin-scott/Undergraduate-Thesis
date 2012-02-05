@@ -157,7 +157,9 @@ class DatabaseInterface
     def fetch_reverse_hops()
         sql = "select distinct inet_ntoa(hop) from cache_hops where date > (current_timestamp()-7*24*60*60)"
         
-        results = Set.new(query(sql)).to_a
+        results = Set.new
+        query(sql).each { |elt| results.add elt }
+        results = results.to_a
 
         # convert (singleton) arrays into the the strings they contain
         results.map { |hop| hop[0] }

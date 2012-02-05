@@ -1,4 +1,5 @@
-#!/homes/network/revtr/ruby-upgrade/bin/ruby
+#!/homes/network/revtr/jruby/bin/jruby
+
 $: << "./"
 
 # Simply append reverse hops onto the previous_week.txt
@@ -17,6 +18,8 @@ $: << "./"
 # has been executed. We simply append reverse hops onto the previous_week.txt
 # file.
 
+require 'isolation_utilities'
+require 'isolation_module'
 require 'db_interface'
 require 'set'
 

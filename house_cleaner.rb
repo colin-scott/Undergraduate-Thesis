@@ -59,7 +59,7 @@ class HouseCleaner
             dataset2unresponsive_targets[FailureIsolation::get_dataset(targ)] << targ
         }}
 
-        @logger.info { "Found #{bad_targ_count} bad <src,targ> paris!" }
+        @logger.info { "Found #{bad_targ_count} bad <src,targ> pairs!" }
 
         # delete cases where the target is measurement from more sources than it is
         # not
@@ -101,10 +101,12 @@ class HouseCleaner
 
         @logger.debug { "dataset2unresponsive_targets: #{dataset2unresponsive_targets.inspect}" }
 
+        @logger.info {"Finding subsitutes for Harsha's pops"}
         find_subs_for_harsha_pops(dataset2unresponsive_targets, dataset2substitute_targets)
 
         # cloudfront is static
 
+        @logger.info {"Finding subsitutes for spoofers"}
         find_subs_for_spoofers(dataset2unresponsive_targets, dataset2substitute_targets)
 
         [dataset2substitute_targets, dataset2unresponsive_targets, possibly_bad_targets, bad_hops, possibly_bad_hops]
@@ -161,23 +163,28 @@ class HouseCleaner
         end
 
         @logger.debug { "core routers generated" }
-
-        # generate pop, edge mappings
-        popsrcdsts = IO.read(FailureIsolation::SourceDests).split("\n")\
-                        .map { |line| line.split }.map { |triple| [triple[0].to_sym, triple[1,2]] }
-        # TODO: filter out core routers?
+   # TODO: filter out core routers?
                         
         # only grab edge routers seen from at least one of our VPs
         current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\
                               .map { |node| @db.hostname2ip[node] })
+
+        # generate pop, edge mappings; convert to ints to save memory
+        popsrcdsts = []
+        File.open(FailureIsolation::SourceDests, "r"){|f|
+            f.each_line{|line|
+                   triple = line.split 
+                   popsrcdsts << [triple[0].to_sym, [Inet::aton(triple[1]), Inet::aton(triple[2])]] \
+                        if pops_set.include? triple[0].to_sym and current_vps.include? triple[2] } #triple[1,2]] }
+        }
 
         pop2edgertrs = Hash.new { |h,k| h[k] = [] }
         popsrcdsts.each do |popsrcdst| 
             pop, srcdst = popsrcdst
             next unless pops_set.include? pop # should be included...
             src, dst = srcdst
-            next unless current_vps.include? src
-            pop2edgertrs[pop] << dst unless FailureIsolation.TargetBlacklist.include? dst
+            next unless current_vps.include? Inet::ntoa(src)
+            pop2edgertrs[pop] << Inet::ntoa(dst) unless FailureIsolation.TargetBlacklist.include? Inet::ntoa(dst)
         end
 
         @logger.debug { "edge routers generated" }
@@ -206,7 +213,7 @@ class HouseCleaner
     def refill_pops(pop2unresponsivetargets, num_rtrs_per_pop, pop2replacements, sorted_replacement_pops)
         chosen_replacements = []
         pop2unresponsivetargets.each do |pop, unresponsivetargets|
-            if pop == PoP::Unknown
+            if pop == PoP::Unknown or sorted_replacement_pops.length == 0
                 next
                 # XXX
             end
@@ -221,7 +228,7 @@ class HouseCleaner
                 # pick a new top pop, and add targets from that
                 replacement_pop = sorted_replacement_pops.shift 
 
-                while pop2replacements[replacement_pop].size < num_needed_replacements
+                while pop2replacements[replacement_pop].size < num_needed_replacements and sorted_replacement_pops.length>0
                     replacement_pop = sorted_replacement_pops.shift 
                 end
                 

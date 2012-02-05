@@ -9,6 +9,7 @@ $: << "./"
 require 'set'
 require 'isolation_utilities.rb'
 require 'yaml'
+require 'thread'
 
 # Define these in case spooftr_config.rb was not loaded
 $REV_TR_TOOL_DIR ||= "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
@@ -60,6 +61,8 @@ module FailureIsolation
     EmptyPingsLogDir = "/homes/network/revtr/revtr_logs/isolation_logs/empty_pings_logs"
 
     WartsDumpPath = "/homes/network/revtr/spoofed_traceroute/scamper/warts-dump"
+
+    TraceDataMutex = Mutex.new
 
     # Return all hops observed on most recent traceroutes from all PL nodes to
     # the given site
@@ -157,11 +160,13 @@ module FailureIsolation
     # signal is sent
     def self.grab_historical_traces
         # TODO: put traces in the DB
+        TraceDataMutex.synchronize{
         @HistoricalTraceTimestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
         @Node2Target2Trace = {}
         node2target2trace.each do |node, target2trace|
             @Node2Target2Trace[node.downcase] = target2trace 
         end
+        }
     end
     
     # ====================================
@@ -350,7 +355,7 @@ module FailureIsolation
         @TargetSet.merge(union)
 
         not_valid_ip = @TargetSet.find { |ip| !ip.matches_ip? }
-        raise "Invalid IP address in targets! #{not_valid_ip}" if not_valid_ip
+        raise "Invalid IP address in targets! Union: #{union.to_a.join(",")}\nTargetSet: #{@TargetSet.to_a.join(",")} #{not_valid_ip.inspect}" if !not_valid_ip.nil? and not_valid_ip.length>0 and not_valid_ip
 
         File.open(TargetSetPath, "w") { |f| f.puts @TargetSet.to_a.join "\n" }
 
