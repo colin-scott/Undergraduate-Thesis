@@ -34,7 +34,7 @@ class Path
         if init_hops.is_a?(Path)
             init_hops = init_hops.hops
         elsif !init_hops.is_a?(Array)
-          raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" 
+            raise "not an Array!: #{init_hops.class} #{init_hops.inspect}" 
         end
 
         if !init_hops.empty? and init_hops[0].is_a?(Symbol)
@@ -48,7 +48,8 @@ class Path
           raise "Caught #{e} #{e.backtrace}, init_hops was #{init_hops.inspect}"
       end
 
-      sanitize_hops
+      sanitize_hops!
+      canonocalize_hops!
    end
 
    # delegate methods to @hops!!!
@@ -66,10 +67,12 @@ class Path
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
    # Make sure the measuremed path is reasonable
-   def sanitize_hops()
+   def sanitize_hops!()
        # TODO: don't return... raise!
-       return if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl }
-       return if @hops.empty?
+       if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } or @hops.empty?
+            @hops = []
+            return
+       end
        get_rid_of_wonky_last_hop
        remove_redundant_dsts
        get_rid_of_trailing_zeros
@@ -86,7 +89,7 @@ class Path
             @hops = @hops[0..-2]
        end
 
-       # third case: ttls actually make sense, but there is still a long
+       # second case: ttls actually make sense, but there is still a long
        # string of 0.0.0.0s
        if @hops.size >= @@last_hop_sanity_check_distance + 1 and @hops[-1].ip != "0.0.0.0" and
                 @hops[-(@@last_hop_sanity_check_distance+1), @@last_hop_sanity_check_distance]\
@@ -94,7 +97,7 @@ class Path
             @hops = @hops[0..-2]
        end
 
-       # second case: only hop is the forty-eth
+       # third case: only hop is the forty-eth
        #   (ASSUMES no intermediate 0.0.0.0s...)
        if @hops[0].ttl.to_i == 40
            @hops = @hops[0..-2]
@@ -107,13 +110,35 @@ class Path
         while @hops.size > 1 and @hops[-1].ip == @dst and @hops[-2].ip == @dst
             @hops = @hops[0..-2]
         end
-    end
+   end
 
    # A long line of 0.0.0.0s at the end is not helpful
    def get_rid_of_trailing_zeros()
         while !@hops.empty? and @hops[-1].ip == "0.0.0.0"
             @hops = @hops[0..-2] 
         end
+   end
+      
+   # Sort hops, and fill in gaps with "0.0.0.0"s
+   def canonocalize_hops!()
+       # Sort
+       @hops.sort_by! { |hop| hop.ttl }
+
+       # Fill in gaps
+       return if @hops.empty?
+       return if @hops[-1].ttl > 45 # packet corruption perhaps...
+       @hops.each_with_index do |hop, i|
+           return if i+1 == @hops.size
+           # look ahead to the next hop
+           next_hop = @hops[i+1]
+           if next_hop.ttl != hop.ttl + 1
+                filler_hop = Hop.new
+                filler_hop.ip = "0.0.0.0"
+                filler_hop.ttl = hop.ttl + 1
+                # on next iteration, this will be the current hop
+                @hops.insert(i+1, filler_hop)
+           end
+       end
    end
 
    # We used to have a valid? flag, which made .find() calls crash. TODO: 
@@ -474,6 +499,7 @@ class Hop
     def initialize(*args)
         @ping_responsive = false
         case args.size
+        when 0 # nothing!
         when 1 # just the ip
             @ip = args.shift
         when 2 # ip, ip_info
@@ -691,14 +717,15 @@ class ReverseHop < Hop
 end
 
 class SpoofedForwardHop < Hop
-    def initialize(ip, ttl, ipInfo)
-        @ip = ip
+    def initialize(hop_ip, ttl, ipInfo)
+        raise "bad ttl #{ttl}" if ttl < 0
+        @ip = hop_ip
         @ttl = ttl
         @dns = ipInfo.resolve_dns(@ip, @ip)
         @prefix, @asn = ipInfo.getInfo(@ip)
         @formatted = ipInfo.format(@ip, @dns, @asn)
     end
-    
+
     def to_s()
         s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
         s << " (pingable from S?: #{@ping_responsive})" unless @ping_responsive.nil?
