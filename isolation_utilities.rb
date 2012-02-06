@@ -11,6 +11,7 @@ require 'thread'
 require 'forwardable'
 require 'set'
 
+
 if RUBY_PLATFORM != 'java'
   require 'inline'
 end
@@ -868,6 +869,8 @@ class LoggerLog < Log
       @myLog.info(message)
   end
 end
+
+$LOG = LoggerLog.new($stderr)
 
 
 if $0 == __FILE__
