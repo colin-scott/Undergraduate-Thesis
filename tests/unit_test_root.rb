@@ -1,3 +1,4 @@
+# Mock out all directory paths and email recipients, and initialize dependencies.
 
 $: << "../"
 
@@ -38,18 +39,31 @@ module TestVars
     # To make unit tests run faster, assume that targets haven't changed since
     # last bootup
     FailureIsolation.module_eval(%{@TargetSet = Set.new(IO.read(TargetSetPath).split("\n"))})
-
-    Controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-    Registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
-    VPs = Controller.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
+    
+    # TODO: necessary?
+    def self.Controller
+        DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
+    end
+    # TODO: necessary?
+    def self.Registrar
+        DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
+    end
+    def self.VPs
+        Controller.hosts.clone.delete_if { |h| h =~ /bgpmux/i }
+    end
     @IpInfo = nil
     def self.IpInfo()
        @IpInfo ||= IpInfo.new 
     end
-
-    Logger = LoggerLog.new($stderr)
-    DB = DatabaseInterface.new(Logger)
-    HouseCleaner = HouseCleaner.new(Logger, DB)
+    def self.Logger
+        LoggerLog.new($stderr)
+    end
+    def self.DB
+        DatabaseInterface.new(Logger)
+    end
+    def self.HouseCleaner
+        HouseCleaner.new(Logger, DB)
+    end
     @dispatcher = nil
     def self.Dispatcher
         @dispatcher ||= FailureDispatcher.new(DB, Logger, HouseCleaner, self.IpInfo)
@@ -89,22 +103,9 @@ module TestVars
        self.make_fake_log_dir(val)
     end
 
-
     # Add fake data to node2targetneverseen.yml
     targets_never_seen = {
       "pl1.rcc.uottawa.ca" => [],
-      "planetlab2.tamu.edu" => [],
-      "planetlab-1.sjtu.edu.cn" => [],
-      "planetlab3-dsl.cs.cornell.edu" => [],
-      "plgmu5.ite.gmu.edu" => [],
-      "plnode-04.gpolab.bbn.com" => [],
-      "dschinni.planetlab.extranet.uni-passau.de" => [],
-      "pli1-pa-4.hpl.hp.com" => [],
-      "planet-lab1.itba.edu.ar" => [],
-      "planetlab1.csuohio.edu" => [],
-      "planetlab2.poly.edu" => [],
-      "planetlab-01.ece.uprm.edu" => [],
-      "planetlab-1.calpoly-netlab.net" => [],
       "prin.bgpmux" => []
     }
     
