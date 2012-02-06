@@ -798,7 +798,10 @@ class FailureDispatcher
             path = ForwardPath.new(src, dst)
         else
             path = ForwardPath.new(src, dst, srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
-                SpoofedForwardHop.new(ttlrtrs, @ipInfo) 
+                # Take the first hop only for now...
+                ttl, rtrs = ttlrtrs.first
+                ip = rtrs.first
+                SpoofedForwardHop.new(ip, ttl, @ipInfo) 
             end)
         end
 

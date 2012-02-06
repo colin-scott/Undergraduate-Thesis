@@ -163,7 +163,7 @@ class HouseCleaner
         end
 
         @logger.debug { "core routers generated" }
-   # TODO: filter out core routers?
+        # TODO: filter out core routers?
                         
         # only grab edge routers seen from at least one of our VPs
         current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\

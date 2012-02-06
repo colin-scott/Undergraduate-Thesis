@@ -691,14 +691,14 @@ class ReverseHop < Hop
 end
 
 class SpoofedForwardHop < Hop
-    def initialize(ttlhops, ipInfo)
-        @ttl = ttlhops[0]
-        @ip = ttlhops[1][0]  # XXX for now, just take the first ip...
+    def initialize(ip, ttl, ipInfo)
+        @ip = ip
+        @ttl = ttl
         @dns = ipInfo.resolve_dns(@ip, @ip)
         @prefix, @asn = ipInfo.getInfo(@ip)
         @formatted = ipInfo.format(@ip, @dns, @asn)
     end
-
+    
     def to_s()
         s = "#{@ttl}.  #{(@formatted.nil?) ? "" : @formatted.clone}"
         s << " (pingable from S?: #{@ping_responsive})" unless @ping_responsive.nil?
