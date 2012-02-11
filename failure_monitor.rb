@@ -24,6 +24,9 @@ class FailureMonitor
         @logger = logger
         @email = email
         @house_cleaner = house_cleaner
+        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
+		puts @controller.inspect
+		puts @controller.hosts.inspect
 
         # TODO: handle these with optparse
         @@minutes_per_round = FailureIsolation::DefaultPeriodSeconds / 60
@@ -99,7 +102,28 @@ class FailureMonitor
         loop do
             start = Time.new
 
-            # ==================================== #                                                                                                                                 
+			# start tcpdump on hot VPs if not started yet:
+            begin
+			node2node = Hash.new
+			nodes = FailureIsolation::CurrentNodes()
+            up_hosts = @controller.hosts
+			nodes.each { |node| node2node[node] = node if up_hosts.include? node }
+			@controller.issue_command_on_hosts(node2node) do |vp, node|
+				begin
+					@logger.info("checking tcpdump on #{node}")
+					if not vp.tcpdump_is_running()
+						vp.start_tcpdump()
+					end
+				rescue Exception => e
+					@logger.warn("#{node} raised #{e}")
+				end
+			end
+            rescue Exception => e
+                @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
+            end
+
+
+            # ==================================== #
             # Grab ping state                      #
             # ==================================== #                                                                                                                                 
             # TODO: cat directly from ssh rather than scp'ing

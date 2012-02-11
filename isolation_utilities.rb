@@ -100,7 +100,7 @@ class Array
     # else, ignores elts that don't have a category
     #
     # Example Usage:
-    # ips.categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+    # ips.categorize(FailureIsolation.IPToPoPSymbol, DataSets::Unknown)
     def categorize(elt2category, unknown=nil)
         categories = Hash.new { |h,k| h[k] = [] }
         self.each do |elt|

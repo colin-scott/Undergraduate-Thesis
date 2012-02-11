@@ -16,6 +16,7 @@ require 'db_interface'
 #           of the spoofer sites)
 class HouseCleaner
     def initialize(logger=LoggerLog.new($stderr), db=DatabaseInterface.new)
+        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @logger = logger
         @db = db
     end
@@ -121,7 +122,7 @@ class HouseCleaner
 
         # (see utilities.rb for .categorize())
         core_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::HarshaPoPs]\
-            .categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+            .categorize(FailureIsolation.IPToPoPSymbol, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::HarshaPoPs] = refill_pops(core_pop2unresponsivetargets,
                                                                        FailureIsolation::CoreRtrsPerPoP,
@@ -129,7 +130,7 @@ class HouseCleaner
         @logger.debug { "Harsha PoPs substituted" }
         
         # (see utilities.rb for .categorize())
-        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPMapping, DataSets::Unknown)
+        edge_pop2unresponsivetargets = dataset2unresponsive_targets[DataSets::BeyondHarshaPoPs].categorize(FailureIsolation.IPToPoPSymbol, DataSets::Unknown)
 
         dataset2substitute_targets[DataSets::BeyondHarshaPoPs] = refill_pops(edge_pop2unresponsivetargets,
                                                                                    FailureIsolation::EdgeRtrsPerPoP,
@@ -150,20 +151,23 @@ class HouseCleaner
     #     { pop -> [edgertr1, edgertr2...] }
     def generate_top_pops(regenerate=true)
         @logger.debug { "generating top pops..." }
-        @logger.debug FailureIsolation::HarshaPoPsPath
-        system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}" if regenerate
+        if regenerate
+            @logger.debug { "Executing #{FailureIsolation::HarshaPoPsPath}" }
+            system "#{FailureIsolation::TopPoPsScripts} #{FailureIsolation::NumTopPoPs}"
+        end
 
-        sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym } 
+        # Note that pops are represented as symbols
+        sorted_pops = IO.read(FailureIsolation::TopN).split("\n").map { |line| line.split[0].to_sym }
         pops_set = Set.new(sorted_pops)
 
-        # generate pop, core mappings
+        # generate pop -> core router(s) mappings
         pop2corertrs = Hash.new { |h,k| h[k] = [] }
-        FailureIsolation.IPToPoPMapping.each do |ip, pop|
+        FailureIsolation.IPToPoPSymbol.each do |ip, pop|
             pop2corertrs[pop] << ip if pops_set.include? pop and !FailureIsolation.TargetBlacklist.include?(ip)
         end
 
         @logger.debug { "core routers generated" }
-        # TODO: filter out core routers?
+        # TODO: filter out core routers which aren't ping responsive?
                         
         # only grab edge routers seen from at least one of our VPs
         current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\
@@ -171,12 +175,14 @@ class HouseCleaner
 
         # generate pop, edge mappings; convert to ints to save memory
         popsrcdsts = []
-        File.open(FailureIsolation::SourceDests, "r"){|f|
-            f.each_line{|line|
-                   triple = line.split 
-                   popsrcdsts << [triple[0].to_sym, [Inet::aton(triple[1]), Inet::aton(triple[2])]] \
-                        if pops_set.include? triple[0].to_sym and current_vps.include? triple[2] } #triple[1,2]] }
-        }
+        File.foreach(FailureIsolation::HarshaPoPSrcDsts, "r") do |line|
+            # Format: <pop #> <PL node> <target>
+            pop, src, target = line.split 
+            pop = pop.to_sym
+            if pops_set.include? pop and current_vps.include? src
+                popsrcdsts << [pop, [Inet.aton(src), Inet.aton(dst)]]
+            end
+        end
 
         pop2edgertrs = Hash.new { |h,k| h[k] = [] }
         popsrcdsts.each do |popsrcdst| 
@@ -189,17 +195,17 @@ class HouseCleaner
 
         @logger.debug { "edge routers generated" }
 
-        currently_used_pops = Set.new(FailureIsolation.HarshaPoPs.map { |ip| FailureIsolation.IPToPoPMapping[ip] })
+        currently_used_pops = Set.new(FailureIsolation.HarshaPoPs.map { |ip| FailureIsolation.IPToPoPSymbol[ip] })
 
         sorted_replacement_pops = sorted_pops.find_all { |pop| !currently_used_pops.include? pop }
 
-            begin
-        File.open(FailureIsolation::HarshaPoPsPath, "w+"){|f| 
-            pop2corertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
-        }
-        File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+"){|f| 
-            pop2edgertrs.values.each{|ips| f.puts ips.sort_by{rand}[0]+"\n"}
-        }
+        begin
+            File.open(FailureIsolation::HarshaPoPsPath, "w+") do |f| 
+                pop2corertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
+            end
+            File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+") do |f| 
+                pop2edgertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
+            end
         rescue Exception
             @logger.info { "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}" }
         end
@@ -387,6 +393,22 @@ class HouseCleaner
         current_sites = Set.new(current_nodes.map { |node| FailureIsolation.Node2Site[node] })
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
+		# stop tcpdump on nodes being swapped out:
+		begin
+		node2node = Hash.new
+		faulty_nodes.each { |node| node2node[node] = node }
+		@controller.issue_command_on_hosts(node2node) do |vp, node|
+			@logger.warn("stopping tcpdump on #{node}")
+			begin
+				vp.stop_tcpdump()
+			rescue Exception => e
+				@logger.warn("#{node} raised #{e}")
+			end
+		end
+		rescue Exception => e
+			@logger.warn("#{e}\n#{e.backtrace.join("\n")}")
+		end
+
         faulty_nodes.each do |broken_vp|
             if !current_nodes.include? broken_vp
                 @logger.warn { "#{broken_vp} not in current node set..." }

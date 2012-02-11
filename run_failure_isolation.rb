@@ -46,6 +46,10 @@ $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to
 # Fail the main thread if any of the subthreads barf
 Thread.abort_on_exception = true
 
+# starting DRb server so we can use @controller.issue_command_on_hosts
+# added by cunha so we can get tcpdump on VPs
+DRb.start_service
+
 def allocate_modules(logger)
    ip_info = IpInfo.new
    db = DatabaseInterface.new(logger, ip_info)

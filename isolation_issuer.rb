@@ -3,85 +3,17 @@ $: << "./"
 
 require 'set'
 require 'isolation_utilities'
+require 'failure_isolation_consts'
+require 'measurement_issuers'
 
-# Issues RPCs to the controller
-module Issuer
-    class PingIssuer
-        def initialize(logger)
-            @logger = logger
-            @parser = Parsers::PingParser.new(logger)
-        end
-
-        # targets is an array of destination ips
-        # return a set of target ips that responded
-        def issue(source_hostname, targets)
-            @logger.debug { "issue_ping_request(): source #{hostname}, dests #{dests.inspect}" }
-
-            ProbeController.issue_to_controller do |controller|
-                hosts = controller.hosts
-                # TODO: raise exception instead
-                @logger.warn { "issue_ping_request(): Not registered! #{hostname}" } unless hosts.include? source_hostname
-            end
-            
-            hostname2targets = { source_hostname => dests }
-
-            ProbeController.issue_to_controller do |controller|
-                results,unsuccessful_hosts,privates,blacklisted = controller.ping(hostname2targets)
-            end
-
-            if not unsuccessful_hosts.empty?
-                @logger.warn { "issue_ping_request(), unsuccessful_hosts!: #{unsuccessful_hosts.inspect}" } 
-            end
-            
-            return @parser.parse(results)
-        end
-    end
-end
-
-# Parses raw measurment results from the controller
-module Parsers
-    class PingParser
-        def initialize(logger)
-            @logger = logger
-        end
-
-        # return a set of ips that responded
-        def parse(results)
-            # results is of the form:
-            # [["74.125.224.48 47 58 69.561996 7743\n128.208.4.244 44 58 78.731003 20416\n", "plgmu4.ite.gmu.edu"]]
-            # controller.log.info { "Ping::parse_results(), raw results: #{results.inspect}" }
-
-            responsive_ips = Set.new
-            
-            split_raw_results(results) do |target, ipid, fiftyeight, rtt, something, sender|
-                # We throw away information about the sender for now
-                responsive_ips.add target.strip
-            end
-
-            responsive_ips
-        end
-
-        # helper method. Takes a block with the following signature:
-        #   |target, ipid, fiftyeight, rtt, something, sender|
-        def split_raw_results(results)
-           results.each do |probes, sender|
-                data = probes
-                data.split("\n").each do |line|
-                    # 74.125.224.48 47 58 69.561996 7743
-                    target, ipid, fiftyeight, rtt, something = line.split
-                    yield target, ipid, fiftyeight, rtt, something, sender
-                end
-            end
-        end
-    end
-end
-
-# Top-level class for issuing measurement requests, parsing results, and
+# Isolation system's interface for measurement requests, parsing results, and
 # returning encapsulated path objects
 class MeasurementRequestor
     def initialize(logger=LoggerLog.new($stderr))
         @logger = logger
-        @ping_issuer = Issuer::PingIssuer.new(logger)
+        @ping_issuer = Issuers::PingIssuer.new(logger)
+        @trace_issuer = Issuers::TraceIssuer.new(logger)
+        @spoofed_ping_issuer = Issuers::SpoofedPingIssuer.new(logger)
     end
 
     # ============================================================ #
@@ -134,5 +66,102 @@ class MeasurementRequestor
 
         [responsive_hops, unresponsive_hops]
     end
-end
 
+    # TODO: add #check_reachbility_for_revtr!(outage) and
+    #       #check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
+
+    # ============================================================ #
+    #                         Traceroute                           #
+    # ============================================================ #
+
+    # Issue a normal traceroute from the source to a list of targets
+    # targets is an array of destination ips
+    # return a hash: 
+    #   { target -> ForwardPath object }
+    # where the ForwardPath objects are empty if the measurement was
+    # unsuccessful
+    def issue_normal_traceroutes(src, targets)
+        @trace_issuer.issue(src, targets)
+    end
+    
+    # ============================================================ #
+    #                         Spoofed Pings                        #
+    # ============================================================ #
+
+    # Issue spoofed pings from all receivers towards the destination spoofing
+    # as the source. If any of them get through, the reverse path is working
+    def issue_pings_towards_srcs(srcdst2outage)
+        srcdst2receivers = srcdst2outage.map_values { |outage| outage.receivers }
+
+        replace_receivers_for_riot!(srcdst2receivers)
+
+        insert_sanity_check_spoofed_pings!(srcdst2receivers)
+        
+        target2receiver2successful_vps = @spoofed_ping_issuer.issue(srcdst2receivers)
+
+        srcdst2outage.each do |srcdst, outage|
+            src, dst = srcdst
+            if target2receiver2successful_vps.nil? || target2receiver2successful_vps[dst].nil? ||
+                                                      target2receiver2successful_vps[dst][src].nil?
+                outage.pings_towards_src = []
+            else
+                outage.pings_towards_src = target2receiver2successful_vps[dst][src]
+            end
+        end
+            
+        log_sanity_check_spoofed_pings(srcdst2receivers, target2receiver2successful_vps, :ping)
+    end
+
+    # Helper method. BGP Mux nodes can only spoof to other BGP Mux nodes. Replace all
+    # receivers with other BGP Mux nodes.
+    def replace_receivers_for_riot!(srcdst2receivers)
+        srcdst2receivers.each do |srcdst, receivers| 
+            src, dst = srcdst
+            if FailureIsolation::PoisonerNames.include? src
+                srcdst2receivers[srcdst] = FailureIsolation::PoisonerNames - [src]
+            end
+        end
+    end
+
+    # Helper method. For all spoofed ping requests, inject a ping to
+    # c5.millenium.berkeley.edu with receiver toil.cs.washington.edu + all
+    # normal receivers. There should always be a response.
+    def insert_sanity_check_spoofed_pings!(srcdst2receivers)
+        all_receivers = srcdst2receivers.value_set.to_a
+
+        srcdst2receivers.keys.each do |srcdst|
+            src = srcdst[0]
+            sanity_check_src_dst = [src, FailureIsolation::TestSpoofPing]
+            srcdst2receivers[sanity_check_src_dst] = [FailureIsolation::TestSpoofReceiver] + all_receivers.clone
+        end
+    end
+    
+    # Helper method. Check all spoofed pings and traceroutes for a response
+    # from c5.millennium.berkeley.edu. If there was no response, log a
+    # warning.
+    def log_sanity_check_spoofed_pings(srcdst2receivers, results, type)
+        srcdst2receivers.keys.each do |srcdst|
+            src, dst = srcdst
+            
+            successful = false
+            if type == :ping
+                next if dst == FailureIsolation::TestSpoofPing
+                successful = (results.include?(FailureIsolation::TestSpoofPing) and
+                              results[FailureIsolation::TestSpoofPing].include?(src))
+            elsif type == :spooftr
+                if dst == FailureIsolation::TestSpoofPing
+                    successful = (results.include?(srcdst) and not results[srcdst].nil? and
+                                  results[srcdst][-1][1].include?(FailureIsolation::TestSpoofPing))
+                else
+                    successful = results.include?(srcdst) and not results[srcdst].nil?
+                end
+            end
+        
+            if successful
+                @logger.info { "Successful spoofed #{type} for #{src} #{dst}" }
+            else
+                @logger.info { "Failed spoofed #{type} for #{src} #{dst}" }
+            end
+        end
+    end
+end

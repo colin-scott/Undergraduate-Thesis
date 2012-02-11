@@ -333,8 +333,8 @@ module FailureIsolation
         @CloudfrontTargets = nil
         self.CloudfrontTargets
         # pops are symbols!
-        @IPToPoPMapping = nil
-        self.IPToPoPMapping
+        @IPToPoPSymbol = nil
+        self.IPToPoPSymbol
         @TargetBlacklist = nil
         self.TargetBlacklist
         @ATTTargets = nil
@@ -418,10 +418,10 @@ module FailureIsolation
 
     # Lazily evaluate IP -> Harsha's POP ID mapping
     # PoPs are symbols!
-    def self.IPToPoPMapping()
-        return  @IPToPoPMapping unless @IPToPoPMapping.nil?
-        @IPToPoPMapping = Hash.new { |h,k| PoP::Unknown }
-        @IPToPoPMapping.merge!(IO.read(IPToPoPMappingPath)\
+    def self.IPToPoPSymbol()
+        return  @IPToPoPSymbol unless @IPToPoPSymbol.nil?
+        @IPToPoPSymbol = Hash.new { |h,k| PoP::Unknown }
+        @IPToPoPSymbol.merge!(IO.read(IPToPoPMappingPath)\
                               .split("\n").map { |line| line.split }.map { |ippop| [ippop[0], ippop[1].to_sym] }.custom_to_hash)
     end
 
@@ -432,7 +432,7 @@ module FailureIsolation
     # trace.out files for the VPs passing through the top 500 pops. Format: <trace.out> <total # paths> <# paths passing through top 100 pops>. Last line is total overall.
     SelectedPaths = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/selected_paths.txt"
     # PL sources and targets for top 500 PoPs. Format: <pop #> <PL node> <target>
-    SourceDests = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
+    HarshaPoPSrcDsts = "/homes/network/revtr/spoofed_traceroute/harshas_new_targets/srcdsts.txt"
 
     # =========================
     #   aliases               #

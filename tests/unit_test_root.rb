@@ -2,6 +2,7 @@
 
 $: << "../"
 
+require 'rubygems'
 require 'failure_isolation_consts'
 require 'action_mailer'
 require 'drb'

@@ -90,7 +90,7 @@ class Registrar
 		uri=vp.uri
         @controller.log {"Register attempt: #{vp} #{uri}"}
 
-        name = (vp.responds_to?(:name)) ? vp.name : nil
+        name = (vp.respond_to?(:name)) ? vp.name : nil
 
         # could add in next line for backwards compatability
         # uri= (vp.is_a?(String) ? vp : vp.uri)
