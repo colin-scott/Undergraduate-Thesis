@@ -273,7 +273,7 @@ module FailureIsolation
     # TODO: for some reason, scp output shows up (twice)
     def self.read_in_riot_ips(remote_path)
         tmp_path = "/tmp/riot_nodes.txt"
-        system "scp #{remote_path} #{tmp_path}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+        system "scp #{remote_path} #{tmp_path}"
         ips = Set.new
 
         File.foreach(tmp_path) do |line|
@@ -284,7 +284,7 @@ module FailureIsolation
         ips
     end
 
-    MuxNodesPath = "cs@riot.cs.washington.edu:~/nodename_ip_device.txt"
+    MuxNodesPath = "cs@riot.cs.washington.edu:/home/cs/nodename_ip_device.txt"
     def self.MuxNodes
         @MuxNodes ||= self.read_in_riot_ips(MuxNodesPath)
     end
@@ -521,6 +521,8 @@ if $0 == __FILE__
     # 5
     # 5
     # 600
+
+    puts FailureIsolation.MuxNodes
 
      require 'yaml'
     #puts previous_outages.inspect

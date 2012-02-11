@@ -52,7 +52,7 @@ class FailureMonitor
         begin
             @vps_2_targets_never_seen = YAML.load_file(FailureIsolation::NonReachableTargetPath)
             raise unless @vps_2_targets_never_seen
-        rescue Exception
+        rescue Exception => e
             @vps_2_targets_never_seen = {}
 
             # unresponsive until proven otherwise
@@ -64,7 +64,7 @@ class FailureMonitor
             # [node, target] -> last time outage was observed
             @nodetarget2lastoutage = (File.readable? FailureIsolation::LastObservedOutagePath) ? YAML.load_file(FailureIsolation::LastObservedOutagePath) : {}
             raise unless @nodetarget2lastoutage.is_a?(Hash)
-        rescue Exception
+        rescue Exception => e
             @nodetarget2lastoutage = {}
         end
 
@@ -104,20 +104,20 @@ class FailureMonitor
 
 			# start tcpdump on hot VPs if not started yet:
             begin
-			node2node = Hash.new
-			nodes = FailureIsolation::CurrentNodes()
-            up_hosts = @controller.hosts
-			nodes.each { |node| node2node[node] = node if up_hosts.include? node }
-			@controller.issue_command_on_hosts(node2node) do |vp, node|
-				begin
-					@logger.info("checking tcpdump on #{node}")
-					if not vp.tcpdump_is_running()
-						vp.start_tcpdump()
-					end
-				rescue Exception => e
-					@logger.warn("#{node} raised #{e}")
-				end
-			end
+			    node2node = Hash.new
+			    nodes = FailureIsolation::CurrentNodes()
+                up_hosts = @controller.hosts
+			    nodes.each { |node| node2node[node] = node if up_hosts.include? node }
+			    @controller.issue_command_on_hosts(node2node) do |vp, node|
+			    	begin
+			    		@logger.info("checking tcpdump on #{node}")
+			    		if not vp.tcpdump_is_running()
+			    			vp.start_tcpdump()
+			    		end
+			    	rescue Exception => e
+			    		@logger.warn("#{node} raised #{e}")
+			    	end
+			    end
             rescue Exception => e
                 @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
             end
@@ -212,7 +212,7 @@ class FailureMonitor
                 yml_hash.each do |k,v|
                    hash[k.strip] = v
                 end 
-            rescue Exception
+            rescue Exception => e
                 @logger.warn { "Corrupt YAML file: #{node}" }
                 next
             end
