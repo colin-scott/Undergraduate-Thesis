@@ -31,7 +31,8 @@ Thread.abort_on_exception = true
 class Timer
     @@default_sleep_period = 10
 
-    def initialize()
+    def initialize(logger)
+        @logger = logger
         @offset2callback = {}
         @mutex = Mutex.new
          
@@ -41,9 +42,9 @@ class Timer
                 before_sleep = Time.now
                 period = calculate_sleep_period
                 begin
-                sleep period if period > 0
-                rescue Exception
-                    $stderr.puts $!.message + " " + $!.backtrace.join(" ")
+                    sleep period if period > 0
+                rescue Exception => e
+                    @logger.warn "Exception while sleeping in poisoner.. #{e} #{e.backtrace.inspect}"
                 end
                 after_sleep = Time.now
                 @offset2callback = update_times(after_sleep.to_i - before_sleep.to_i)
@@ -147,7 +148,6 @@ class PoisonLog
         # see if there was already an entry with the same
         #   -  source, destination, and direction
         already_there = @previous_outages.values.reverse.find do |log_entry|
-            $stderr.puts log_entry.inspect
             log_entry.src == src && log_entry.dst == dst && log_entry.direction == direction
         end
     end
@@ -176,7 +176,7 @@ class Poisoner
         @ip_info = ip_info
         @logger = logger
         @poison_log = PoisonLog.new(logger)
-        @timer_loop = Timer.new
+        @timer_loop = Timer.new(logger)
         @unpoison_timeout_seconds = unpoison_timeout_seconds
 
         # TODO: threshold for outage duration! Don't want to poison outages
