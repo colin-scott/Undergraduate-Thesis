@@ -3,7 +3,6 @@
 # Utilities methods, along with custom defined Monkey Wrenching to built-in
 # classes
 
-require 'isolation_module'
 require 'syslog'
 require 'date'
 require 'logger'
@@ -11,6 +10,16 @@ require 'thread'
 require 'forwardable'
 require 'set'
 
+# TODO: global variables are the devil!
+#       we should instead pass around a "utilities" object
+$EMAIL_ADDRESSES ||= ["cs@cs.washington.edu"]
+$TEXT_ADDRESSES ||= []
+$BASEDIR ||= "/homes/network/revtr/spoofed_traceroute"
+$REV_TR_TOOL_DIR ||= "#{$BASEDIR}/reverse_traceroute"
+$DATADIR ||= "#{$BASEDIR}/data"
+$PL_HOSTNAMES_W_IPS ||= "#{$DATADIR}/pl_hostnames_w_ips.txt"
+$PL_HOSTNAMES_W_SITES ||= "#{$DATADIR}/pl_hosts_w_sites.txt"
+$BLACKLIST ||= "#{$DATADIR}/blacklist"
 
 if RUBY_PLATFORM != 'java'
   require 'inline'
@@ -871,7 +880,6 @@ class LoggerLog < Log
 end
 
 $LOG = LoggerLog.new($stderr)
-
 
 if $0 == __FILE__
     puts Inet::prefix("1.2.3.4", 4)
