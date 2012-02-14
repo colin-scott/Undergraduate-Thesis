@@ -122,7 +122,7 @@ class Path
    # Sort hops, and fill in gaps with "0.0.0.0"s
    def canonocalize_hops!()
        # Sort
-       @hops.sort_by! { |hop| hop.ttl }
+       @hops = @hops.sort_by { |hop| hop.ttl }
 
        # Fill in gaps
        return if @hops.empty?
@@ -196,7 +196,7 @@ class Path
    # Are the contents of this path sane?
    # overriden by subclasses if necessary
    def valid?()
-       return @invalid_reason.nil?
+       (@invalid_reason.nil? && !(@hops.find { |h| h.is_a?(Symbol) or h.is_a?(String) }))
    end
 
    # Does this path contain a loop?

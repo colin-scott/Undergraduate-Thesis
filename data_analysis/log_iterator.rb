@@ -108,7 +108,22 @@ module LogIterator
             end
         end
 
-        threads.each { |thread| thread.get }
+        threads.each do |thread|
+            begin
+                thread.get
+            rescue Exception => e
+                # Two levels of nesting to get at the real exception!
+                 # jruby, sometimes you do weird things...
+                 begin
+                 e = e.cause if e.cause
+                 e = e.cause if e.cause
+                 rescue Exception # catch errors this generates...
+                      # What errors is it generating??? That might be good to
+                      # know ;-)
+                 end
+                 raise e
+            end
+        end
     end
 
     # Copy all log entries up to now to the snapshot directory (for consistent
@@ -119,13 +134,13 @@ module LogIterator
         FileUtils.cp(Dir.glob(FailureIsolation::IsolationResults+"/*"),  FailureIsolation::Snapshot)
     end
     
-    private
+    #private
 
     # Read a single log file, and return the unmarshalled outage
     def self.read_log(file)
         new_outage = nil
         begin
-            input = File.new(file)
+            input = File.new(file, "r")
             src, dst, dataset, direction, formatted_connected, 
                                               formatted_unconnected, pings_towards_src,
                                               tr, spoofed_tr,
@@ -153,7 +168,7 @@ module LogIterator
         end
 
         # More backwards compatibility...
-        outage.file ||= file
+        outage.file = file
         return outage 
     end
 end

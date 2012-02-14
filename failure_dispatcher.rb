@@ -264,6 +264,8 @@ class FailureDispatcher
                   e = e.cause if e.cause
                   e = e.cause if e.cause
                   rescue Exception # catch errors this generates...
+                      # What errors is it generating??? That might be good to
+                      # know ;-)
                   end
                   raise e
               else

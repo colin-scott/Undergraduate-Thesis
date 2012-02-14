@@ -21,6 +21,7 @@ Lock::acquire_lock("isolation_lock.txt")
 # TODO: These dependancies should be moved into the individual classes
 # that need them
 
+require 'isolation_module'
 require 'db_interface'
 require 'pstore'
 require 'failure_monitor'

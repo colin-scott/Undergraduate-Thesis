@@ -254,7 +254,9 @@ class Outage
         year = timestamp[0..3]
         # we know that no log is from before Feb. 12th. So it must be a single
         # digit.
-        month = timestamp[4..4] 
+        month = timestamp[4..4]
+        month = timestamp[4..5] if month == "0"
+
         days_in_month = (month == "2") ? 28 : 31
     
         timestamp = timestamp[5..-1]
@@ -269,7 +271,7 @@ class Outage
            begin
                return Time.parse("#{year}.#{month}.#{timestamp[0...1]}")
            rescue Exception
-               puts "#{year}.#{month}.#{timestamp[0...1]}"
+               $stderr.puts "Excpetion #{e} : #{year}.#{month}.#{timestamp[0...1]}"
                raise
            end
         end
@@ -300,7 +302,11 @@ class Outage
        ping_responsive_ips |= @historical_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
        ping_responsive_ips |= @historical_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
        ping_responsive_ips |= @spoofed_tr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip }
-       ping_responsive_ips |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if spoofed_revtr.valid?
+       begin
+            ping_responsive_ips |= @spoofed_revtr.find_all { |hop| hop.ping_responsive }.map { |hop| hop.ip } if @spoofed_revtr.valid?
+       rescue Exception => e
+           raise "#{@spoofed_revtr.class}  #{e}"
+       end
 
        ping_responsive_ips
    end

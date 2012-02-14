@@ -40,7 +40,7 @@ class DotGenerator
         create_dot_file(outage, dot_output)
         # TODO: once support installs graphviz on slider, I should run dot
         # locally rather than pushing the bits across the wire to toil
-        File.open(output, "w") { |f| f.puts `cat #{dot_output} | ssh cs@toil "dot -Tjpg" ` } 
+        system "dot -T jpg #{dot_output} > #{output}"
     end
 
     def create_dot_file(outage, output)
@@ -56,6 +56,7 @@ class DotGenerator
         historic_revtr = outage.historic_revtr
         additional_traces = outage.additional_traces
         upstream_reverse_paths = outage.upstream_reverse_paths
+        upstream_reverse_paths ||= []
 
         # we want to keep all 0.0.0.0's distinct in the final graph, so
         # we append this marker to each 0.0.0.0 node to keep them distinct

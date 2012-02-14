@@ -36,6 +36,9 @@ class Direction
     end
 
     def eql?(other)
+        # Violates symmetry, transitivity, blah blah blah
+        # Josh Bloch is a silly billy
+        return true if self.symbol == other
         return false if !other.respond_to?(:symbol)
         @symbol.eql? other.symbol
     end
