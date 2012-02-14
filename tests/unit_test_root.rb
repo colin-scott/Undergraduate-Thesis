@@ -2,6 +2,7 @@
 
 $: << "../"
 
+require 'isolation_module'
 require 'rubygems'
 require 'failure_isolation_consts'
 require 'action_mailer'
@@ -54,7 +55,8 @@ module TestVars
     end
     @IpInfo = nil
     def self.IpInfo()
-       @IpInfo ||= IpInfo.new 
+       @IpInfo = IpInfo.new if not @IpInfo
+       @IpInfo
     end
     def self.Logger
         LoggerLog.new($stderr)
