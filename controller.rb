@@ -174,122 +174,6 @@ class Registrar
          end
         return results
     end
-
-    # default ttl range is (1..30)
-    def client_spoofed_traceroute(source, dests, receivers=nil, already_registered=false)
-        if receivers.nil?
-            receivers = @controller.hosts.clone[0..5] # TODO: randomize the receivers
-            # XXX 5 is a magic number
-            #
-        end
-
-        pingspoof_interface(source, dests, receivers, already_registered) do |hostname, dests, receivers|
-            SpoofedTR::sendProbes(hostname, dests, receivers, @controller)
-        end
-    end
-
-    def batch_spoofed_traceroute(srcdst2stillconnected)
-        SpoofedTR::sendBatchProbes(srcdst2stillconnected, @controller)
-    end
-
-    def receive_batched_spoofed_pings(srcdst2stillconnected)
-        SpoofedPing::receiveBatchProbes(srcdst2stillconnected, @controller)
-    end
-
-    # sends out spoofed pings from all other nodes as this source 
-    # This is only temporary so that we can play around with outages by hand before
-    # we build the full blown system
-    def receive_all_spoofed_pings(source, dests, already_registered=false)
-        receive_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
-    end
-
-    # sends out spoofed pings from the given set of nodes as the source 
-    def receive_spoofed_pings(source, dests, spoofers, already_registered=false)
-        pingspoof_interface(source, dests, spoofers, already_registered) do |hostname, dests, spoofers|
-            SpoofedPing::receiveProbes(hostname, dests, spoofers, @controller)
-        end
-    end
-
-    def send_all_spoofed_pings(source, dests, already_registered=false)
-        send_spoofed_pings(source, dests, @controller.hosts.clone, already_registered)
-    end
-
-    def send_spoofed_pings(source, dests, receivers, already_registered=false)
-        pingspoof_interface(source, dests, receivers, already_registered) do |hostname, dests, receivers|
-            SpoofedPing::sendProbes(hostname, dests, receivers, @controller)
-        end
-    end
-
-    def ping(source, dests, already_registered=false)
-        # reduuundanttt
-        if !already_registered
-           register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
-           # we want an exception to be thrown back at the client
-        end
-
-        results = Ping::sendProbes(source, dests, @controller)
-
-        begin
-           unregister(source) unless already_registered
-        rescue Exception
-           @controller.log  { "Unable to unregister #{source}: #{$!}" }
-           return
-        end
-
-        results
-    end
-
-    # returns hash
-    #   src -> [pingable dsts] # precondition: all srcs and dsts already registered
-    def all_pairs_ping(srcs, dsts)
-        return Ping::all_pairs_ping(srcs,dsts,@controller)
-    end
-
-    # TODO: automatically check if the VP is already registered
-    def traceroute(source, dests, already_registered=false)
-        # reduuundanttt
-        if !already_registered
-           register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
-           # we want an exception to be thrown back at the client
-        end
-
-        results = Traceroute::sendProbes(source, dests, @controller)
-
-        begin
-           unregister(source) unless already_registered
-        rescue Exception
-           @controller.log { "Unable to unregister #{source}: #{$!}" }
-           return
-        end
-
-        results
-    end
-
-    private
-
-    def pingspoof_interface(source, dests, helper_vps, already_registered, &block)
-        raise ArgumentError.new "Cannot distinguish more than 2047 paths at once" if dests.size > 2047
-        hostname = source.is_a?(String) ? source : source.hostname
-        helper_vps.delete(hostname) if helper_vps.is_a?(Array)
-
-        if !already_registered
-           register_result = register(source) # may throw exception (back at the caller? --not sure how Drb handles this)
-           # we want an exception to be thrown back at the client
-        end
-
-        $pl_host2ip["toil.cs.washington.edu"] = "128.208.4.244" # XXX
-        
-        results = block.call(hostname, dests, helper_vps)
-
-        begin
-           unregister(source) unless already_registered
-        rescue Exception
-           @controller.log { "Unable to unregister #{source}: #{$!}" }
-           return
-        end
-         
-        return results
-    end
 end
 
 # issues:
@@ -1299,10 +1183,6 @@ require options[:config]
 require 'file_lock'
 Lock::acquire_lock("controller_lock.txt") unless options[:actual_test]
 
-require "#{$REV_TR_TOOL_DIR}/spoofed_traceroute"
-require "#{$REV_TR_TOOL_DIR}/traceroute"
-require "#{$REV_TR_TOOL_DIR}/spoofed_ping"
-require "#{$REV_TR_TOOL_DIR}/ping"
 `mkdir /tmp/revtr`
 $stderr_FILE="/tmp/revtr/controller.out"
 
@@ -1363,15 +1243,6 @@ Signal.trap("TERM"){
 Signal.trap("KILL"){ 
     registrar_drb.stop_service
     c.shutdown(9) 
-}
-
-# reload modules
-Signal.trap("USR1"){
-    c.log { "reloading modules.." }
-    load "#{$REV_TR_TOOL_DIR}/spoofed_traceroute.rb"
-    load "#{$REV_TR_TOOL_DIR}/traceroute.rb"
-    load "#{$REV_TR_TOOL_DIR}/spoofed_ping.rb"
-    load "#{$REV_TR_TOOL_DIR}/ping.rb"
 }
 
 ## mem usage

@@ -31,6 +31,7 @@ require 'isolation_utilities.rb'
 require 'db_interface'
 require 'failure_isolation_consts'
 require 'fileutils'
+require 'measurement_issuers'
 
 class Suspect
     attr_accessor :ip, :outage
@@ -45,8 +46,7 @@ end
 #   - takes a MergedOutage object as param
 #   - returns a set of suspects
 class Initializer
-    def initialize(registrar=nil, db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
-        @registrar = registrar
+    def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr))
         @db = db
         @logger = logger
 
@@ -159,10 +159,10 @@ end
 #   - takes an immutable set of suspects, and a MergedOutage object
 #   - returns a list of suspects to remove from the suspect set
 class Pruner
-    def initialize(registrar, db, logger)
-        @registrar = registrar
+    def initialize(db, logger)
         @db = db
         @logger = logger
+        @ping_issuer = Issuers::PingIssuer.new(logger)
     end
 
     # To specify an order for your methods to be executed in, add method names here, first to last
@@ -226,8 +226,7 @@ class Pruner
         if((srcs & FailureIsolation::PoisonerNames).empty?)
             responsive_targets = issue_pings_with_pptasks(srcs, suspect_set.to_a)
         else
-            src2pingable = @registrar.all_pairs_ping(srcs, suspect_set.to_a)
-            responsive_targets = src2pingable.value_set.to_a
+            responsive_targets = @ping_issuer.issue(srcs, suspect_set.to_a)
         end
 
         if !suspect_set.empty? and (responsive_targets.nil? or responsive_targets.empty?)

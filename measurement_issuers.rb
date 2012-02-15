@@ -50,11 +50,17 @@ module Issuers
             @parser = Parsers::PingParser.new(logger)
         end
 
+        # first arg may either be a single hostname, or a list of hostnames
         # targets is an array of destination ips
         # return a set of target ips that responded
-        def issue(source_hostname, targets)
-            hostname2targets = { source_hostname => targets }
-            controller_results = Issuers.issue([source_hostname],hostname2targets,:ping,@logger)
+        def issue(source_or_sources, targets)
+            sources = source_or_sources.is_a?(Array) ? source_or_sources : [source_or_sources]
+
+            hostname2targets = {}
+            sources.each do |source|
+                hostname2targets[source] = targets.clone
+            end
+            controller_results = Issuers.issue(sources,hostname2targets,:ping,@logger)
             return @parser.parse(controller_results)
         end
     end
@@ -145,6 +151,7 @@ module Issuers
         # targets is an array of destination ips
         # returns a nested hash:
         #   target -> { receiver => [succesful sender1, succesful sender2...] }
+        # guarenteed to include every target
         def issue(srcdst2receivers)
             # We insert a start and end ttl of 30, then piggyback on
             # controller.spoof_tr
@@ -162,7 +169,7 @@ module Issuers
 
         # dests is an array of destination ips
         # return a hash: 
-        #   { dest ip -> ForwardPath object }
+        #   { [src,dst] -> ForwardPath object }
         # where the ForwardPath objects are empty if the measurement was
         # unsuccessful
         #

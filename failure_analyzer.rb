@@ -54,24 +54,24 @@ end
 #
 # essentially, acts on Outage objects which already have data fields filled in
 class FailureAnalyzer
-    def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr), registrar=nil, db=DatabaseInterface.new)
+    def initialize(ipInfo=IpInfo.new, logger=LoggerLog.new($stderr), db=DatabaseInterface.new)
         @ipInfo = ipInfo
         @logger = logger
 
-        load_suspect_set_processors(ipInfo, logger, registrar, db)
+        load_suspect_set_processors(ipInfo, logger, db)
     end
 
     # Grab initializer and pruner methods
     # TODO: reload me whenever the data is read in again
-    def load_suspect_set_processors(ipInfo, logger, registrar, db)
+    def load_suspect_set_processors(ipInfo, logger, db)
         # Gather initializer methods from the Initializer class
-        @initializer = Initializer.new(registrar, db, logger)
+        @initializer = Initializer.new(db, logger)
         # .public_methods(false) excludes superclass methods
         public_methods = @initializer.public_methods(false)
         @suspect_set_initializers = public_methods.uniq.map { |m| @initializer.method m }
 
         # Gather pruner methods from the Pruner class
-        @pruner = Pruner.new(registrar, db, logger)
+        @pruner = Pruner.new(db, logger)
         @suspect_set_pruners = Pruner::OrderedMethods.uniq.map { |m| @pruner.method m }
     end
 

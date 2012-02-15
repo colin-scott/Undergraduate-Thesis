@@ -10,6 +10,7 @@ require 'isolation_mail'
 require 'socket'
 require 'isolation_utilities.rb'
 require 'db_interface'
+require 'drb'
 
 # Invariant:
 #    - Never monitor a site that already has a monitoring node (only the rest

@@ -23,6 +23,7 @@ require 'filters'
 require 'pstore'
 require 'timeout'
 require 'house_cleaner'
+require 'isolation_issuer'
 
 $TEST_THREADS = false
 if RUBY_PLATFORM == "java"
@@ -46,8 +47,6 @@ class FailureDispatcher
     def initialize(db=DatabaseInterface.new, logger=LoggerLog.new($stderr), house_cleaner=HouseCleaner.new, ip_info=IpInfo.new)
         @logger = logger
         @house_cleaner = house_cleaner
-        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-        @registrar = DRb::DRbObject.new_with_uri(FailureIsolation::RegistrarUri)
 
         # TODO: will this ACL work with the new ruby upgrade?
         acl=ACL.new(%w[deny all
@@ -59,18 +58,14 @@ class FailureDispatcher
 
         # Only allow one thread at a time to access Dave's DRB server
         @drb_mutex = Mutex.new
-        # Only allow one thread at a time to issue spoofed traceroutes (needed
-        # since spoofer ids must be unique. TODO: integrate Italo's spoofer id
-        # fixes so that this isn't necessary)
-        @spoof_tr_mutex = Mutex.new
-
+        
         connect_to_drb() # sets @rtrSvc
         @have_retried_connection = false # so that multiple threads don't try to reconnect to DRb
 
         @ipInfo = ip_info
         @db = db
-
-        @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @registrar, @db)
+        @isolation_issuer = MeasurementRequestor.new(@logger, @ipInfo)
+        @failure_analyzer = FailureAnalyzer.new(@ipInfo, @logger, @db)
 
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)
@@ -106,10 +101,16 @@ class FailureDispatcher
     #
     # Send a warning email if no VPs are registered or all VPs are quarentined
     def sanity_check_registered_vps
-        registered_vps = @controller.hosts.clone
+        registered_vps = []
+        under_quarantine = []
+        ProbeController.issue_to_controller do |controller|
+            registered_vps = controller.hosts.clone
+            under_quarantine = controller.under_quarantine.clone
+        end
+
         if registered_vps.empty?
             Emailer.isolation_exception("No VPs are registered with the controller!").deliver
-        elsif Set.new(@controller.under_quarantine) == Set.new(registered_vps)
+        elsif Set.new(under_quarantine) == Set.new(registered_vps)
             Emailer.isolation_exception("All VPs are quarentined!").deliver
         end
 
@@ -157,7 +158,8 @@ class FailureDispatcher
         
         # quickly isolate the directions of the failures
         measurement_times << ["spoof_ping", Time.new]
-        issue_pings_towards_srcs(srcdst2outage)
+        # mutates outage.pings_towards_srcs
+        @isolation_issuer.issue_pings_towards_srcs!(srcdst2outage)
         @logger.debug { "pings towards source issued" }
 
         # if we control one of the targets, (later) send out spoofed traceroutes in
@@ -167,7 +169,7 @@ class FailureDispatcher
 
         # we check the forward direction by issuing spoofed traceroutes (which subsume spoofed pings)
         measurement_times << ["spoof_tr", Time.new]
-        issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage)
+        @isolation_issuer.issue_spoofed_traceroutes!(srcdst2outage, dstsrc2outage)
         @logger.debug { "spoofed traceroute issued" }
 
         # Now thread out on each src,dst pair, and issue the remaining
@@ -196,6 +198,7 @@ class FailureDispatcher
             # have them in the future
             t = Time.new
             
+            # join on threads
             grab_thread_results(outage_threads)
             
             t_prime = Time.new
@@ -261,11 +264,11 @@ class FailureDispatcher
                   # Two levels of nesting to get at the real exception!
                   # jruby, sometimes you do weird things...
                   begin
-                  e = e.cause if e.cause
-                  e = e.cause if e.cause
+                    e = e.cause if e.cause
+                    e = e.cause if e.cause
                   rescue Exception # catch errors this generates...
-                      # What errors is it generating??? That might be good to
-                      # know ;-)
+                    # What errors is it generating??? That might be good to
+                    # know ;-)
                   end
                   raise e
               else
@@ -276,14 +279,16 @@ class FailureDispatcher
       end
     end
 
+    # Invariant: there should always be a one-to-one mapping between trackers and outages
     def assert_no_outage_loss(num_passed_outages, srcdst2filter_tracker)
-       # There should always be a one-to-one mapping between trackers and outages
        num_passed_trackers = srcdst2filter_tracker.find_all { |srcdst, filter_tracker| filter_tracker.passed? }.size
        if num_passed_outages != num_passed_trackers
            @logger.warn { "# of passed outages (#{num_passed_outages}) != # of passed filters (#{num_passed_trackers}) #{caller[0..3]}" }
        end
     end
 
+    # At the end of the measurement pipeline, swap out nodes with consistent
+    # empty pings
     def swap_out_faulty_nodes(srcdst2filter_tracker)
         sources_to_swap = Set.new
         srcdst2filter_tracker.each do |srcdst, tracker|
@@ -386,7 +391,7 @@ class FailureDispatcher
         gather_measurements(outage, filter_tracker)
 
         # turn into a linked list ( I think? )
-        outage.build
+        outage.build!
 
         if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker)
             # Generate a DOT graph
@@ -425,7 +430,6 @@ class FailureDispatcher
     # Run analaysis on the merged_outage object with FailureAnalyzer
     def analyze_measurements(merged_outage)
         #TODO: move all of these method sigatures to take a single outage
-        #object 
         @failure_analyzer.identify_faults(merged_outage)
 
         merged_outage.each do |outage|
@@ -466,7 +470,7 @@ class FailureDispatcher
         # maybe not accurate given multiple threads, but fukit
         tr_time = Time.new
         outage.measurement_times << ["tr_time", tr_time]
-        outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+        outage.tr = @isolation_issuer.issue_normal_traceroutes(outage.src, outage.dst)[outage.dst]
 
         @logger.debug { "traceroutes issued" }
 
@@ -476,7 +480,7 @@ class FailureDispatcher
             restart_atd(outage.src)
             sleep 10
             tr_time2 = Time.new
-            outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
+            outage.tr = @isolation_issuer.issue_normal_traceroutes(outage.src, outage.dst)[outage.dst]
             if outage.tr.empty?
                 @logger.warn { "traceroute still empty! (#{outage.src}, #{outage.dst})" } 
                 @node_2_failed_measurements[outage.src] += 1
@@ -495,8 +499,8 @@ class FailureDispatcher
 
             3.times do 
                 sleep 30
-                outage.tr = issue_normal_traceroutes(outage.src, [outage.dst])[outage.dst]
-                issue_spoofed_traceroutes({[outage.src,outage.dst] => outage})
+                outage.tr = @isolation_issuer.issue_normal_traceroutes(outage.src, outage.dst)[outage.dst]
+                @isolation_issuer.issue_spoofed_traceroutes!({[outage.src,outage.dst] => outage})
 
                 break if !outage.paths_diverge?
                 measurements_reissued += 1
@@ -511,7 +515,7 @@ class FailureDispatcher
         outage.measurement_times << ["non-revtr pings", Time.new]
         # Note that outage.ping_responsive() is computed on demand. The return
         # value here is only used to check if need to reissue pings
-        responsive_hops, non_responsive_hops = check_reachability!(outage)
+        responsive_hops, non_responsive_hops = @isolation_issuer.check_reachability!(outage)
         responsive_ips, non_responsive_ips = hops_to_uniq_ips(responsive_hops), hops_to_uniq_ips(non_responsive_hops)
 
         @logger.debug { "non-revtr pings issued" }
@@ -523,7 +527,7 @@ class FailureDispatcher
             @node2emptypings[outage.src].push_empty
             restart_atd(outage.src)
             sleep 10
-            responsive_hops, non_responsive_hops = check_reachability!(outage)
+            responsive_hops, non_responsive_hops = @isolation_issuer.check_reachability!(outage)
             responsive_ips, non_responsive_ips = hops_to_uniq_ips(responsive_hops), hops_to_uniq_ips(non_responsive_hops)
             if responsive_ips.empty?
                 @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips)" } 
@@ -537,7 +541,7 @@ class FailureDispatcher
         end
 
         outage.measurement_times << ["pings_to_nonresponsive_hops", Time.new]
-        check_pingability_from_other_vps!(outage.connected, non_responsive_hops)
+        @isolation_issuer.check_pingability_from_other_vps!(outage.connected, non_responsive_hops)
 
         @logger.debug { "pings to non-responsive hops issued" }
 
@@ -556,7 +560,7 @@ class FailureDispatcher
         if outage.spoofed_revtr.valid?
             # Issue pings to all hops on the spoofed revtr
            outage.measurement_times << ["revtr pings", Time.new]
-           check_reachbility_for_revtr!(outage)
+           @isolation_issuer.check_reachbility_for_revtr!(outage)
 
            @logger.debug { "revtr pings issued" }
         end
@@ -571,7 +575,7 @@ class FailureDispatcher
 
         # Issue ground truth measurements (forward path from dst -> src)
         if outage.symmetric
-            outage.dst_tr = issue_normal_traceroutes(outage.dst_hostname, [outage.src_ip])[outage.src_ip]
+            outage.dst_tr = @isolation_issuer.issue_normal_traceroutes(outage.dst_hostname, outage.src_ip)[outage.src_ip]
             @logger.debug { "destination's tr issued. valid?:#{outage.dst_tr.valid?}" }
 
             splice_alternate_paths(outage)
@@ -586,6 +590,7 @@ class FailureDispatcher
         end
     end
 
+    # Convert list of hop objects to list of uniq ip addresses
     def hops_to_uniq_ips(hops)
         Set.new(hops.map { |h| h.ip })
     end
@@ -599,6 +604,7 @@ class FailureDispatcher
     end
 
     # Generate a DOT graph for a given (src, dst) outage 
+    # TODO: move me into mkdot.rb
     def generate_jpg(outage)
         # TODO: put this into its own function
         jpg_output = "#{FailureIsolation::DotFiles}/#{outage.log_name}.jpg"
@@ -619,25 +625,8 @@ class FailureDispatcher
         "http://revtr.cs.washington.edu/isolation_graphs/#{subdir}/#{basename}"
     end
 
-    ## For all reachable hops /beyond/ the suspected failure, issue a
-    ## traceroute to them from the source to see how the paths differ
-    #def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
-    #                                    historical_tr, spoofed_revtr, historical_revtr)
-    #    return {} if suspected_failure.nil?
-
-    #    pingable_targets = @failure_analyzer.pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
-    #    pingable_targets |= @failure_analyzer.pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
-
-    #    pingable_targets.map! { |hop| hop.ip }
-
-    #    @logger.debug { "pingable_targets, #{Time.now} #{pingable_targets.inspect}" }
-
-    #    targ2trace = issue_normal_traceroutes(src, pingable_targets)
-
-    #    targ2trace
-    #end
-
     # Fetch the most recent historical revtr from Dave's database
+    # TODO: move me somewhere else
     def fetch_historical_revtr(src,dst)
         @logger.debug { "fetch_historical_revtr(#{src}, #{dst})" }
 
@@ -677,159 +666,6 @@ class FailureDispatcher
         # todoc: why is this a nested array?
         [ForwardPath.new(src, dst, historical_tr_ttlhoptuples.map { |ttlhop| HistoricalForwardHop.new(ttlhop[0], ttlhop[1], @ipInfo) }),
             historical_trace_timestamp]
-    end
-
-    # BGP Mux nodes can only spoof to other BGP Mux nodes. Replace all
-    # receivers with other BGP Mux nodes.
-    def replace_receivers_for_riot!(srcdst2receivers)
-        # ==================================== #
-        #   riot specific!                     #
-        # ==================================== #
-        srcdst2receivers.each do |srcdst, receivers| 
-            # Mux monitors can only spoof to other Mux monitors
-            src, dst = srcdst
-            if FailureIsolation::PoisonerNames.include? src
-                srcdst2receivers[srcdst] = FailureIsolation::PoisonerNames - [src]
-            end
-        end
-    end
-
-    def insert_sanity_check_spoofed_pings!(srcdst2receivers)
-        all_receivers = srcdst2receivers.value_set.to_a
-
-        srcdst2receivers.keys.each do |srcdst|
-            src = srcdst[0]
-            sanity_check_src_dst = [src, FailureIsolation::TestSpoofPing]
-
-            # To sanity check the lack of reverse path outages, insert
-            # c5.millennium.berkeley.edu as a target and pl05 as a receiver,
-            # and log how often those spoofed pings go through.
-            srcdst2receivers[sanity_check_src_dst] = [FailureIsolation::TestSpoofReceiver] + all_receivers.clone
-        end
-    end
-
-    def log_sanity_check_spoofed_pings(srcdst2receivers, results, type)
-        srcdst2receivers.keys.each do |srcdst|
-            src, dst = srcdst
-			
-			successful = false
-            if type == :ping
-            	next if dst == FailureIsolation::TestSpoofPing
-                successful = (results.include?(FailureIsolation::TestSpoofPing) and
-                              results[FailureIsolation::TestSpoofPing].include?(src))
-            elsif type == :spooftr
-            	if dst == FailureIsolation::TestSpoofPing
-					successful = (results.include?(srcdst) and not results[srcdst].nil? and
-								  results[srcdst][-1][1].include?(FailureIsolation::TestSpoofPing))
-				else
-					successful = results.include?(srcdst) and not results[srcdst].nil?
-				end
-            end
-
-            if successful
-                @logger.info { "Successful spoofed #{type} for #{src} #{dst}" }
-            else
-                @logger.info { "Failed spoofed #{type} for #{src} #{dst}" }
-            end
-        end
-    end
-
-    # Issue spoofed pings from all receivers towards the destination spoofing
-    # as the source. If any of
-    # them get through, the reverse path is working
-    def issue_pings_towards_srcs(srcdst2outage)
-        srcdst2receivers = srcdst2outage.map_values { |outage| outage.receivers }
-
-        replace_receivers_for_riot!(srcdst2receivers)
-
-        insert_sanity_check_spoofed_pings!(srcdst2receivers)
-        
-        # hash is target2receiver2succesfulvps
-        spoofed_ping_results = @registrar.receive_batched_spoofed_pings(srcdst2receivers)
-
-        @logger.debug { "issue_pings_towards_srcs, spoofed_ping_results: #{spoofed_ping_results.inspect}" }
-
-        srcdst2outage.each do |srcdst, outage|
-            src, dst = srcdst
-            if spoofed_ping_results.nil? || spoofed_ping_results[dst].nil? || spoofed_ping_results[dst][src].nil?
-                outage.pings_towards_src = []
-            else
-                outage.pings_towards_src = spoofed_ping_results[dst][src]
-            end
-        end
-            
-        log_sanity_check_spoofed_pings(srcdst2receivers, spoofed_ping_results, :ping)
-    end
-
-    # Issue spoofed traceroutes from all sources to all respective
-    # destinations
-    def issue_spoofed_traceroutes(srcdst2outage, dstsrc2outage={})
-        @spoof_tr_mutex.synchronize do
-            # merging for symmetric outages
-            # TODO: add in the other node as the receiver, since we have
-            # control over it?
-            merged_srcdst2outage = dstsrc2outage.merge(srcdst2outage)
-            
-            # TODO: send spoofed pings to all receivers?
-            srcdst2stillconnected = merged_srcdst2outage.map_values { |outage| outage.receivers }
-            replace_receivers_for_riot!(srcdst2stillconnected)
-
-            # TODO: this isn't just a ping to the test IP -- it's a full
-            # spoofed traceroute...
-            insert_sanity_check_spoofed_pings!(srcdst2stillconnected)
-
-            # Issue spoofed trs all at once to ensure unique spoofer ids
-            srcdst2sortedttlrtrs = @registrar.batch_spoofed_traceroute(srcdst2stillconnected)
-                                                
-            srcdst2outage.each do |srcdst, outage|
-                outage.spoofed_tr = retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
-            end
-
-            dstsrc2outage.each do |dstsrc, outage|
-                outage.dst_spoofed_tr = retrieve_spoofed_tr(dstsrc, srcdst2sortedttlrtrs)
-            end
-
-            log_sanity_check_spoofed_pings(srcdst2stillconnected, srcdst2sortedttlrtrs, :spooftr)
-        end
-    end
-
-    # Enapsulate a list of ttlrtrs into a SpoofedForwardHop object.
-    def retrieve_spoofed_tr(srcdst, srcdst2sortedttlrtrs)
-        src, dst = srcdst
-        if srcdst2sortedttlrtrs.nil? || srcdst2sortedttlrtrs[srcdst].nil?
-            path = ForwardPath.new(src, dst)
-        else
-            path = ForwardPath.new(src, dst, srcdst2sortedttlrtrs[srcdst].map do |ttlrtrs|
-                # Take the first hop only for now...
-                ttl, rtrs = ttlrtrs.first
-                ip = rtrs.first
-                SpoofedForwardHop.new(ip, ttl, @ipInfo) 
-            end)
-        end
-
-        path
-    end
-
-    # Issue a normal traceroute from the source to single target
-    #
-    # precondition: targets is a single element array. Not sure why this is
-    def issue_normal_traceroutes(src, targets)
-        # Issue spoofed trs all at once to ensure unique spoofer ids
-        dest2ttlhoptuples = @registrar.traceroute(src, targets, true)
-
-
-        # TODO: this parsing should be done directly in tracerouter.rb
-        targ2paths = {}
-
-        targets.each do |targ|
-            if dest2ttlhoptuples.nil? || dest2ttlhoptuples[targ].nil?
-                targ2paths[targ] = ForwardPath.new(src, targ)
-            else
-                targ2paths[targ] = ForwardPath.new(src, targ, dest2ttlhoptuples[targ].map {|ttlhop| ForwardHop.new(ttlhop, @ipInfo)})
-            end
-        end
-
-        targ2paths 
     end
 
     # Issue a revtr. Use historical hops for symmetry assumptions optionally. 
@@ -897,78 +733,6 @@ class FailureDispatcher
         return SpoofedReversePath.new(src, dst, revtr)
     end
 
-    # We would like to know whether the hops on the historicalfoward/reverse/historicalreverse paths
-    # are pingeable from the source. Send pings, update
-    # hop.ping_responsive, and return the responsive pings
-    def check_reachability!(outage)
-        all_hop_sets = [[Hop.new(outage.dst), Hop.new(FailureIsolation::TestPing)], outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
-
-        for hop in outage.historical_tr
-            all_hop_sets << hop.reverse_path if !hop.reverse_path.nil? and hop.reverse_path.valid?
-        end
-
-        request_pings(outage, all_hop_sets)
-    end
-    
-    # we check reachability separately for the revtr hops, since the revtr can take an
-    # excrutiatingly long time to execute sometimes
-    def check_reachbility_for_revtr!(outage)
-        if outage.revtr.valid?
-           return request_pings(outage, [outage.revtr]) 
-        else
-           return [[], []]
-        end
-    end
-
-    # Helper method.
-    def request_pings(outage, all_hop_sets)
-        source = outage.src
-        all_hop_ips = Set.new
-        all_hop_sets.each { |hops| all_hop_ips |= (hops.map { |hop| hop.ip }) }
-
-        responsive_ips = @registrar.ping(source, all_hop_ips.to_a, true)
-        responsive_ips ||= []
-        @logger.debug { "Responsive to ping: #{responsive_ips.inspect}" }
-
-        responsive_hops = []
-        unresponsive_hops = []
-        
-        # update hop reachability, and gather lists of responsive/unresponsive hops
-        all_hop_sets.each do |hop_set|
-            hop_set.each do |hop|
-                hop.ping_responsive = responsive_ips.include? hop.ip 
-                if hop.ping_responsive
-                    responsive_hops << hop
-                else
-                    unresponsive_hops << hop
-                end
-            end
-        end
-
-        [responsive_hops, unresponsive_hops]
-    end
-
-    # Are the hops reachable from VPs other than the source?
-    def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
-        # there might be multiple hops with the same ip, so we can't have a
-        # nice hashmap from ips -> hops
-        targets = non_responsive_hops.map { |hop| hop.ip }
-
-        # there might be multiple hops with the same ip, so we can't have a
-        # nice hashmap from ips -> hops
-        targets = non_responsive_hops.map { |hop| hop.ip }
-
-        src2reachable = @registrar.all_pairs_ping(connected_vps, targets)
-
-        pingable_ips = src2reachable.value_set.to_a
-
-        non_responsive_hops.each do |hop|
-            hop.reachable_from_other_vps = pingable_ips.include? hop.ip
-        end
-
-        pingable_ips
-    end
-
     # 2. In the intro, we claim that routing problems where
     # a working policy-compliant path exists, but networks
     # instead route along a different path that fails to deliver
@@ -1017,15 +781,15 @@ class FailureDispatcher
 
           # ping ingress from s and d to reach reachbilitity
           @logger.debug { "splice_alternate_paths() issuing pings" }
-          pingable_ips = check_pingability_from_other_vps!([outage.src, outage.dst_hostname], [ingress])
+          pingable_ips = @isolation_issuer.check_pingability_from_other_vps!([outage.src, outage.dst_hostname], [ingress])
           return unless pingable_ips.include? ingress.ip
 
           @logger.debug { "splice_alternate_paths() ingress router reachable" }
 
-          src_trace_to_ingress = issue_normal_traceroutes(outage.src, [ingress.ip])[ingress.ip]
+          src_trace_to_ingress = @isolation_issuer.issue_normal_traceroutes(outage.src, ingress.ip)[ingress.ip]
           @logger.debug { "normal trace: #{src_trace_to_ingress}" }
           return unless src_trace_to_ingress.valid?
-          # TODO: normal revtr
+          # TODO: normal revtr rather than spoofed
           dst_revtr_from_ingress = issue_revtr(outage.dst_hostname, ingress.ip, [], false)
           @logger.debug { "dst revtr: #{dst_revtr_from_ingress}" }
           return unless dst_revtr_from_ingress.valid?
@@ -1044,6 +808,7 @@ class FailureDispatcher
     # to check historial reahability.
     #
     # TODO: Am I giving Ethan all of these hops properly?
+    # TODO: move me somewhere else
     def fetch_historical_pingability!(outage)
         all_hop_sets = [outage.historical_tr, outage.spoofed_tr, outage.historical_revtr]
 
@@ -1069,17 +834,22 @@ class FailureDispatcher
 
     # see outage.rb
     def log_srcdst_outage(outage)
+        # TODO: use pstore instead of individual files
+        #       or MySQL
         log_outage(outage, FailureIsolation::IsolationResults)
     end
 
     # see outage.rb
     def log_merged_outage(outage)
+        # TODO: use pstore instead of individual files
+        #       or MySQL
         log_outage(outage, FailureIsolation::MergedIsolationResults)
     end
 
     # Helper method
     def log_outage(outage, path)
         # TODO: use pstore instead of individual files
+        #       or MySQL
         filename = outage.file
         File.open(path+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
     end
@@ -1131,11 +901,11 @@ class EmptyStats
 end
 
 if $TEST_THREADS
-foo = lambda do
-while true
-    puts "Foo!"
-    sleep 1
-end
+    foo = lambda do
+    while true
+        puts "Foo!"
+        sleep 1
+    end
 end
     thread = $executor.submit(&foo)
     puts #{TimeUnit.values.inspect}  

@@ -375,7 +375,7 @@ class Outage
    end
 
    # Our fake builder pattern
-   def build()
+   def build!()
         insert_measurement_durations
         link_listify!
    end

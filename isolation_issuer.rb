@@ -9,11 +9,18 @@ require 'measurement_issuers'
 # Isolation system's interface for measurement requests, parsing results, and
 # returning encapsulated path objects
 class MeasurementRequestor
-    def initialize(logger=LoggerLog.new($stderr))
+    def initialize(logger=LoggerLog.new($stderr),ip_info=IpInfo.new)
         @logger = logger
+        @ip_info = ip_info
+        # Only allow one thread at a time to issue spoofed traceroutes (needed
+        # since spoofer ids must be unique. TODO: integrate Italo's spoofer id
+        # fixes so that this isn't necessary)
+        @spoof_tr_mutex = Mutex.new
+
         @ping_issuer = Issuers::PingIssuer.new(logger)
-        @trace_issuer = Issuers::TraceIssuer.new(logger)
+        @trace_issuer = Issuers::TraceIssuer.new(logger,@ip_info)
         @spoofed_ping_issuer = Issuers::SpoofedPingIssuer.new(logger)
+        @spoofed_trace_issuer = Issuers::SpoofedTraceIssuer.new(logger,@ip_info)
     end
 
     # ============================================================ #
@@ -37,6 +44,32 @@ class MeasurementRequestor
         end
 
         handle_ping_request(outage, all_hop_sets)
+    end
+ 
+    # we check reachability separately for the revtr hops, since the revtr can take an
+    # excrutiatingly long time to execute sometimes
+    def check_reachbility_for_revtr!(outage)
+        if outage.revtr.valid?
+           # TODO: add sanity-check ping targets?
+           return handle_ping_request(outage, [outage.revtr]) 
+        else
+           return [[], []]
+        end
+    end
+
+    # Are the hops reachable from VPs other than the source?
+    def check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
+        # there might be multiple hops with the same ip, so we can't have a
+        # nice hashmap from ips -> hops
+        targets = non_responsive_hops.map { |hop| hop.ip }
+
+        responsive_ips = @ping_issuer.issue(connected_vps, targets)
+
+        non_responsive_hops.each do |hop|
+            hop.reachable_from_other_vps = responsive_ips.include? hop.ip
+        end
+
+        responsive_ips
     end
     
     # Helper method. Encpasulate raw ips into Hop objects
@@ -67,22 +100,38 @@ class MeasurementRequestor
         [responsive_hops, unresponsive_hops]
     end
 
-    # TODO: add #check_reachbility_for_revtr!(outage) and
-    #       #check_pingability_from_other_vps!(connected_vps, non_responsive_hops)
-
     # ============================================================ #
     #                         Traceroute                           #
     # ============================================================ #
 
     # Issue a normal traceroute from the source to a list of targets
-    # targets is an array of destination ips
+    # targets is either a single ip, or an array of destination ips
     # return a hash: 
     #   { target -> ForwardPath object }
     # where the ForwardPath objects are empty if the measurement was
     # unsuccessful
-    def issue_normal_traceroutes(src, targets)
+    def issue_normal_traceroutes(src, target_or_targets)
+        targets = target_or_targets.is_a?(Array) ? target_or_targets : [target_or_targets]
         @trace_issuer.issue(src, targets)
     end
+
+    ## For all reachable hops /beyond/ the suspected failure, issue a
+    ## traceroute to them from the source to see how the paths differ
+    #def measure_traces_to_pingable_hops(src, suspected_failure, direction, 
+    #                                    historical_tr, spoofed_revtr, historical_revtr)
+    #    return {} if suspected_failure.nil?
+    #
+    #    pingable_targets = @failure_analyzer.pingable_hops_beyond_failure(src, suspected_failure, direction, historical_tr)
+    #    pingable_targets |= @failure_analyzer.pingable_hops_near_destination(src, historical_tr, spoofed_revtr, historical_revtr)
+    #
+    #    pingable_targets.map! { |hop| hop.ip }
+    #
+    #    @logger.debug { "pingable_targets, #{Time.now} #{pingable_targets.inspect}" }
+    #
+    #    targ2trace = issue_normal_traceroutes(src, pingable_targets)
+    #
+    #    targ2trace
+    #end
     
     # ============================================================ #
     #                         Spoofed Pings                        #
@@ -90,7 +139,7 @@ class MeasurementRequestor
 
     # Issue spoofed pings from all receivers towards the destination spoofing
     # as the source. If any of them get through, the reverse path is working
-    def issue_pings_towards_srcs(srcdst2outage)
+    def issue_pings_towards_srcs!(srcdst2outage)
         srcdst2receivers = srcdst2outage.map_values { |outage| outage.receivers }
 
         replace_receivers_for_riot!(srcdst2receivers)
@@ -162,6 +211,42 @@ class MeasurementRequestor
             else
                 @logger.info { "Failed spoofed #{type} for #{src} #{dst}" }
             end
+        end
+    end
+
+    # ============================================================ #
+    #                         Spoofed Traceroutes                  #
+    # ============================================================ #
+    
+    # Issue spoofed traceroutes from all sources to all respective
+    # destinations. Mutates outage.spoofed_tr
+    def issue_spoofed_traceroutes!(srcdst2outage, dstsrc2outage={})
+        @spoof_tr_mutex.synchronize do
+            # merging for symmetric outages
+            # TODO: add in the other node as the receiver, since we have
+            # control over it?
+            merged_srcdst2outage = dstsrc2outage.merge(srcdst2outage)
+            
+            # TODO: send spoofed pings to all receivers?
+            srcdst2stillconnected = merged_srcdst2outage.map_values { |outage| outage.receivers }
+            replace_receivers_for_riot!(srcdst2stillconnected)
+
+            # TODO: this doesn't just trigger a ping to the test IP -- it triggers a full
+            # spoofed traceroute...
+            insert_sanity_check_spoofed_pings!(srcdst2stillconnected)
+
+            # Issue spoofed trs all at once to ensure unique spoofer ids
+            srcdst2path = @spoofed_trace_issuer.issue(srcdst2stillconnected)
+                                                
+            srcdst2outage.each do |srcdst, outage|
+                outage.spoofed_tr = srcdst2path[srcdst]
+            end
+
+            dstsrc2outage.each do |dstsrc, outage|
+                outage.dst_spoofed_tr = srcdst2path[srcdst]
+            end
+
+            log_sanity_check_spoofed_pings(srcdst2stillconnected, srcdst2sortedttlrtrs, :spooftr)
         end
     end
 end
