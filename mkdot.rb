@@ -3,6 +3,7 @@
 # Module for generating DOT graphs for human consumption of measurement data.
 
 # TODO:
+#    * Use ruby's dot gem rather than manipulating the dot output manually.
 #    * This code is shite. Refactor just about everything. esp. add_path()
 #    * handle 0.0.0.0's more elegantly. To collapse too many 0.0.0.0's, what if we name the 0.0.0.0
 #       nodes as the hop before them and the hop after them, and say the number of *s in a row? this
@@ -10,7 +11,6 @@
 #    * For paths that don't reach, should we connect them to the dst / src, with a special edge indicating 
 #        that it didn't work? This will tie the images together.
 #    * use a different alias dataset
-#    * label the reverse links were symmetry was assumed
 #    * graphs really need a legend -> include a link in the emails 
 #    * fix the bug where there are gaps in the spoofed traceroute ttls ->
 #         false edges

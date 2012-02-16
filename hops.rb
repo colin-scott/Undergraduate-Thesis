@@ -525,10 +525,6 @@ class Hop
         @cluster
     end
 
-    def <=>(other)
-        @ttl <=> other.ttl
-    end
-
     # Which of the two hops is closer to the dest?
     def self.later(tr_suspect, spooftr_suspect)
         if tr_suspect.nil?

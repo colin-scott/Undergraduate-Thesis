@@ -226,6 +226,11 @@ class Outage
 
         #link_listify!
         
+        @connected ||= []
+        @formatted_connected ||= []
+        @formatted_unconnected ||= []
+        @formatted_never_seen ||= []
+
         @file = get_uniq_filename(@src, @dst)
    end
 
