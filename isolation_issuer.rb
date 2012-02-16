@@ -200,7 +200,7 @@ class MeasurementRequestor
             elsif type == :spooftr
                 if dst == FailureIsolation::TestSpoofPing
                     successful = (results.include?(srcdst) and not results[srcdst].nil? and
-                                  results[srcdst][-1][1].include?(FailureIsolation::TestSpoofPing))
+                                  results[srcdst].map { |hop| hop.ip }.include?(FailureIsolation::TestSpoofPing))
                 else
                     successful = results.include?(srcdst) and not results[srcdst].nil?
                 end
@@ -246,7 +246,7 @@ class MeasurementRequestor
                 outage.dst_spoofed_tr = srcdst2path[srcdst]
             end
 
-            log_sanity_check_spoofed_pings(srcdst2stillconnected, srcdst2sortedttlrtrs, :spooftr)
+            log_sanity_check_spoofed_pings(srcdst2stillconnected, srcdst2path, :spooftr)
         end
     end
 end

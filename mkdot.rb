@@ -161,8 +161,9 @@ class DotGenerator
         @logger.debug { "node2pingable: #{node2pingable.inspect}" }
         @logger.debug { "node2historicallypingable: #{node2historicallypingable.inspect}" }
 
-        output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes,
-                        symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, output)
+        output_dot_file(src, dst, direction, dataset, node2asn, node_attributes,
+                        edge_attributes, symmetric_revtr_links, node2neighbors,
+                        edge_seen_in_measurements, output)
     end
 
     private
@@ -247,19 +248,37 @@ class DotGenerator
     
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
-    def output_dot_file(src, dst, direction, dataset, node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
+    def output_dot_file(src, dst, direction, dataset, node2asn,
+                        node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
           dot.puts "  labelloc = \"t\""
-          node_attributes.each_pair do |node,attributes|
-            n="  \"#{node}\" ["
-            attributes.each_pair{|k,v|
-              n << "#{k}=\"#{v}\", "
-            }
-            n[-2..-1]="];"
-            dot.puts n
-          end
+          asn2nodes = Hash.new{|h,k| h[k] = []}
+          node2asn.each_pair{|node, asn|
+              asn2nodes[asn] << node
+          }
+
+          asn2nodes.each_pair{|asn, nodes|
+              if not asn.nil?
+                dot.puts "subgraph cluster_#{asn}{"
+                dot.puts "  labeljust=\"l\";"
+                dot.puts "  label=\"AS#{asn}\";"
+              end
+
+              nodes.each{|node|
+                attributes = node_attributes[node]
+                n="  \"#{node}\" ["
+                attributes.each_pair{|k,v|
+                  n << "#{k}=\"#{v}\", "
+                }
+                n[-2..-1]="];"
+                dot.puts n
+              }
+              if not asn.nil?
+                  dot.puts "}"
+              end
+          }
           node2neighbors.each_pair do |node,neighbors|
             neighbors.each_key do |neighbor|
               edge= "  \"#{node}\" -> \"#{neighbor}\" ["
