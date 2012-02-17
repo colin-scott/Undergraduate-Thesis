@@ -165,8 +165,7 @@ class Emailer < ActionMailer::Base
 
         @merged_outage = merged_outage
 
-        mail( # :subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
-             :subject => "Measurement Complete Outages since Dec. 01 With IDs",
+        mail(:subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
              :from => "uwfailures@gmail.com",
              :to => recipient) do |format|
             format.html { render "isolation_results.text.html.erb" } 

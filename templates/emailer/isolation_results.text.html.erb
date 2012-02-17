@@ -6,7 +6,6 @@
   </head>
   <body>
   <p>
-  <!--
   Merged Outage {id=<%= @merged_outage.file %>.bin}<br />
   <ul type=none>
       <li>Merging Method: <%= @merged_outage.merging_method %></li>
@@ -46,7 +45,6 @@
   </ul>
   Individual outage(s): <br />
 
-  -->
   <% @merged_outage.each do |outage| %>
     <hr />
         <img src="<%= outage.graph_url %>" alt="dot" />

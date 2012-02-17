@@ -284,6 +284,11 @@ module Parsers
 
             raise "Only expected a single source (#{results.map { |t| t[1] }.inspect})" if results.size > 1
 
+            if results.empty?
+                # Empty trace logging occurs at a higher level
+                return dst2path 
+            end
+
             probes, vp = results.first
 
             raise "Results from #{vp} != expected source #{src}" if vp != src

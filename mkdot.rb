@@ -23,9 +23,11 @@ require 'isolation_utilities.rb'
 
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
+        
 class DotGenerator
-    def initialize(logger = LoggerLog.new($stderr))
+    def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ISP_TO_ASN_MAP)
         @logger = logger
+        @asn2isp = load_asn_to_isp_map(isp2asn_fn)
     end
 
     # Give unique colors to each ASN
@@ -33,6 +35,24 @@ class DotGenerator
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
+    # fn is CSV: ISP name, ASN1, ASN2, ...
+    # map to string to string, to dead with 32-bit asns
+    def load_asn_to_isp_map(fn)
+        asn2isp = Hash.new{|h,k| h.include?(k.to_s)? h[k.to_s] : k}
+        File.open(fn, 'r'){|f|
+            f.each{|line|
+                info = line.chomp("\n").split(",")
+                asn2isp[info[0]] = info[1..-1].join(",")
+#                 info = line.chomp("\n").split(",")
+#                 info[1..-1].each{|asn|
+#                     $stderr.puts "#{asn} #{info[0]}"
+#                     asn2isp[asn] = info[0]
+#                 }
+            }
+        }
+        return asn2isp
+    end
+        
     # Top level method for generating a DOT graph
     def generate_jpg(outage, output="/tmp/t.jpg")
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
@@ -156,14 +176,14 @@ class DotGenerator
 
         symmetric_revtr_links -= non_symmetric_revtr_links
 
-        assign_colors!(node2asn, node_attributes)
+        asn2color = assign_colors!(node2asn, node_attributes)
 
         @logger.debug { "node2pingable: #{node2pingable.inspect}" }
         @logger.debug { "node2historicallypingable: #{node2historicallypingable.inspect}" }
 
         output_dot_file(src, dst, direction, dataset, node2asn, node_attributes,
                         edge_attributes, symmetric_revtr_links, node2neighbors,
-                        edge_seen_in_measurements, output)
+                        edge_seen_in_measurements, output, asn2color)
     end
 
     private
@@ -182,6 +202,7 @@ class DotGenerator
         node2asn.each do |node, asn|
             node_attributes[node]["color"] = asn2color[asn] unless asn.nil?
         end
+        return asn2color
     end
     
     def add_path(path, type, node2names, node2pingable, node2historicallypingable,
@@ -249,7 +270,7 @@ class DotGenerator
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
     def output_dot_file(src, dst, direction, dataset, node2asn,
-                        node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn)
+                        node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn, asn2color)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
@@ -262,8 +283,11 @@ class DotGenerator
           asn2nodes.each_pair{|asn, nodes|
               if not asn.nil?
                 dot.puts "subgraph cluster_#{asn}{"
+                dot.puts "  fontsize=\"16\";"
+                dot.puts "  label_scheme=\"3\";"
                 dot.puts "  labeljust=\"l\";"
-                dot.puts "  label=\"AS#{asn}\";"
+                dot.puts "  label=\"AS#{@asn2isp[asn]}\";"
+                dot.puts "  color=\"#{asn2color[asn]}\";"
               end
 
               nodes.each{|node|
@@ -313,7 +337,7 @@ class DotGenerator
               end
               if edge_seen_in_measurements[[node,neighbor,:revtr]]
                 rtre = edge
-                rtre += "color=\"red\", arrowhead=\"none\", arrowtail=\"normal\", "
+                rtre += "color=\"red\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
                     rtre += "label=\"sym\", "
                 end
@@ -323,7 +347,7 @@ class DotGenerator
               end
               if edge_seen_in_measurements[[node,neighbor,:aux_revtr]]
                 rtre = edge
-                rtre += "color=\"pink\", arrowhead=\"none\", arrowtail=\"normal\", "
+                rtre += "color=\"pink\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
                     rtre += "label=\"sym\", "
                 end
@@ -333,7 +357,7 @@ class DotGenerator
               end
               if edge_seen_in_measurements[[node,neighbor,:historic_revtr]]
                 rtre = edge
-                rtre += "style=\"dotted\", color=\"red\", arrowhead=\"none\", arrowtail=\"normal\", "
+                rtre += "style=\"dotted\", color=\"red\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
                     rtre += "label=\"sym\", "
                 end
