@@ -65,6 +65,7 @@ class DotGenerator
         system "composite -gravity northeast #{legend_fn} #{no_legend} #{output}"
     end
 
+    # helper method. create the dot file, in preparation for the final jpg
     def create_dot_file(outage, output)
         # TODO: fix the references so we don't have to type this out
         src = outage.src
@@ -129,40 +130,37 @@ class DotGenerator
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
 
-        # XXX hmmmm, so many parameters...  TODO: encapsulate all of this into a
-        # one-time-use object? Orrrrrrr... fill in all of the node attributes
-        # separately from add_path(). Satan
-        add_path(tr, :tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        additional_traces.each do |target, trace|
-            add_path(trace, :aux_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        # Inputs to add_path
+        symbol2paths = {
+            :tr => [tr],
+            :aux_tr => additional_traces,
+            :spoofed_tr => [spoofed_tr],
+            :historic_tr => [historic_tr],
+            :historic_revtr => [historic_revtr] + historic_tr.map { hop.reverse_path },
+            :revtr => [revtr],
+            :aux_revtr => upstream_reverse_paths
+        }
+
+        # Add paths
+        symbol2paths.each do |symbol, paths|
+            paths.each do |path|
+                add_path(path, symbol,node2names, node2pingable, node2historicallypingable,
+                         node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
+                         node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+
+                # Add in an invisible edge
+                if not path.empty?
+                    
+                end
+            end
         end
 
-        
-        add_path(spoofed_tr, :spoofed_tr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        add_path(historic_tr, :historic_tr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-
-        #XXX
-        #hop = historic_tr[-4]
-        #puts hop.dns
-        #puts hop.reverse_path
-        #add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
-
-        historic_tr.each do |hop|
-            add_path(hop.reverse_path, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless hop.is_a?(MockHop)
-        end
-        add_path(historic_revtr, :historic_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        # dave returns a symbol if the revtr request failed... TODO: this
-        # filtering should happen at a higher level
-        add_path(revtr, :revtr, node2names, node2pingable, node2historicallypingable,node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker) unless revtr[0].is_a?(Symbol)
-
-        upstream_reverse_paths.each do |target, up_revtr|
-            add_path(up_revtr, :aux_revtr, node2names, node2pingable, node2historicallypingable, node2othervpscanreach,symmetric_revtr_links, non_symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
-        end
-
+        # Add labels
         node2names.each_pair do |node,ips|
-            node_attributes[node]["label"] = ips.uniq.sort.join(" ").gsub(" ", "\\n")
+            node_attributes[node]["label"] = ips.uniq.sort.map { |ip| ip.gsub(/0.0.0.0/, "*").join(" ").gsub(" ", "\\n")
         end
 
+        # Classify Reachability
         node2pingable.each_pair do |node, pingable|
             if !pingable && !node2othervpscanreach[node]
                 node_attributes[node]["style"] = "dotted" 
@@ -171,6 +169,7 @@ class DotGenerator
             end # else, use rounded
         end
 
+        # Classify Historical Reachability
         node2historicallypingable.each_pair do |node, pingable|
             node_attributes[node]["shape"] = "box" if pingable == "N/A"
             node_attributes[node]["shape"] = "diamond" if !pingable
@@ -178,11 +177,13 @@ class DotGenerator
 
         symmetric_revtr_links -= non_symmetric_revtr_links
 
+        # Assign colors by ASN
         asn2color = assign_colors!(node2asn, node_attributes)
 
         @logger.debug { "node2pingable: #{node2pingable.inspect}" }
         @logger.debug { "node2historicallypingable: #{node2historicallypingable.inspect}" }
 
+        # Dump to file
         output_dot_file(src, dst, direction, dataset, node2asn, node_attributes,
                         edge_attributes, symmetric_revtr_links, node2neighbors,
                         edge_seen_in_measurements, output, asn2color)
@@ -233,7 +234,6 @@ class DotGenerator
           # TODO: distinguish between a hop being historically unresponsive
           # (hop.last_responsive.nil?) from a hop not found in the pingability
           # DB (hop.last_responsive == "N/A")
-          #
           #
           # oh boy, this is messy. Mixing booleans with "N/A" is bad news
           # bears. We need the boolean ||= b/c multiple IPs may map to the same
