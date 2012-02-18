@@ -11,7 +11,6 @@
 #    * For paths that don't reach, should we connect them to the dst / src, with a special edge indicating 
 #        that it didn't work? This will tie the images together.
 #    * use a different alias dataset
-#    * graphs really need a legend -> include a link in the emails 
 #    * fix the bug where there are gaps in the spoofed traceroute ttls ->
 #         false edges
 
@@ -54,13 +53,16 @@ class DotGenerator
     end
         
     # Top level method for generating a DOT graph
-    def generate_jpg(outage, output="/tmp/t.jpg")
+    # Generates a jpg with a legend.  Also generates put and legend-less files
+    # in the same directory with similar names, in case we need to edit the
+    # dot by hand (pruning, say) or move the legend to a different location.
+    def generate_jpg(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN)
         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
         dot_output = output.gsub(/\.jpg$/, ".dot")
         create_dot_file(outage, dot_output)
-        # TODO: once support installs graphviz on slider, I should run dot
-        # locally rather than pushing the bits across the wire to toil
-        system "dot -T jpg #{dot_output} > #{output}"
+        no_legend = output.gsub(/\.jpg$/, '_no_legend.jpg')
+        system "dot -T jpg #{dot_output} > #{no_legend}"
+        system "composite -gravity northeast #{legend_fn} #{no_legend} #{output}"
     end
 
     def create_dot_file(outage, output)
@@ -284,7 +286,6 @@ class DotGenerator
               if not asn.nil?
                 dot.puts "subgraph cluster_#{asn}{"
                 dot.puts "  fontsize=\"16\";"
-                dot.puts "  label_scheme=\"3\";"
                 dot.puts "  labeljust=\"l\";"
                 dot.puts "  label=\"AS#{@asn2isp[asn]}\";"
                 dot.puts "  color=\"#{asn2color[asn]}\";"
