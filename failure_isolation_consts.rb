@@ -15,6 +15,7 @@ require 'thread'
 $REV_TR_TOOL_DIR ||= "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 $DATADIR ||= "/homes/network/revtr/spoofed_traceroute/data"
 $ISP_TO_ASN_MAP = $DATADIR + "/asn_to_name.txt"
+$DOT_LEGEND_FN = $DATADIR + "/legend.png"
 # $ISP_TO_ASN_MAP = $DATADIR + "/isp_to_asns_map.txt"
 
 # Constants for the entire isolation system
