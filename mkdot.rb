@@ -23,22 +23,24 @@ require 'isolation_utilities.rb'
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
 class DotGenerator
-    def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ISP_TO_ASN_MAP)
+    def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ASN_TO_ISP_MAP)
         @logger = logger
         @asn2isp = load_asn_to_isp_map(isp2asn_fn)
     end
 
-    # Give unique colors to each ASN
+    # Give unique colors to each isp
     DotGenerator::Colors = ["aquamarine",  "blue", "blueviolet", "brown", "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "crimson", "cyan", "darkgoldenrod1", "darkgreen", 
                      "darkolivegreen", "darkorange", "darkorchid", "darkslateblue", "forestgreen", "deeppink1", "firebrick1", "gold", "green", "indigo", "midnightblue", "red", 
                      "saddlebrown", "violetred1", "springgreen", "bisque"]
 
-    # fn is CSV: ISP name, ASN1, ASN2, ...
-    # map to string to string, to dead with 32-bit asns
+    # fn is CSV: ASN,ISP name
+    # map to string to string, to deal with 32-bit asns
     def load_asn_to_isp_map(fn)
         asn2isp = Hash.new{|h,k| h.include?(k.to_s)? h[k.to_s] : k}
         File.open(fn, 'r'){|f|
             f.each{|line|
+                # TODO(ethankb): make this a regexp that is passed in to allow
+                # either file format.  low priority
                 info = line.chomp("\n").split(",")
                 asn2isp[info[0]] = info[1..-1].join(",")
 #                 info = line.chomp("\n").split(",")
@@ -123,8 +125,10 @@ class DotGenerator
         # cluster -> historically pingable?
         node2historicallypingable = Hash.new(false)
 
-        # set of all ASes
-        node2asn = {}
+        # set of all isps
+        # as of 2012/2/18, this actually stores node->ISP name, rather than
+        # node->ASN
+        node2isp = {}
 
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
@@ -147,7 +151,7 @@ class DotGenerator
             paths.each do |path|
                 add_path(path, symbol,node2names, node2pingable, node2historicallypingable,
                          node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
-                         node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+                         node2neighbors, edge_seen_in_measurements, node2isp, oooo_marker)
             end
         end
 
@@ -186,40 +190,41 @@ class DotGenerator
 
         symmetric_revtr_links -= non_symmetric_revtr_links
 
-        # Assign colors by ASN
-        asn2color = assign_colors!(node2asn, node_attributes)
+        # Assign colors by isp
+        isp2color = assign_colors!(node2isp, node_attributes)
 
         @logger.debug { "node2pingable: #{node2pingable.inspect}" }
         @logger.debug { "node2historicallypingable: #{node2historicallypingable.inspect}" }
 
         # Dump to file
-        output_dot_file(src, dst, direction, dataset, node2asn, node_attributes,
+        output_dot_file(src, dst, direction, dataset, node2isp, node_attributes,
                         edge_attributes, symmetric_revtr_links, node2neighbors,
-                        edge_seen_in_measurements, output, asn2color)
+                        edge_seen_in_measurements, output, isp2color)
     end
 
     private
 
-    def assign_colors!(node2asn, node_attributes)
-        all_ases = node2asn.values.uniq
-        asn2color = {}
+    def assign_colors!(node2isp, node_attributes)
+        all_isps = node2isp.values.uniq
+        isp2color = {}
         i = 0
-        all_ases.each do |asn|
-           next if asn.nil?     # nil asn's get assigned to black by default
-           asn2color[asn] = DotGenerator::Colors[i] 
+        all_isps.each do |isp|
+           next if isp.nil?     # nil isp's get assigned to black by default
+           isp2color[isp] = DotGenerator::Colors[i] 
            i += 1
-           raise "too many asns!" if i >= DotGenerator::Colors.size
+           raise "too many isps!" if i >= DotGenerator::Colors.size
         end
 
-        node2asn.each do |node, asn|
-            node_attributes[node]["color"] = asn2color[asn] unless asn.nil?
+        node2isp.each do |node, isp|
+            node_attributes[node]["color"] = isp2color[isp] unless isp.nil?
         end
-        return asn2color
+        return isp2color
     end
     
+    #
     def add_path(path, type, node2names, node2pingable, node2historicallypingable,
                      node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
-                     node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+                     node2neighbors, edge_seen_in_measurements, node2isp, oooo_marker)
         if !path.respond_to?(:valid?) 
             raise "Not a path object #{path.class} #{type}" 
         end
@@ -238,7 +243,7 @@ class DotGenerator
           current = $ip2cluster[ip]
           name = (hop.dns.nil? or hop.dns.empty?) ? hop.ip : hop.dns
           node2names[current] << name
-          node2asn[current] = hop.asn
+          node2isp[current] = @asn2isp[hop.asn]
           node2pingable[current] ||= hop.ping_responsive
 
           node2othervpscanreach[current] ||= hop.reachable_from_other_vps
@@ -283,24 +288,25 @@ class DotGenerator
     
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
-    def output_dot_file(src, dst, direction, dataset, node2asn,
-                        node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn, asn2color)
+    def output_dot_file(src, dst, direction, dataset, node2isp,
+                        node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn, isp2color)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
           dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
           dot.puts "  labelloc = \"t\""
-          asn2nodes = Hash.new{|h,k| h[k] = []}
-          node2asn.each_pair{|node, asn|
-              asn2nodes[asn] << node
+          isp2nodes = Hash.new{|h,k| h[k] = []}
+          node2isp.each_pair{|node, isp|
+              isp2nodes[isp] << node
           }
 
-          asn2nodes.each_pair{|asn, nodes|
-              if not asn.nil?
-                dot.puts "subgraph cluster_#{asn}{"
-                dot.puts "  fontsize=\"16\";"
+          isp2nodes.each_pair{|isp, nodes|
+              if not isp.nil?
+                dot.puts "subgraph cluster_#{isp.to_s.gsub(/[^0-9a-z]/i, '_')}{"
+                dot.puts "  fontsize=\"22\";"
                 dot.puts "  labeljust=\"l\";"
-                dot.puts "  label=\"AS#{@asn2isp[asn]}\";"
-                dot.puts "  color=\"#{asn2color[asn]}\";"
+                dot.puts "  label=\"#{isp}\";"
+                #dot.puts "  label=\"AS#{@asn2isp[asn]}\";"
+                dot.puts "  color=\"#{isp2color[isp]}\";"
               end
 
               nodes.each{|node|
@@ -312,7 +318,7 @@ class DotGenerator
                 n[-2..-1]="];"
                 dot.puts n
               }
-              if not asn.nil?
+              if not isp.nil?
                   dot.puts "}"
               end
           }
