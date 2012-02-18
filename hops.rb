@@ -445,7 +445,7 @@ class ForwardPath < Path
    end
 
    # Are all hops ping responsive (or not historically pingable) except the
-   # destionation?
+   # destination?
    def ping_responsive_except_dst?(dst=nil)
        return false if @hops.empty?
 
@@ -595,6 +595,7 @@ end
 # Used to be used for DOT graph generation, but no longer necessary
 # TODO: just instantiate a Hop object...
 MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
+
 # We added these fields after mkdot was written?
 class MockHop
     attr_accessor :next, :previous
@@ -749,7 +750,7 @@ if __FILE__ == $0
 
     src = "1.2.2.2"
     dst = "1.2.3.4"
-    r = HistoricalReversePath.new(src, dst,  test)
+    r = HistoricalReversePath.new(src, dst, test)
     t = ForwardPath.new(src, dst, test)
     q = SpoofedReversePath.new(src, dst, test)
     u = Path.new(src, dst, test)

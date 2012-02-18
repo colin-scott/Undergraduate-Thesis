@@ -22,7 +22,6 @@ require 'isolation_utilities.rb'
 
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
-        
 class DotGenerator
     def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ISP_TO_ASN_MAP)
         @logger = logger
@@ -130,13 +129,15 @@ class DotGenerator
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
 
+        $stderr.puts historic_tr.map { |hop| hop.reverse_path }.inspect
+
         # Inputs to add_path
         symbol2paths = {
             :tr => [tr],
             :aux_tr => additional_traces,
             :spoofed_tr => [spoofed_tr],
             :historic_tr => [historic_tr],
-            :historic_revtr => [historic_revtr] + historic_tr.map { hop.reverse_path },
+            :historic_revtr => [historic_revtr] + historic_tr.map { |hop| hop.reverse_path }.find_all { |path| !path.is_a?(Array) },
             :revtr => [revtr],
             :aux_revtr => upstream_reverse_paths
         }
@@ -147,17 +148,25 @@ class DotGenerator
                 add_path(path, symbol,node2names, node2pingable, node2historicallypingable,
                          node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
                          node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+            end
+        end
 
-                # Add in an invisible edge
-                if not path.empty?
-                    
-                end
+        # Add invisible links for forward trs that didn't reach
+        dst_node = $ip2cluster[dst] 
+        [tr, spoofed_tr, historic_tr].each do |path|
+            if path.valid? and not path.reached?(dst)
+                last_hop = path[-1]
+                node2neighbors[last_hop][dst_node] = true
+                # Note that we do not update edge_seen_in_measurements, since
+                # that will later change the edge to (blue|black|red) instead
+                # of invisible
+                edge_attributes[[last_hop,dst_node]]["style"] = "invis"
             end
         end
 
         # Add labels
         node2names.each_pair do |node,ips|
-            node_attributes[node]["label"] = ips.uniq.sort.map { |ip| ip.gsub(/0.0.0.0/, "*").join(" ").gsub(" ", "\\n")
+            node_attributes[node]["label"] = ips.uniq.sort.map { |ip| ip.gsub(/0.0.0.0/, "*") }.join(" ").gsub(" ", "\\n")
         end
 
         # Classify Reachability
@@ -211,6 +220,9 @@ class DotGenerator
     def add_path(path, type, node2names, node2pingable, node2historicallypingable,
                      node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
                      node2neighbors, edge_seen_in_measurements, node2asn, oooo_marker)
+        if !path.respond_to?(:valid?) 
+            raise "Not a path object #{path.class} #{type}" 
+        end
         return if !path.valid?
         previous = nil
         current = nil
@@ -304,6 +316,7 @@ class DotGenerator
                   dot.puts "}"
               end
           }
+
           node2neighbors.each_pair do |node,neighbors|
             neighbors.each_key do |neighbor|
               edge= "  \"#{node}\" -> \"#{neighbor}\" ["
