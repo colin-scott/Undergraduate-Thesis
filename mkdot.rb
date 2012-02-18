@@ -133,8 +133,6 @@ class DotGenerator
         # is a node not pingable from S, but pingable from other VPs?
         node2othervpscanreach = {}
 
-        $stderr.puts historic_tr.map { |hop| hop.reverse_path }.inspect
-
         # Inputs to add_path
         symbol2paths = {
             :tr => [tr],

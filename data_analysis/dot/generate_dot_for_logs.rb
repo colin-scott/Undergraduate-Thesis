@@ -29,4 +29,7 @@ outage_ids.each do |outage_id|
     jpg_output = "/homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
     dot_gen.generate_jpg(o, jpg_output)
     puts "jpg output at: http://revtr.cs.washington.edu/isolation_graphs/ethan_testing/#{basename}"
+    puts "jpg output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
+    puts "jpg_no_legend output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.jpg$/, '_no_legend.jpg')}"
+    puts "dot output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.jpg$/, '.dot')}"
 end
