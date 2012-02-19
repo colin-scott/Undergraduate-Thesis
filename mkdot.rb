@@ -58,11 +58,26 @@ class DotGenerator
     # in the same directory with similar names, in case we need to edit the
     # dot by hand (pruning, say) or move the legend to a different location.
     def generate_jpg(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN)
-        raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
-        dot_output = output.gsub(/\.jpg$/, ".dot")
+        generate_image(outage, output, legend_fn, extension='jpg')
+#         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
+#         dot_output = output.gsub(/\.jpg$/, ".dot")
+#         create_dot_file(outage, dot_output)
+#         no_legend = output.gsub(/\.jpg$/, '_no_legend.png')
+#         system "dot -Tpng:cairo #{dot_output} > #{no_legend}"
+#         system "composite -gravity northeast #{legend_fn} #{no_legend} #{output.gsub(/\.jpg$/, ".png")}"
+    end
+
+    def generate_png(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN)
+        generate_image(outage, output, legend_fn, extension='png')
+    end
+
+    def generate_image(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN,
+                       extension='jgp')
+        raise "Output file must be a .#{extension}!" unless output =~ /\.#{extension}$/
+        dot_output = output.gsub(/\.#{extension}$/, ".dot")
         create_dot_file(outage, dot_output)
-        no_legend = output.gsub(/\.jpg$/, '_no_legend.jpg')
-        system "dot -T jpg #{dot_output} > #{no_legend}"
+        no_legend = output.gsub(/\.#{extension}$/, "_no_legend.#{extension}")
+        system "dot -T#{extension}:cairo #{dot_output} > #{no_legend}"
         system "composite -gravity northeast #{legend_fn} #{no_legend} #{output}"
     end
 
