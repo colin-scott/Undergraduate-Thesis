@@ -114,9 +114,17 @@ class Path
 
    # A long line of 0.0.0.0s at the end is not helpful
    def get_rid_of_trailing_zeros()
-        while !@hops.empty? and @hops[-1].ip == "0.0.0.0"
-            @hops = @hops[0..-2] 
-        end
+       trailing_zeros = 0
+       if not @hops.empty?
+           while @hops[-1 - trailing_zeros].ip == "0.0.0.0"
+               trailing_zeros += 1
+           end
+       end
+       cut_index = -1 - [0, trailing_zeros - 3].max
+       @hops = @hops[0..cut_index]
+#         while !@hops.empty? and @hops[-1].ip == "0.0.0.0"
+#             @hops = @hops[0..-2] 
+#         end
    end
       
    # Sort hops, and fill in gaps with "0.0.0.0"s
