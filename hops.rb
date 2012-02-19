@@ -439,6 +439,7 @@ class ForwardPath < Path
 
    # Did the measurement reach the given destination?
    def reached?(dst)
+        dst = dst.is_a?(Hop) ? dst.ip : dst
         dst = dst.strip
         #$LOG.puts" reached?: #{@hops.inspect}"
         !@hops.find { |hop| hop.ip.strip == dst }.nil?

@@ -112,12 +112,12 @@ class DotGenerator
         # symmetry
         non_symmetric_revtr_links = Set.new
         
-        # cluster -> (cluster -> bool)
-        node2neighbors=Hash.new{|hash,key| hash[key]=Hash.new(false)}
+        # cluster -> Set of clusters
+        node2neighbors=Hash.new{|hash,key| hash[key] = Set.new }
         
-        # [cluster,cluster,measurement_type]->bool
+        # Set of [cluster,cluster,measurement_type]
         # whether it was seen in, say, traceroutes
-        edge_seen_in_measurements=Hash.new(false)
+        edge_seen_in_measurements = Set.new
 
         # cluster -> pingable?
         node2pingable = {}
@@ -144,28 +144,19 @@ class DotGenerator
             :aux_revtr => upstream_reverse_paths
         }
 
+        # Add invisible links for forward trs that didn't reach in add_path()
+        dst_node = $ip2cluster[dst] 
+
         # Add paths
         symbol2paths.each do |symbol, paths|
             paths.each do |path|
-                add_path(path, symbol,node2names, node2pingable, node2historicallypingable,
+                add_path(path, symbol, dst_node, node2names, node2pingable, node2historicallypingable,
                          node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
-                         node2neighbors, edge_seen_in_measurements, node2isp, oooo_marker)
+                         node2neighbors, edge_seen_in_measurements, edge_attributes, node2isp, oooo_marker)
             end
         end
 
-        # Add invisible links for forward trs that didn't reach
-        dst_node = $ip2cluster[dst] 
-        [tr, spoofed_tr, historic_tr].each do |path|
-            if path.valid? and not path.reached?(dst)
-                last_hop = path[-1]
-                node2neighbors[last_hop][dst_node] = true
-                # Note that we do not update edge_seen_in_measurements, since
-                # that will later change the edge to (blue|black|red) instead
-                # of invisible
-                edge_attributes[[last_hop,dst_node]]["style"] = "invis"
-            end
-        end
-
+        
         # Add labels
         node2names.each_pair do |node,ips|
             node_attributes[node]["label"] = ips.uniq.sort.map { |ip| ip.gsub(/0.0.0.0/, "*") }.join(" ").gsub(" ", "\\n")
@@ -220,16 +211,17 @@ class DotGenerator
     end
     
     #
-    def add_path(path, type, node2names, node2pingable, node2historicallypingable,
+    def add_path(path, type, dst_node, node2names, node2pingable, node2historicallypingable,
                      node2othervpscanreach, symmetric_revtr_links, non_symmetric_revtr_links,
-                     node2neighbors, edge_seen_in_measurements, node2isp, oooo_marker)
+                     node2neighbors, edge_seen_in_measurements, edge_attributes, node2isp, oooo_marker)
         if !path.respond_to?(:valid?) 
             raise "Not a path object #{path.class} #{type}" 
         end
         return if !path.valid?
         previous = nil
         current = nil
-        for hop in path
+        for i in (0...path.size)
+          hop = path[i]
           # we include the preamble of the reverse traceroute output as a "hop" -- make sure to exclude
           # preamble from the graph. 
           # Actually, this might be covered by !path.valid? above..
@@ -274,15 +266,26 @@ class DotGenerator
                 non_symmetric_revtr_links.add [current, previous]
               end
 
-              node2neighbors[current][previous] = true
-              edge_seen_in_measurements[[current, previous, type]] = true
+              node2neighbors[current].add previous
+              edge_seen_in_measurements.add [current, previous, type]
             else
-              node2neighbors[previous][current] = true
-              edge_seen_in_measurements[[previous, current, type]] = true
+              node2neighbors[previous].add current
+              edge_seen_in_measurements.add [previous, current, type]
             end
+          end
+
+          ## Add in invisble link if the trace didn't reach
+          # (This code needs to stay in add_path(), since current may be a
+          # 0.0.0.0X node
+          if i+1 == path.size and path.valid? and [:tr, :spoofed_tr, :historic_tr].include? type and current != dst_node
+            node2neighbors[current].add dst_node
+            # Note that we give edge_seen_in_measurements a special type, to
+            # differentiate from (blue|black|red) 
+            edge_seen_in_measurements.add [current, dst_node, :invis]
           end
         end
     end
+
     
     # TODO: is there a way to generate a .jpg without having to write to a file?
     # I'm sure there is some library for interfacing directly with dot...
@@ -322,14 +325,14 @@ class DotGenerator
           }
 
           node2neighbors.each_pair do |node,neighbors|
-            neighbors.each_key do |neighbor|
+            neighbors.each do |neighbor|
               edge= "  \"#{node}\" -> \"#{neighbor}\" ["
               attributes = ""
               edge_attributes[[node,neighbor]].each_pair{|k,v|
                 attributes += "#{k}=\"#{v}\", " 
               }
               edge = edge + attributes
-              if edge_seen_in_measurements[[node,neighbor,:tr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:tr]
                 tre=edge
                 tre += "style=\"solid\", "
         #        if not edge_attributes[[node,neighbor]].has_key?("style")
@@ -338,22 +341,22 @@ class DotGenerator
                 tre[-2..-1]="];" 
                 dot.puts tre
               end
-              if edge_seen_in_measurements[[node,neighbor,:spoofed_tr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:spoofed_tr]
                 tre=edge
                 tre += "color=\"blue\",style=\"solid\"];"
                 dot.puts tre
               end
-              if edge_seen_in_measurements[[node,neighbor,:aux_tr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:aux_tr]
                 tre=edge
                 tre += "color=\"darkolivegreen\",style=\"solid\"];"
                 dot.puts tre
               end
-              if edge_seen_in_measurements[[node,neighbor,:historic_tr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:historic_tr]
                 tre=edge
                 tre += "style=\"dotted\"];"
                 dot.puts tre
               end
-              if edge_seen_in_measurements[[node,neighbor,:revtr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:revtr]
                 rtre = edge
                 rtre += "color=\"red\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
@@ -363,7 +366,7 @@ class DotGenerator
                 rtre[-2..-1]="];" 
                 dot.puts rtre
               end
-              if edge_seen_in_measurements[[node,neighbor,:aux_revtr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:aux_revtr]
                 rtre = edge
                 rtre += "color=\"pink\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
@@ -373,7 +376,7 @@ class DotGenerator
                 rtre[-2..-1]="];" 
                 dot.puts rtre
               end
-              if edge_seen_in_measurements[[node,neighbor,:historic_revtr]]
+              if edge_seen_in_measurements.include? [node,neighbor,:historic_revtr]
                 rtre = edge
                 rtre += "style=\"dotted\", color=\"red\", dir=\"back\", arrowhead=\"none\", arrowtail=\"normal\", "
                 if symmetric_revtr_links.include? [node,neighbor]
@@ -381,6 +384,11 @@ class DotGenerator
                 end
 
                 rtre[-2..-1]="];" 
+                dot.puts rtre
+              end
+              if edge_seen_in_measurements.include? [node,neighbor,:invis]
+                rtre = edge
+                rtre += "style=\"invis\"];"
                 dot.puts rtre
               end
             end
