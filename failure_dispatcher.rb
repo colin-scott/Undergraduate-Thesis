@@ -880,18 +880,25 @@ class EmptyStats
 		@empty = 0
 		@array = Array.new
 		@histsz = history_size
+        @mutex = Mutex.new
 	end
 	def push_empty
-		@empty += 1
-		@array.push(1)
-		self._check_size
+        @mutex.synchronize do
+            @empty += 1
+            @array.push(1)
+            self._check_size
+        end
 	end
 	def push_nonempty
-		@array.push(0)
-		self._check_size
+        @mutex.synchronize do
+            @array.push(0)
+            self._check_size
+        end
 	end
 	def fraction_empty
-		return @empty.to_f / @array.length
+        @mutex.synchronize do
+            return @empty.to_f / @array.length
+        end
 	end
 	def _check_size
 		while(@array.length > @histsz)
