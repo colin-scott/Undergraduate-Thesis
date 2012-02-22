@@ -522,7 +522,7 @@ class FailureDispatcher
 
         ## Moar empty measurements!
         if responsive_ips.empty?
-            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips)" }
+            @logger.warn { "empty pings! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips: [#{non_responsive_ips.join(",")}])" }
 
             @node2emptypings[outage.src].push_empty
             restart_atd(outage.src)
@@ -530,7 +530,7 @@ class FailureDispatcher
             responsive_hops, non_responsive_hops = @isolation_issuer.check_reachability!(outage)
             responsive_ips, non_responsive_ips = hops_to_uniq_ips(responsive_hops), hops_to_uniq_ips(non_responsive_hops)
             if responsive_ips.empty?
-                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips)" } 
+                @logger.warn { "pings still empty! (#{outage.src}, #{outage.dst} #{responsive_ips.size + non_responsive_ips.size} ips: [#{non_responsive_ips.join(",")}])" } 
                 @node_2_failed_measurements[outage.src] += 1
                 @node2emptypings[outage.src].push_empty
             else
@@ -583,7 +583,6 @@ class FailureDispatcher
         end
 
 	    fempty = @node2emptypings[outage.src].fraction_empty
-	    @logger.info { "empty pings: src #{outage.src} fraction empty #{fempty}" }
         if fempty > FailureIsolation::EmptyPingsThreshold
             @logger.info { "scheduling #{outage.src} for swap_out" }
             SwapFilters.empty_pings!(outage, filter_tracker)
