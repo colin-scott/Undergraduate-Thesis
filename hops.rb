@@ -366,6 +366,7 @@ class HistoricalReversePath < RevPath
    attr_accessor :timestamp, :src, :dst, :valid
 
    def initialize(src, dst, init_hops=[])
+       # src is ISSUER (destination), dst is receiver (source)... 
        super(src, dst, init_hops)
        @timestamp = 0 # measurement timestamp
        @valid = false # if false, then there was nothing found in the DB

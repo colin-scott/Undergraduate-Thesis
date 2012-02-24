@@ -109,6 +109,11 @@ class DotGenerator
         spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
         historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
 
+        if historical_revtr.valid? and historical_revtr[0].ip != dst
+            dst_hop = MockHop.new((Resolv.getaddress(dst) rescue dst), dst, 0, nil, true, true, [], true)
+            historical_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historical_revtr)
+        end
+
         # Cluster -> dns names we have seen for the cluster
         node2names = Hash.new{|h,k| h[k] = []}
         
