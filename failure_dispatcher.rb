@@ -70,7 +70,7 @@ class FailureDispatcher
         # track when nodes fail to return tr or ping results
         @node_2_failed_measurements = Hash.new(0)
 
-        @dot_generator = DotGenerator.new(@logger)
+        @dot_generator = DotGenerator.new(@logger, $ASN_TO_ISP_MAP, @ip_info)
 
         @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 

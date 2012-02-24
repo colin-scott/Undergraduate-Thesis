@@ -23,9 +23,10 @@ require 'isolation_utilities.rb'
 $ip2cluster ||= Hash.new { |h,k| k } # loaded by isolation_module.rb
 
 class DotGenerator
-    def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ASN_TO_ISP_MAP)
+    def initialize(logger = LoggerLog.new($stderr), isp2asn_fn=$ASN_TO_ISP_MAP, ip_info=IpInfo.new)
         @logger = logger
         @asn2isp = load_asn_to_isp_map(isp2asn_fn)
+        @ip_info = ip_info
     end
 
     # Give unique colors to each isp
@@ -104,13 +105,13 @@ class DotGenerator
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_hop = Hop.new($pl_ip2host[src], src, ip_info)
+        src_hop = Hop.new($pl_ip2host[src], src, @ip_info)
         tr = ForwardPath.new(src, dst, [src_hop] + tr)
         spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
         historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
 
         if historic_revtr.valid? and historic_revtr[0].ip != dst
-            dst_hop = Hop.new(dst, ip_info)
+            dst_hop = Hop.new(dst, @ip_info)
             historic_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historic_revtr)
         end
 
