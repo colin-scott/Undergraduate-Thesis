@@ -105,7 +105,10 @@ class DotGenerator
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_hop = Hop.new($pl_ip2host[src], src, @ip_info)
+        src_ip = $pl_ip2host[src]
+        src_ip = (Resolv.getaddress(src) rescue src) unless src_ip.matches_ip?
+        src_ip = "0.0.0.0" unless src_ip.matches_ip?
+        src_hop = Hop.new(src_ip, src, @ip_info)
         tr = ForwardPath.new(src, dst, [src_hop] + tr)
         spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
         historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
