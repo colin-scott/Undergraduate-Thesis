@@ -16,6 +16,9 @@ dot_gen = DotGenerator.new
 outage_ids = ARGV.clone
 
 outage_ids.each do |outage_id|
+    if not outage_id.include? "/"
+        outage_id = FailureIsolation::IsolationResults + "/#{outage_id}"
+    end
     o = nil
     begin
         o = LogIterator.read_log(outage_id)
@@ -25,11 +28,12 @@ outage_ids.each do |outage_id|
         o = LogIterator.read_log(file)
     end
 
-    basename = "#{File.basename(o.file)}.jpg"
-    jpg_output = "/homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
-    dot_gen.generate_jpg(o, jpg_output)
-    puts "jpg output at: http://revtr.cs.washington.edu/isolation_graphs/ethan_testing/#{basename}"
-    puts "jpg output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
-    puts "jpg_no_legend output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.jpg$/, '_no_legend.jpg')}"
-    puts "dot output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.jpg$/, '.dot')}"
+    extension = 'png'
+    basename = "#{File.basename(o.file)}.#{extension}"
+    img_output = "/homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
+    dot_gen.generate_png(o, img_output)
+    puts "image output at: http://revtr.cs.washington.edu/isolation_graphs/ethan_testing/#{basename}"
+    puts "image output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename}"
+    puts "no_legend output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.#{extension}$/, "_no_legend.#{extension}")}"
+    puts "dot output at: /homes/network/revtr/www/isolation_graphs/ethan_testing/#{basename.gsub(/\.#{extension}$/, '.dot')}"
 end

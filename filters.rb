@@ -288,6 +288,7 @@ module SecondLevelFilters
         BOTH_DIRECTIONS_WORKING,
         FWD_MEASUREMENTS_EMPTY,
         TR_REACHED,
+        SPOOFED_TR_REACHED,
         NO_HISTORICAL_TRACE,
         NO_PINGS,
         TR_REACHED_LAST_HOP,
@@ -311,6 +312,7 @@ module SecondLevelFilters
        filter_tracker.failure_reasons << BOTH_DIRECTIONS_WORKING if self.both_directions_working?(direction)
        filter_tracker.failure_reasons << FWD_MEASUREMENTS_EMPTY if self.forward_measurements_empty?(tr, spoofed_tr)
        filter_tracker.failure_reasons << TR_REACHED if self.tr_reached_dst_AS?(dst, tr, ip_info)
+       filter_tracker.failure_reasons << SPOOFED_TR_REACHED if self.spoofed_tr_reached_dst_AS?(dst, spoofed_tr, direction, ip_info)
        filter_tracker.failure_reasons << DEST_PINGABLE if self.destination_pingable?(ping_responsive, dst, tr)
        filter_tracker.failure_reasons << NO_HISTORICAL_TRACE if self.no_historical_trace?(historical_tr, src, dst, skip_hist_tr)
        filter_tracker.failure_reasons << HISTORICAL_TR_NOT_REACH if self.historical_trace_didnt_reach?(historical_tr, src, skip_hist_tr)
@@ -336,6 +338,13 @@ module SecondLevelFilters
    # destination AS, we exclude the outage
    def self.tr_reached_dst_AS?(dst, tr, ip_info)
         tr_reached_dst_AS = tr.reached_dst_AS?(dst, ip_info)
+   end
+
+   # For forward path outages, make sure the spoofed tr didn't reach the
+   # destintion AS (in case tr /didn't/ reach, but spoofed tr did)
+   def self.spoofed_tr_reached_dst_AS?(dst, spoofed_tr, direction, ip_info)
+        return false unless direction == Direction.FORWARD
+        spoofed_tr_reached_dst_AS = spoofed_tr.reached_dst_AS?(dst, ip_info)
    end
 
    # Outage may have resolved itself during measurement

@@ -308,7 +308,7 @@ class DotGenerator
                         node_attributes, edge_attributes, symmetric_revtr_links, node2neighbors, edge_seen_in_measurements, dotfn, isp2color)
         File.open( dotfn, "w"){ |dot|
           dot.puts "digraph \"tr\" {"
-          dot.puts "  label = \"#{src}, #{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
+          dot.puts "  label = \"Src:#{src}, Dst:#{dst}\\n#{direction} failure\\nDataset: #{dataset}\""
           dot.puts "  labelloc = \"t\""
           isp2nodes = Hash.new{|h,k| h[k] = []}
           node2isp.each_pair{|node, isp|

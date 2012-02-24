@@ -116,7 +116,7 @@ class Path
    def get_rid_of_trailing_zeros()
        trailing_zeros = 0
        if not @hops.empty?
-           while @hops[-1 - trailing_zeros].ip == "0.0.0.0"
+           while @hops.length > trailing_zeros and @hops[-1 - trailing_zeros].ip == "0.0.0.0"
                trailing_zeros += 1
            end
        end
@@ -430,9 +430,12 @@ class ForwardPath < Path
        dst = dst.is_a?(Hop) ? dst.ip.strip : dst.strip
        return false if dst.nil?
        dst_as = ipInfo.getASN(dst)
+       return false if dst_as.nil?
        last_non_zero_hop = last_non_zero_ip
-       last_hop_as = (last_non_zero_hop.nil?) ? nil : ipInfo.getASN(last_non_zero_hop)
-       return !dst_as.nil? && !last_hop_as.nil? && dst_as == last_hop_as
+       return false if last_non_zero_hop.nil?
+       last_hop_as = ipInfo.getASN(last_non_zero_hop)
+       return false if last_hop_as.nil?
+       return dst_as == last_hop_as
    end
 
    def last_non_zero_ip

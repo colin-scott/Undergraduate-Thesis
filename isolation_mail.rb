@@ -160,12 +160,14 @@ class Emailer < ActionMailer::Base
             format.html { render "check_up_vps_issue.text.html.erb" } 
         end
     end
-    def isolation_results(merged_outage, recipient="failures@cs.washington.edu")
+    def isolation_results(merged_outage, recipient="failures@cs.washington.edu",
+                          subject="Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '};" + 
+                                   "sources: #{merged_outage.sources.join ' '}")
         @@logger.info { "Attempted to send isolation_results email" }
 
         @merged_outage = merged_outage
 
-        mail(:subject => "Isolation: #{merged_outage.direction}; #{merged_outage.datasets.join ' '}; sources: #{merged_outage.sources.join ' '}",
+        mail(:subject => subject,
              :from => "uwfailures@gmail.com",
              :to => recipient) do |format|
             format.html { render "isolation_results.text.html.erb" } 

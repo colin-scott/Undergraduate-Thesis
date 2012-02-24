@@ -30,8 +30,11 @@ LogIterator.iterate_all_logs(options) do |o|
     dot_gen.generate_jpg(o,jpg)
     begin
         merged_outage = MergedOutage.new(id+=1, [o])
-        Emailer.isolation_results(merged_outage).deliver
-        sleep 1
+        if o.src == "pl1.rcc.uottowa.ca"
+            Emailer.isolation_results(merged_outage).deliver
+        elsif o.src == "planetlab2.csohio.edu"
+            Emailer.isolation_results(merged_outage).deliver
+        end
     rescue Exception => e
         $stderr.puts "Exception: #{e} #{e.backtrace} #{o.file}"
     end
