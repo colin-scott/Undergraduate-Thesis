@@ -276,6 +276,7 @@ module SecondLevelFilters
    BOTH_DIRECTIONS_WORKING = :direction
    FWD_MEASUREMENTS_EMPTY = :forward_meas_empty
    TR_REACHED = :tr_reach 
+   SPOOFED_TR_REACHED = :spoofed_tr_reach
    NO_HISTORICAL_TRACE = :no_hist 
    NO_PINGS = :no_ping 
    TR_REACHED_LAST_HOP = :tr_reached_last_hop 

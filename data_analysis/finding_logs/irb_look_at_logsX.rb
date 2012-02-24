@@ -6,6 +6,9 @@ require 'failure_isolation_consts'
 require 'outage'
 require 'irb'
 require 'log_iterator'
+require 'db_interface'
+
+$db = DatabaseInterface.new
 
 outage_ids = ARGV.clone
 

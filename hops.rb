@@ -384,8 +384,8 @@ class HistoricalReversePath < RevPath
    def to_s
        # print the pretty output
        result = "From #{@src} to #{@dst} at #{@timestamp}:\n"
-       result << @hops.map { |x| x.to_s }.join("\n") if @valid
-       result << "Failed query, reason: #{@invalid_reason}" if !@valid
+       result << @hops.map { |x| x.to_s }.join("\n") if valid?
+       result << "Failed query, reason: #{@invalid_reason}" if !valid?
        result
    end
 end
