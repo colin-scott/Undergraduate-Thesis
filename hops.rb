@@ -605,15 +605,6 @@ class Hop
     end
 end
 
-# Used to be used for DOT graph generation, but no longer necessary
-# TODO: just instantiate a Hop object...
-MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive, :reverse_path, :reachable_from_other_vps)
-
-# We added these fields after mkdot was written?
-class MockHop
-    attr_accessor :next, :previous
-end
-
 class ForwardHop < Hop 
     attr_accessor :reverse_path
     def initialize(ttlhop, ipInfo)

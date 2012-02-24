@@ -104,14 +104,14 @@ class DotGenerator
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_hop = MockHop.new((Resolv.getaddress(src) rescue src), src, 0, nil, true, true, [], true)
+        src_hop = Hop.new($pl_ip2host[src], src, ip_info)
         tr = ForwardPath.new(src, dst, [src_hop] + tr)
         spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
         historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
 
-        if historical_revtr.valid? and historical_revtr[0].ip != dst
-            dst_hop = MockHop.new((Resolv.getaddress(dst) rescue dst), dst, 0, nil, true, true, [], true)
-            historical_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historical_revtr)
+        if historic_revtr.valid? and historic_revtr[0].ip != dst
+            dst_hop = Hop.new(dst, ip_info)
+            historic_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historic_revtr)
         end
 
         # Cluster -> dns names we have seen for the cluster
