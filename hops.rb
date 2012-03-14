@@ -73,7 +73,7 @@ class Path
        # handle the exception, and it causes the entire isolation system to
        # bomb
        return if @hops.empty?
-       if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } #or @hops.empty?
+       if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } 
            raise "Doesn't quack like a hop! (#{caller[0..5]})"
        end
        get_rid_of_wonky_last_hop
@@ -750,6 +750,16 @@ class SpoofedForwardHop < Hop
     def inspect
         "Spoofed fwd hop: #{@ip} #{@prefix} #{@dns} #{@asn}"
     end
+end
+
+# Used to be used for DOT graph generation, but no longer necessary
+# TODO: just instantiate a Hop object...
+MockHop = Struct.new(:ip, :dns, :ttl, :asn, :ping_responsive, :last_responsive,
+:reverse_path, :reachable_from_other_vps)
+
+# We added these fields after mkdot was written?
+class MockHop
+    attr_accessor :next, :previous
 end
 
 if __FILE__ == $0

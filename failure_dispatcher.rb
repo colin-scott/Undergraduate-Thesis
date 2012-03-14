@@ -449,7 +449,7 @@ class FailureDispatcher
     # than this longgg method
     def gather_measurements(outage, filter_tracker)
         reverse_problem = outage.pings_towards_src.empty?
-        forward_problem = outage.spoofed_tr.nil? or !outage.spoofed_tr.reached?(outage.dst)
+        forward_problem = (outage.spoofed_tr.nil? || !outage.spoofed_tr.reached?(outage.dst))
 
         outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
         @logger.debug { "direction: #{outage.direction}" }

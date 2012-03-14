@@ -34,7 +34,7 @@ class Timer
         @logger = logger
         @offset2callback = {}
         @mutex = Mutex.new
-    @default_sleep_period = 10
+        @default_sleep_period = 10
          
         Thread.new do
             # would be simpler to just spin, but oh well...
