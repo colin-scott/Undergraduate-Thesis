@@ -41,6 +41,7 @@ require 'mkdot'
 require 'hops'
 require 'failure_analyzer'
 require 'failure_dispatcher'
+require 'java'
 
 # TODO: move me into FailureIsolationConsts
 $node_to_remove = "/homes/network/revtr/spoofed_traceroute/data/sig_usr2_node_to_remove.txt"
@@ -102,10 +103,10 @@ begin
 
    # Loop infinitely
    monitor.start_pull_cycle()
-rescue Exception => e
-   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
+rescue java.lang.OutOfMemoryError
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
+   stacktraces = []
    if logger
         Thread.list.each do |t|
             next if t == Thread.current
@@ -113,16 +114,20 @@ rescue Exception => e
             begin
                 t.raise(Exception.new("trying to get backtrace"))
             rescue Exception => r
-                logger.warn "Thread #{t} backtrace: #{r.backtrace.join("\n")}"
+                stacktrace = "Thread #{t} backtrace: #{r.backtrace.join("\n")}" 
+                logger.warn { stacktrace }
             end
         end
    end
-
+   Emailer.isolation_exception("Thrashing: \n#{stacktraces.join "\n"}")
+rescue Exception => e
    # TODO: if e has a cause, print it (until there are no more causes). 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
+ensure
+   # Send to log in case email doesn't go through
    $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
-   logger.close
-   sleep 1
+   logger.close unless logger.nil?
+   # fail fast!
    throw e
 end
