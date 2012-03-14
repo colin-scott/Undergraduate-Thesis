@@ -6,9 +6,10 @@ require 'failure_isolation_consts'
 require 'outage'
 require 'irb'
 require 'log_iterator'
-require 'db_interface'
+require 'rubygems'
+require 'mkdot'
 
-$db = DatabaseInterface.new
+$dot_gen = DotGenerator.new
 
 outage_ids = ARGV.clone
 
@@ -29,5 +30,7 @@ outage_ids.each do |outage_id|
     end
 
     $o = o
-    IRB.start
+    require 'ruby-debug'
+    debugger
+    $dot_gen.generate_jpg($o, "/homes/network/revtr/www/isolation_graphs/colin_testing/#{File.basename o.file}.jpg")
 end

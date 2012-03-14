@@ -60,15 +60,9 @@ class DotGenerator
     # dot by hand (pruning, say) or move the legend to a different location.
     def generate_jpg(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN)
         generate_image(outage, output, legend_fn, extension='jpg')
-#         raise "Output file must be a .jpg!" unless output =~ /\.jpg$/
-#         dot_output = output.gsub(/\.jpg$/, ".dot")
-#         create_dot_file(outage, dot_output)
-#         no_legend = output.gsub(/\.jpg$/, '_no_legend.png')
-#         system "dot -Tpng:cairo #{dot_output} > #{no_legend}"
-#         system "composite -gravity northeast #{legend_fn} #{no_legend} #{output.gsub(/\.jpg$/, ".png")}"
     end
 
-    def generate_png(outage, output="/tmp/t.jpg", legend_fn=$DOT_LEGEND_FN)
+    def generate_png(outage, output="/tmp/t.png", legend_fn=$DOT_LEGEND_FN)
         generate_image(outage, output, legend_fn, extension='png')
     end
 
@@ -86,7 +80,7 @@ class DotGenerator
     def create_dot_file(outage, output)
         # TODO: fix the references so we don't have to type this out
         src = outage.src
-        dst = outage.dst
+        dst = outage.dst.strip
         direction = outage.direction
         dataset = outage.dataset
         tr = outage.tr
@@ -105,17 +99,19 @@ class DotGenerator
 
         # the source is not included in the forward traceroutes, so we insert
         # a mock hop object into the beginning of the paths
-        src_ip = $pl_ip2host[src]
+        src_ip = src #  $pl_ip2host[src]
         src_ip = (Resolv.getaddress(src) rescue src) unless src_ip.matches_ip?
         src_ip = "0.0.0.0" unless src_ip.matches_ip?
         src_hop = Hop.new(src_ip, src, @ip_info)
-        tr = ForwardPath.new(src, dst, [src_hop] + tr)
-        spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr)
-        historic_tr = ForwardPath.new(src, dst, [src_hop] + historic_tr)
+        src_hop.ttl = 0
+        tr = ForwardPath.new(src, dst, [src_hop] + tr.hops)
+        spoofed_tr = ForwardPath.new(src, dst, [src_hop] + spoofed_tr.hops)
+        src_historical_hop = HistoricalForwardHop.new(0, src_ip, @ip_info)
+        historic_tr = ForwardPath.new(src, dst, [src_historical_hop] + historic_tr.hops)
 
         if historic_revtr.valid? and historic_revtr[0].ip != dst
-            dst_hop = Hop.new(dst, @ip_info)
-            historic_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historic_revtr)
+            dst_hop = ReverseHop.new(dst, 0, @ip_info)
+            historic_revtr = HistoricalReversePath.new(dst, src, [dst_hop] +  historic_revtr.hops)
         end
 
         # Cluster -> dns names we have seen for the cluster
@@ -179,7 +175,6 @@ class DotGenerator
                          node2neighbors, edge_seen_in_measurements, edge_attributes, node2isp, oooo_marker)
             end
         end
-
         
         # Add labels
         node2names.each_pair do |node,ips|

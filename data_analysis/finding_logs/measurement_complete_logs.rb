@@ -40,3 +40,5 @@ LogIterator.iterate_all_logs(options) do |o|
     #    $stderr.puts "Exception: #{e} #{e.backtrace} #{o.file}"
     #end
 end
+
+FileUtils.mv(Dir.glob("/homes/network/revtr/www/isolation_graphs/potential_cases/jpgs/*dot"), "/homes/network/revtr/www/isolation_graphs/potential_cases/dots")

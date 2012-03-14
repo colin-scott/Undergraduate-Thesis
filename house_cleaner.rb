@@ -383,6 +383,7 @@ class HouseCleaner
     # TODO: make the blacklist site-specific, not host-specific
     def swap_out_faulty_nodes(faulty_nodes)
         return if faulty_nodes.empty?
+        faulty_nodes = faulty_nodes.map { |hostname| hostname.downcase }
 
         # TODO: create a "isolation_warning" email template
         Emailer.isolation_exception("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes.join "\n"}").deliver
@@ -412,17 +413,22 @@ class HouseCleaner
 
         faulty_nodes.each do |broken_vp|
             if !current_nodes.include? broken_vp
-                @logger.warn { "#{broken_vp} not in current node set..." }
+                @logger.warn { "#{broken_vp} was not in current node set." }
                 next 
             end
         
             current_nodes.delete broken_vp
             blacklist.add broken_vp
+            # TODOC: Send a signal to ourselves? I guess there are other
+            # clients of house_cleaner.rb
             system "echo #{broken_vp} > #{FailureIsolation::NodeToRemovePath} && pkill -SIGUSR2 -f run_failure_isolation.rb"
         end
 
         while current_nodes.size < FailureIsolation::NumActiveNodes
-            raise "No more nodes left to swap!" if available_nodes.empty?
+            if available_nodes.empty?
+                Emailer.isolation_exception("No more nodes to swap!", "ikneaddough@gmail.com").deliver
+                raise "No more nodes left to swap!" 
+            end
             new_vp = available_nodes.shift
             new_vp_site = FailureIsolation.Node2Site[new_vp]
             next if current_sites.include? new_vp_site

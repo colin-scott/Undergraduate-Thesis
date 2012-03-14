@@ -17,6 +17,7 @@
 
 require 'forwardable'
 require 'isolation_utilities.rb'
+require 'isolation_mail'
 
 # Generic Path class
 class Path
@@ -68,10 +69,8 @@ class Path
 
    # Make sure the measuremed path is reasonable
    def sanitize_hops!()
-       # TODO: don't return... raise!
        if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } or @hops.empty?
-            @hops = []
-            return
+           raise "Doesn't quack like a hop!"
        end
        get_rid_of_wonky_last_hop
        remove_redundant_dsts
@@ -558,6 +557,8 @@ class Hop
         return !@ping_responsive && @reachable_from_other_vps
     end
 
+    alias :pingable_from_anyone :pingable_from_other_vps
+
     # Is this hop a (veritable) border router?
     def on_as_boundary?
         if !@previous.nil? && @previous.asn != @asn && @previous.ip != "0.0.0.0"
@@ -688,6 +689,13 @@ class ReverseHop < Hop
                 @dns = @ip
             end
 
+        when 3 # ip, ttl, ip_info
+            @ip, @ttl, ipInfo = args
+            @type = :mock_hop
+            @dns = ipInfo.resolve_dns(@ip, @ip)
+            @ttl = @ttl.to_i
+            @valid_ip = (@ip != "0.0.0.0")
+            @formatted = "#{@ttl}.  #{dns} (#{@ip}) #{@type}"
         when 5 # parse from print_cached_reverse_path_reasons.rb
             @ip, @ttl, @type, sym_reasons, ipInfo = args
             @type = @type.to_sym
@@ -704,6 +712,7 @@ class ReverseHop < Hop
             @prefix, @asn = ipInfo.getInfo(@ip)
         rescue Exception => e
             # XXX for debugging purposes
+            raise e
             Emailer.isolation_exception("formatted: #{@formatted} \n#{e} \n#{e.backtrace.join("<br />")}").deliver
         end
     end
