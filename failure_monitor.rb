@@ -238,15 +238,15 @@ class FailureMonitor
         end
 
         if num_behind_nodes == FailureIsolation.CurrentNodes.size 
-            Emailer.isolation_exception("Warning: all VPs were skipped due to out of date ping state").deliver
+            Emailer.isolation_warning("Warning: all VPs were skipped due to out of date ping state").deliver
         end
 
         if num_source_problems == FailureIsolation.CurrentNodes.size 
-            Emailer.isolation_exception("Warning: all VPs were skipped due to high # of reported outages").deliver
+            Emailer.isolation_warning("Warning: all VPs were skipped due to high # of reported outages").deliver
         end
 
         if not stale_nodes.empty?
-            Emailer.isolation_exception(%{The following nodes have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
+            Emailer.isolation_warning(%{The following nodes have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
         end
 
         # nodes with problems at the source are excluded from node2targetstate
@@ -265,7 +265,7 @@ class FailureMonitor
             mtime = Time.parse(date + " " + clock)
             return [node, mtime]
         rescue Exception => e
-            Emailer.isolation_exception("unparseable filename #{yaml} #{e.backtrace}", "ikneaddough@gmail.com").deliver
+            Emailer.isolation_warning("unparseable filename #{yaml} #{e.backtrace}", "ikneaddough@gmail.com").deliver
             hostname = File.basename(yaml).gsub(/_target_state.yml$/, "")
             if hostname == "target_state.yml"
                 hostname = `#{FailureIsolation::PPTASKS} ssh #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} \
@@ -438,7 +438,7 @@ class FailureMonitor
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
         if (FailureIsolation.AllNodes - FailureIsolation.NodeBlacklist).empty?
-            Emailer.isolation_exception("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}").deliver
+            Emailer.isolation_warning("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}", ["ikneaddoug@gmail.com", "failures@cs.washington.edu"]).deliver
             return
         end
         

@@ -103,6 +103,7 @@ begin
    # Loop infinitely
    monitor.start_pull_cycle()
 rescue Exception => e
+   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
    if logger

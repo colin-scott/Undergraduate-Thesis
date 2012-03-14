@@ -29,12 +29,12 @@ require 'thread'
 Thread.abort_on_exception = true
 
 class Timer
-    @@default_sleep_period = 10
 
     def initialize(logger)
         @logger = logger
         @offset2callback = {}
         @mutex = Mutex.new
+    @default_sleep_period = 10
          
         Thread.new do
             # would be simpler to just spin, but oh well...
@@ -44,7 +44,7 @@ class Timer
                 begin
                     sleep period if period > 0
                 rescue Exception => e
-                    @logger.warn "Exception while sleeping in poisoner.. #{e} #{e.backtrace.inspect}"
+                    @logger.warn "Exception while sleeping in poisoner.. #{e.message} #{e.backtrace}"
                 end
                 after_sleep = Time.now
                 @offset2callback = update_times(after_sleep.to_i - before_sleep.to_i)
@@ -70,10 +70,9 @@ class Timer
     end
 
     def calculate_sleep_period()
-        sleep_period = nil
+        sleep_period = @default_sleep_period
         @mutex.synchronize do
-            sleep_period = @offset2callback.keys.min
-            sleep_period ||= @@default_sleep_period 
+            sleep_period = @offset2callback.keys.min if @offset2callback.length>0
         end
         sleep_period
     end
@@ -318,7 +317,7 @@ class Poisoner
 
         @logger.debug { "before poison" }
         # Y U THRASH?
-        Emailer.isolation_exception("Poisoning #{src} #{asn}").deliver
+        Emailer.isolation_warning("Poisoning #{src} #{asn}").deliver
 
         @logger.debug { "about to poison" }
         # (logs event on riot)

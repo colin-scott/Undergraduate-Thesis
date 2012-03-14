@@ -69,8 +69,12 @@ class Path
 
    # Make sure the measuremed path is reasonable
    def sanitize_hops!()
-       if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } or @hops.empty?
-           raise "Doesn't quack like a hop!"
+       # DRC: removed the 'or @hops.empty?' because none of Colin's code an
+       # handle the exception, and it causes the entire isolation system to
+       # bomb
+       return if @hops.empty?
+       if @hops.find { |h| !h.respond_to?(:ip) or !h.ip or !h.respond_to?(:ttl) or !h.ttl } #or @hops.empty?
+           raise "Doesn't quack like a hop! (#{caller[0..5]})"
        end
        get_rid_of_wonky_last_hop
        remove_redundant_dsts
@@ -445,7 +449,7 @@ class ForwardPath < Path
 
    def last_non_zero_hop()
         last_hop = @hops.reverse.find { |hop| hop.ip != "0.0.0.0" }
-        return (last_hop.nil? || last_hop.is_a?(MockHop)) ? nil : last_hop
+        return (last_hop.nil? ) ? nil : last_hop
    end
 
    # Did the measurement reach the given destination?
@@ -477,7 +481,7 @@ class ForwardPath < Path
        # for normal tr this is exactly what we want
        # for historical tr and spoofed tr, we actually want to identify
        # the first /non-responsive/ hop as the suspected failure
-       @hops.reverse.find { |hop| !hop.is_a?(MockHop) && hop.ping_responsive && hop.ip != "0.0.0.0" }
+       @hops.reverse.find { |hop|  hop.ping_responsive && hop.ip != "0.0.0.0" }
    end
 
    def valid?()
@@ -713,7 +717,7 @@ class ReverseHop < Hop
         rescue Exception => e
             # XXX for debugging purposes
             raise e
-            Emailer.isolation_exception("formatted: #{@formatted} \n#{e} \n#{e.backtrace.join("<br />")}").deliver
+            Emailer.isolation_warning("formatted: #{@formatted} \n#{e} \n#{e.backtrace.join("<br />")}").deliver
         end
     end
 

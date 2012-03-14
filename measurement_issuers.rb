@@ -373,7 +373,11 @@ module Parsers
                 src, dst = srcdst
                 # Note that sorting ttls and removing redundant hops is
                 # performed in the ForwardPath initializer
+                begin
                 srcdst2path[srcdst] = ForwardPath.new(src, dst, hops)
+                rescue Exception
+                    @logger.warn { "invalid forward path (#{caller[3..6]})! src: #{src} #{dst} #{hops}" }
+                end
             end
 
             srcdst2path

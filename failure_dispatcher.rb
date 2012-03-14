@@ -91,7 +91,7 @@ class FailureDispatcher
                     @rtrSvc.respond_to?(:anything?)
                 rescue DRb::DRbConnError
                     # Email only gets sent to Dave for now
-                    Emailer.isolation_exception("Revtr Service is down!", "choffnes@cs.washington.edu").deliver
+                    Emailer.isolation_warning("Revtr Service is down!", "choffnes@cs.washington.edu").deliver
                 end 
             end
         end
@@ -109,9 +109,9 @@ class FailureDispatcher
         end
 
         if registered_vps.empty?
-            Emailer.isolation_exception("No VPs are registered with the controller!").deliver
+            Emailer.isolation_warning("No VPs are registered with the controller!").deliver
         elsif Set.new(under_quarantine) == Set.new(registered_vps)
-            Emailer.isolation_exception("All VPs are quarentined!").deliver
+            Emailer.isolation_warning("All VPs are quarentined!").deliver
         end
 
         registered_vps
@@ -449,7 +449,7 @@ class FailureDispatcher
     # than this longgg method
     def gather_measurements(outage, filter_tracker)
         reverse_problem = outage.pings_towards_src.empty?
-        forward_problem = !outage.spoofed_tr.reached?(outage.dst)
+        forward_problem = outage.spoofed_tr.nil? or !outage.spoofed_tr.reached?(outage.dst)
 
         outage.direction = @failure_analyzer.infer_direction(reverse_problem, forward_problem)
         @logger.debug { "direction: #{outage.direction}" }
@@ -683,7 +683,7 @@ class FailureDispatcher
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_connection_refused])
         rescue Exception, NoMethodError => e
-            Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver 
+            Emailer.isolation_warning("#{e} \n#{e.backtrace.join("<br />")}").deliver 
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_exception])
         rescue Timeout::Error

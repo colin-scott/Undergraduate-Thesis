@@ -241,7 +241,7 @@ module RegistrationFilters
                 #{email_warnings.join "\n"}
             }
             
-            Emailer.isolation_exception(message, "ikneaddough@gmail.com").deliver
+            Emailer.isolation_warning(message, ["ikneaddough@gmail.com", "failures@cs.washington.edu"]).deliver
 
             # Swap out nodes, but only if they have been unresponsive for more
             # than 5 rounds. check_up_and_restart_vps.rb is run every half

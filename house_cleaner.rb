@@ -386,7 +386,7 @@ class HouseCleaner
         faulty_nodes = faulty_nodes.map { |hostname| hostname.downcase }
 
         # TODO: create a "isolation_warning" email template
-        Emailer.isolation_exception("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes.join "\n"}").deliver
+        Emailer.isolation_warning("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes.join "\n"}").deliver
         @logger.debug { "swapping out faulty nodes: #{faulty_nodes}" }
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
@@ -426,7 +426,7 @@ class HouseCleaner
 
         while current_nodes.size < FailureIsolation::NumActiveNodes
             if available_nodes.empty?
-                Emailer.isolation_exception("No more nodes to swap!", "ikneaddough@gmail.com").deliver
+                Emailer.isolation_warning("No more nodes to swap!", "ikneaddough@gmail.com").deliver
                 raise "No more nodes left to swap!" 
             end
             new_vp = available_nodes.shift
