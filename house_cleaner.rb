@@ -17,7 +17,6 @@ require 'drb'
 #           of the spoofer sites)
 class HouseCleaner
     def initialize(logger=LoggerLog.new($stderr), db=DatabaseInterface.new)
-        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
         @logger = logger
         @db = db
     end
@@ -385,11 +384,12 @@ class HouseCleaner
         return if faulty_nodes.empty?
         faulty_nodes = faulty_nodes.map { |hostname| hostname.downcase }
 
-        # TODO: create a "isolation_warning" email template
         Emailer.isolation_warning("Swapping out faulty nodes (#{caller}):\n\n #{faulty_nodes.join "\n"}").deliver
-        @logger.debug { "swapping out faulty nodes: #{faulty_nodes}" }
 
         all_nodes = Set.new(@db.controllable_isolation_vantage_points.keys)
+        if all_nodes.empty?
+            raise "No nodes are controllable!"
+        end
         blacklist = FailureIsolation.NodeBlacklist
         current_nodes = FailureIsolation.CurrentNodes
         current_sites = Set.new(current_nodes.map { |node| FailureIsolation.Node2Site[node] })
@@ -397,25 +397,22 @@ class HouseCleaner
         
 		# stop tcpdump on nodes being swapped out:
 		begin
-		node2node = Hash.new
-		faulty_nodes.each { |node| node2node[node] = node }
-		@controller.issue_command_on_hosts(node2node) do |vp, node|
-			@logger.warn("stopping tcpdump on #{node}")
-			begin
-				vp.stop_tcpdump()
-			rescue Exception => e
-				@logger.warn("#{node} raised #{e}")
-			end
-		end
+		    node2node = Hash.new
+		    faulty_nodes.each { |node| node2node[node] = node }
+		    @controller.issue_command_on_hosts(node2node) do |vp, node|
+		    	@logger.warn("stopping tcpdump on #{node}")
+		    	begin
+		    		vp.stop_tcpdump()
+		    	rescue Exception => e
+		    		@logger.warn("#{node} raised #{e}")
+		    	end
+		    end
 		rescue Exception => e
 			@logger.warn("#{e}\n#{e.backtrace.join("\n")}")
 		end
 
         faulty_nodes.each do |broken_vp|
-            if !current_nodes.include? broken_vp
-                @logger.warn { "#{broken_vp} was not in current node set." }
-                next 
-            end
+            next if !current_nodes.include? broken_vp
         
             current_nodes.delete broken_vp
             blacklist.add broken_vp

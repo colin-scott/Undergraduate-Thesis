@@ -367,7 +367,7 @@ module FailureIsolation
                     #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
         
         # target list is pulled from toil
-        #
+        
         # target list is pulled from riot as well
     end
 
@@ -495,6 +495,9 @@ module PoP
 end
 
 if $0 == __FILE__
+    puts FailureIsolation.NodeBlacklist.inspect
+    puts FailureIsolation.AllNodes.inspect
+    puts FailureIsolation.CurrentNodes.inspect
     #puts `#{FailureIsolation::CurrentPoisoningsPath}`
     #puts FailureIsolation.SpooferTargets.to_a.inspect
     #puts FailureIsolation.MuxNodes.inspect

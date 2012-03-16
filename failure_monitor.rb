@@ -211,13 +211,15 @@ class FailureMonitor
                 hash = {}
                 yml_hash.each do |k,v|
                    hash[k.strip] = v
-                end 
+               end 
             rescue Exception => e
                 @logger.warn { "Corrupt YAML file: #{node}" }
                 next
             end
 
             if not (hash.keys - FailureIsolation.TargetSet).empty?
+                # TODO: this seems to be problematic for BGPMux nodes and
+                # other...
                 @logger.warn("#{node} targets mismatches current target set:\n\tMonitored: #{hash.keys.length} Target set: #{FailureIsolation.TargetSet.length} Diff: #{(hash.keys-FailureIsolation.TargetSet).length}")
                 stale_nodes << node
                 next
@@ -438,7 +440,7 @@ class FailureMonitor
     def swap_out_faulty_nodes()
         # First check if no nodes are left to swap out
         if (FailureIsolation.AllNodes - FailureIsolation.NodeBlacklist).empty?
-            Emailer.isolation_warning("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}", ["ikneaddoug@gmail.com", "failures@cs.washington.edu"]).deliver
+            Emailer.isolation_warning("No nodes left to swap out!\nSee: #{FailureIsolation::NodeBlacklistPath}", ["ikneaddough@gmail.com", "failures@cs.washington.edu"]).deliver
             return
         end
         

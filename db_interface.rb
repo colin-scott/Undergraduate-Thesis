@@ -457,6 +457,8 @@ end
 if $0 == __FILE__
     db = DatabaseInterface.new
     # puts db.fetch_pingability(ARGV).inspect
-    puts db.node_hostname("38.98.51.15")
-    puts db.check_target_probing_status(FailureIsolation.TargetSet)
+    #puts db.node_hostname("38.98.51.15")
+    #puts db.check_target_probing_status(FailureIsolation.TargetSet)
+    all_nodes = Set.new(db.controllable_isolation_vantage_points.keys)
+    puts all_nodes.inspect
 end
