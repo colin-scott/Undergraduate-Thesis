@@ -399,14 +399,16 @@ class HouseCleaner
 		begin
 		    node2node = Hash.new
 		    faulty_nodes.each { |node| node2node[node] = node }
-		    @controller.issue_command_on_hosts(node2node) do |vp, node|
-		    	@logger.warn("stopping tcpdump on #{node}")
-		    	begin
-		    		vp.stop_tcpdump()
-		    	rescue Exception => e
-		    		@logger.warn("#{node} raised #{e}")
-		    	end
-		    end
+            ProbeController::issue_to_controller do |controller|
+		        controller.issue_command_on_hosts(node2node) do |vp, node|
+		        	@logger.warn("stopping tcpdump on #{node}")
+		        	begin
+		        		vp.stop_tcpdump()
+		        	rescue Exception => e
+		        		@logger.warn("#{node} raised #{e}")
+		        	end
+		        end
+            end
 		rescue Exception => e
 			@logger.warn("#{e}\n#{e.backtrace.join("\n")}")
 		end

@@ -24,9 +24,6 @@ class FailureMonitor
         @logger = logger
         @email = email
         @house_cleaner = house_cleaner
-        @controller = DRb::DRbObject.new_with_uri(FailureIsolation::ControllerUri)
-		puts @controller.inspect
-		puts @controller.hosts.inspect
 
         # TODO: handle these with optparse
         @@minutes_per_round = FailureIsolation::DefaultPeriodSeconds / 60
@@ -106,18 +103,23 @@ class FailureMonitor
             begin
 			    node2node = Hash.new
 			    nodes = FailureIsolation::CurrentNodes()
-                up_hosts = @controller.hosts
+                up_hosts = []
+                ProbeController.issue_to_controller do |controller|
+                    up_hosts = controller.hosts
+                end
 			    nodes.each { |node| node2node[node] = node if up_hosts.include? node }
-			    @controller.issue_command_on_hosts(node2node) do |vp, node|
-			    	begin
-			    		@logger.info("checking tcpdump on #{node}")
-			    		if not vp.tcpdump_is_running()
-			    			vp.start_tcpdump()
-			    		end
-			    	rescue Exception => e
-			    		@logger.warn("#{node} raised #{e}")
-			    	end
-			    end
+                ProbeController.issue_to_controller do |controller|
+			        controller.issue_command_on_hosts(node2node) do |vp, node|
+			        	begin
+			        		@logger.info("checking tcpdump on #{node}")
+			        		if not vp.tcpdump_is_running()
+			        			vp.start_tcpdump()
+			        		end
+			        	rescue Exception => e
+			        		@logger.warn("#{node} raised #{e}")
+			        	end
+			        end
+                end
             rescue Exception => e
                 @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
             end
