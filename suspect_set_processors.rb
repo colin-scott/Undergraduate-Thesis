@@ -272,9 +272,6 @@ class Pruner
             results |= ip_addrs
         end
 
-
-        # TODO: I suspect that this block of code may be the cause of the
-        # heap overflows....
         if results.empty?
             uuid = (0...36).map { (97 + rand(25)).chr }.join
             FileUtils.mkdir_p("#{FailureIsolation::EmptyPingsLogDir}/#{uuid}")

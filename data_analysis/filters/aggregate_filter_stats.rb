@@ -11,6 +11,7 @@ $: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute/data_analysis"
 
 require 'log_iterator'
 require 'log_filterer'
+require 'failure_analyzer'
 require 'data_analysis'
 require 'filter_stats'
 require 'filters'
