@@ -24,6 +24,7 @@ require 'pstore'
 require 'timeout'
 require 'house_cleaner'
 require 'isolation_issuer'
+require 'java'
 
 $TEST_THREADS = false
 if RUBY_PLATFORM == "java"
@@ -682,6 +683,8 @@ class FailureDispatcher
         rescue DRb::DRbConnError => e
             connect_to_drb()
             return SpoofedReversePath.new(src, dst, [:drb_connection_refused])
+        rescue java.lang.OutOfMemoryError => e
+            raise "OOM here! #{e.backtrace.inspect}"
         rescue Exception, NoMethodError => e
             Emailer.isolation_warning("#{e} \n#{e.backtrace.join("<br />")}").deliver 
             connect_to_drb()

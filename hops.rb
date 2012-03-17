@@ -716,8 +716,8 @@ class ReverseHop < Hop
             @prefix, @asn = ipInfo.getInfo(@ip)
         rescue Exception => e
             # XXX for debugging purposes
-            raise e
             Emailer.isolation_warning("formatted: #{@formatted} \n#{e} \n#{e.backtrace.join("<br />")}").deliver
+            raise e
         end
     end
 

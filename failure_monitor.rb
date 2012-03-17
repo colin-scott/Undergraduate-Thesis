@@ -14,6 +14,7 @@ require 'filter_stats'
 require 'isolation_utilities.rb'
 require 'time'
 require 'filters'
+require 'java'
 
 class FailureMonitor
     attr_accessor :dispatcher
@@ -49,7 +50,7 @@ class FailureMonitor
         begin
             @vps_2_targets_never_seen = YAML.load_file(FailureIsolation::NonReachableTargetPath)
             raise unless @vps_2_targets_never_seen
-        rescue Exception => e
+        rescue Errno::ENOENT
             @vps_2_targets_never_seen = {}
 
             # unresponsive until proven otherwise
@@ -61,7 +62,7 @@ class FailureMonitor
             # [node, target] -> last time outage was observed
             @nodetarget2lastoutage = (File.readable? FailureIsolation::LastObservedOutagePath) ? YAML.load_file(FailureIsolation::LastObservedOutagePath) : {}
             raise unless @nodetarget2lastoutage.is_a?(Hash)
-        rescue Exception => e
+        rescue Errno::ENOENT
             @nodetarget2lastoutage = {}
         end
 
@@ -152,28 +153,24 @@ class FailureMonitor
     end
 
     def start_tcpdump()
-        begin
-            node2node = Hash.new
-            nodes = FailureIsolation.CurrentNodes()
-            up_hosts = []
-            ProbeController.issue_to_controller do |controller|
-                up_hosts = controller.hosts
+        node2node = Hash.new
+        nodes = FailureIsolation.CurrentNodes()
+        up_hosts = []
+        ProbeController.issue_to_controller do |controller|
+            up_hosts = controller.hosts
+        end
+        nodes.each { |node| node2node[node] = node if up_hosts.include? node }
+        ProbeController.issue_to_controller do |controller|
+            controller.issue_command_on_hosts(node2node) do |vp, node|
+            	begin
+            		@logger.info("checking tcpdump on #{node}")
+            		if not vp.tcpdump_is_running()
+            			vp.start_tcpdump()
+            		end
+            	rescue NameError::message
+            		@logger.warn("Italo #{node} raised #{e}")
+            	end
             end
-            nodes.each { |node| node2node[node] = node if up_hosts.include? node }
-            ProbeController.issue_to_controller do |controller|
-                controller.issue_command_on_hosts(node2node) do |vp, node|
-                	begin
-                		@logger.info("checking tcpdump on #{node}")
-                		if not vp.tcpdump_is_running()
-                			vp.start_tcpdump()
-                		end
-                	rescue Exception => e
-                		@logger.warn("#{node} raised #{e}")
-                	end
-                end
-            end
-        rescue Exception => e
-            @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
         end
     end
 
@@ -221,7 +218,7 @@ class FailureMonitor
                 yml_hash.each do |k,v|
                    hash[k.strip] = v
                end 
-            rescue Exception => e
+            rescue ArgumentError
                 @logger.warn { "Corrupt YAML file: #{node}" }
                 next
             end
@@ -291,6 +288,8 @@ class FailureMonitor
             date = date[0...up_to_year_index]
             mtime = Time.parse(date + " " + clock)
             return [node, mtime]
+        rescue java.lang.OutOfMemoryError => e
+            raise "OOM here! #{e.backtrace.inspect}"
         rescue Exception => e
             Emailer.isolation_warning("unparseable filename #{yaml} #{e.backtrace}", "ikneaddough@gmail.com").deliver
             hostname = File.basename(yaml).gsub(/_target_state.yml$/, "")

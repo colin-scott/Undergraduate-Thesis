@@ -7,6 +7,7 @@
 require 'hops'
 require 'set'
 require 'failure_isolation_consts'
+require 'java'
 
 # What heuristic was used to merge the Outages 
 module MergingMethod
@@ -275,6 +276,8 @@ class Outage
            # +- 30 days. fuckit
            begin
                return Time.parse("#{year}.#{month}.#{timestamp[0...1]}")
+           rescue java.lang.OutOfMemoryError => e
+                raise "OOM here! #{e.backtrace.inspect}"
            rescue Exception
                $stderr.puts "Excpetion #{e} : #{year}.#{month}.#{timestamp[0...1]}"
                raise

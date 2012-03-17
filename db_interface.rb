@@ -24,6 +24,7 @@ require 'socket'
 require 'isolation_utilities'
 require 'set'
 require 'failure_isolation_consts'
+require 'java'
 
 # TODO: make all static sql queries class variables
 class DatabaseInterface
@@ -316,6 +317,8 @@ class DatabaseInterface
               results.each_hash{|row|
                 reason = row["state"] + " at " + row["lastUpdate"]
               }
+            rescue java.lang.OutOfMemoryError => e
+                raise "OOM here! #{e.backtrace.inspect}"
             rescue Exception
               @logger.warn { "Error with query: #{sql}" }
               @logger.puts $!
@@ -362,6 +365,8 @@ class DatabaseInterface
 
           break unless path.empty?
         end # results.each_hash
+      rescue java.lang.OutOfMemoryError => e
+        raise "OOM here! #{e.backtrace.inspect}"
       rescue Exception
         @logger.info { "Error with query: #{sql}" }
         @logger.puts $!

@@ -11,6 +11,7 @@ require 'socket'
 require 'isolation_utilities.rb'
 require 'db_interface'
 require 'drb'
+require 'java'
 
 # Invariant:
 #    - Never monitor a site that already has a monitoring node (only the rest
@@ -199,15 +200,12 @@ class HouseCleaner
 
         sorted_replacement_pops = sorted_pops.find_all { |pop| !currently_used_pops.include? pop }
 
-        begin
-            File.open(FailureIsolation::HarshaPoPsPath, "w+") do |f| 
-                pop2corertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
-            end
-            File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+") do |f| 
-                pop2edgertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
-            end
-        rescue Exception
-            @logger.info { "EXCEPTION: #{$!.to_s} #{$!.backtrace.join("\n")}" }
+        File.open(FailureIsolation::HarshaPoPsPath, "w+") do |f| 
+            pop2corertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
+        end
+
+        File.open(FailureIsolation::BeyondHarshaPoPsPath, "w+") do |f| 
+            pop2edgertrs.values.each { |ips| f.puts ips.sort_by{rand}[0] }
         end
 
         [sorted_replacement_pops, pop2corertrs, pop2edgertrs]
@@ -396,22 +394,20 @@ class HouseCleaner
         available_nodes = (all_nodes - blacklist - current_nodes).to_a.sort_by { |node| rand }
         
 		# stop tcpdump on nodes being swapped out:
-		begin
-		    node2node = Hash.new
-		    faulty_nodes.each { |node| node2node[node] = node }
-            ProbeController::issue_to_controller do |controller|
-		        controller.issue_command_on_hosts(node2node) do |vp, node|
-		        	@logger.warn("stopping tcpdump on #{node}")
-		        	begin
-		        		vp.stop_tcpdump()
-		        	rescue Exception => e
-		        		@logger.warn("#{node} raised #{e}")
-		        	end
-		        end
-            end
-		rescue Exception => e
-			@logger.warn("#{e}\n#{e.backtrace.join("\n")}")
-		end
+		node2node = Hash.new
+		faulty_nodes.each { |node| node2node[node] = node }
+        ProbeController::issue_to_controller do |controller|
+		    controller.issue_command_on_hosts(node2node) do |vp, node|
+		    	@logger.warn("stopping tcpdump on #{node}")
+		    	begin
+		    		vp.stop_tcpdump()
+                rescue java.lang.OutOfMemoryError => e
+                    raise "OOM here! #{e.backtrace.inspect}"
+		    	rescue Exception => e
+		    		@logger.warn("#{node} raised #{e}")
+		    	end
+		    end
+        end
 
         faulty_nodes.each do |broken_vp|
             next if !current_nodes.include? broken_vp
