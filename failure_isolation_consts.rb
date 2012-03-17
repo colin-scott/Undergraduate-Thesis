@@ -5,6 +5,8 @@ $: << "./"
 # Constants (and assorted convenience methods) for the isolation system.
 #
 # Lazily evaluates all large datasets
+#
+# TODO: OOM's are potentially due to IO.read's in this file...
 
 require 'set'
 require 'isolation_utilities.rb'

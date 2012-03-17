@@ -171,8 +171,7 @@ class HouseCleaner
         # TODO: filter out core routers which aren't ping responsive?
                         
         # only grab edge routers seen from at least one of our VPs
-        current_vps = Set.new(IO.read(FailureIsolation::CurrentNodesPath).split("\n")\
-                              .map { |node| @db.hostname2ip[node] })
+        current_vps = FailureIsolation.CurrentNodes.map { |node| @db.hostname2ip[node] }
 
         # generate pop, edge mappings; convert to ints to save memory
         popsrcdsts = []
