@@ -189,7 +189,7 @@ class FailureMonitor
         stale_nodes = []
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
-        @problems_at_the_source = []
+        @problems_at_the_source = {}
         @outdated_nodes.delete_if { |k,v| not FailureIsolation.CurrentNodes.include? k }
 
         Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
