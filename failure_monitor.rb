@@ -100,30 +100,8 @@ class FailureMonitor
             start = Time.new
 
 			# start tcpdump on hot VPs if not started yet:
-            begin
-			    node2node = Hash.new
-			    nodes = FailureIsolation.CurrentNodes()
-                up_hosts = []
-                ProbeController.issue_to_controller do |controller|
-                    up_hosts = controller.hosts
-                end
-			    nodes.each { |node| node2node[node] = node if up_hosts.include? node }
-                ProbeController.issue_to_controller do |controller|
-			        controller.issue_command_on_hosts(node2node) do |vp, node|
-			        	begin
-			        		@logger.info("checking tcpdump on #{node}")
-			        		if not vp.tcpdump_is_running()
-			        			vp.start_tcpdump()
-			        		end
-			        	rescue Exception => e
-			        		@logger.warn("#{node} raised #{e}")
-			        	end
-			        end
-                end
-            rescue Exception => e
-                @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
-            end
-
+            start_tcpdump()
+            
             # ==================================== #
             # Grab ping state                      #
             # ==================================== #                                                                                                                                 
@@ -166,6 +144,32 @@ class FailureMonitor
             @logger.info { "Sleeping for #{sleep_period} seconds" }
 
             sleep sleep_period if sleep_period > 0
+        end
+    end
+
+    def start_tcpdump()
+        begin
+            node2node = Hash.new
+            nodes = FailureIsolation.CurrentNodes()
+            up_hosts = []
+            ProbeController.issue_to_controller do |controller|
+                up_hosts = controller.hosts
+            end
+            nodes.each { |node| node2node[node] = node if up_hosts.include? node }
+            ProbeController.issue_to_controller do |controller|
+                controller.issue_command_on_hosts(node2node) do |vp, node|
+                	begin
+                		@logger.info("checking tcpdump on #{node}")
+                		if not vp.tcpdump_is_running()
+                			vp.start_tcpdump()
+                		end
+                	rescue Exception => e
+                		@logger.warn("#{node} raised #{e}")
+                	end
+                end
+            end
+        rescue Exception => e
+            @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
         end
     end
 
@@ -425,6 +429,7 @@ class FailureMonitor
     # ================================================= #                                                                                                                                 
     # Methods for filtering out faulty VPs and targets  # 
     # ================================================= #                                                                                                                                 
+    # TODO: separate these out into a different component?
 
     # Every day, identify broken monitor VPs and unresponsive targets, replace
     # them, and send out a summary email
