@@ -189,6 +189,8 @@ class FailureMonitor
         stale_nodes = []
 
         @not_sshable = FailureIsolation.CurrentNodes.clone
+        @problems_at_the_source = []
+        @outdated_nodes.delete_if { |k,v| not FailureIsolation.CurrentNodes.include? k }
 
         Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
             node, mtime = parse_filename(yaml)
@@ -217,7 +219,7 @@ class FailureMonitor
                 hash = {}
                 yml_hash.each do |k,v|
                    hash[k.strip] = v
-               end 
+                end 
             rescue ArgumentError
                 @logger.warn { "Corrupt YAML file: #{node}" }
                 next
@@ -259,18 +261,27 @@ class FailureMonitor
 
         num_successful = node2targetstate.size
         ping_state_diagnostics = {
-            :successful => num_successful,
-            :problem_at_source => num_source_problems,
-            :behind_nodes => num_behind_nodes,
-            :stale_nodes => stale_nodes.size
+            :successful => [num_successful, node2targetstate.keys],
+            :not_sshable => [@not_sshable.size, @not_sshable],
+            :problem_at_source => [num_source_problems, @problems_at_the_source],
+            :behind_nodes => [num_behind_nodes, @outdated_nodes],
+            :stale_nodes => [stale_nodes.size, stale_nodes]
         }
 
         @logger.info { "Ping state diagnostics: #{ping_state_diagnostics.inspect}" }
 
-        fraction_successful = (num_successful*1.0) / FailureIsolation.CurrentNodes.size
+        current_vps = []
+        ProbeController.issue_to_controller do |controller|
+            current_vps = controller.hosts.clone
+        end
+        fraction_successful = (num_successful*1.0) / current_vps.size
         if fraction_successful < @@ping_success_threshold
-            Emailer.isolation_warning(%{Only #{fraction_successul} nodes have sane ping state data!\n #{ping_state_diagnostics.inspect})},
-                                     ["ikneaddough@gmail.com", "failures@cs.washington.edu"]).deliver
+            message = "Only #{fraction_successul} nodes have sane ping state data!"
+            ping_state_diagnostics.each do |k,v|
+                messsage << "\n"
+                message << "   #{k.inspect} => #{v.inspect}" 
+            end
+            Emailer.isolation_warning(message, ["ikneaddough@gmail.com", "failures@cs.washington.edu"]).deliver
         end
 
         # nodes with problems at the source, stale target lists, etc. are excluded from node2targetstate
