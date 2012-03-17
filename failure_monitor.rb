@@ -102,7 +102,7 @@ class FailureMonitor
 			# start tcpdump on hot VPs if not started yet:
             begin
 			    node2node = Hash.new
-			    nodes = FailureIsolation::CurrentNodes()
+			    nodes = FailureIsolation.CurrentNodes()
                 up_hosts = []
                 ProbeController.issue_to_controller do |controller|
                     up_hosts = controller.hosts
@@ -123,7 +123,6 @@ class FailureMonitor
             rescue Exception => e
                 @logger.warn{"#{e}\n#{e.backtrace.join("\n")}"}
             end
-
 
             # ==================================== #
             # Grab ping state                      #
@@ -356,13 +355,12 @@ class FailureMonitor
     #
     # Returns [srcdst2outage, srcdst2filtertracker]
     def filter_outages(target2observingnode2rounds, target2neverseen, target2stillconnected)
-        # For debugging:
-        total_src_dsts = target2observingnode2rounds.values.reduce(0) { |sum,hash| sum + hash.size }
-
         # [node observing outage, target] -> outage struct
         srcdst2outage = {}
         srcdst2filtertracker = apply_first_lvl_filters!(target2observingnode2rounds, target2neverseen, target2stillconnected)
 
+        # For debugging:
+        total_src_dsts = target2observingnode2rounds.values.reduce(0) { |sum,hash| sum + hash.size }
         if total_src_dsts != srcdst2filtertracker.size
             @logger.warn { "total_src_dsts (#{total_src_dsts}) != srcdst2filterstracker.size (#{srcdst2filtertracker.size})" }
         end
