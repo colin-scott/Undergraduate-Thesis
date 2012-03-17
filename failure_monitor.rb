@@ -80,6 +80,10 @@ class FailureMonitor
         # a particular source to a particular destination
         @@isolation_interval_rounds = 3
 
+        # minimum fraction of current nodes with successul (e.g., not stale) ping monitor data
+        # before a warning email is sent out
+        @@ping_success_threshold = 0.75
+
         # current logical round
         @current_round = 0
     end
@@ -256,7 +260,23 @@ class FailureMonitor
             Emailer.isolation_warning(%{The following nodes have an out-of-date target list\n #{stale_nodes.join "\n"}}).deliver
         end
 
-        # nodes with problems at the source are excluded from node2targetstate
+        num_successful = node2targetstate.size
+        ping_state_diagnostics = {
+            :successful => num_successful,
+            :problem_at_source => num_source_problems,
+            :behind_nodes => num_behind_nodes,
+            :stale_nodes => stale_nodes.size
+        }
+
+        @logger.info { "Ping state diagnostics: #{ping_state_diagnostics.inspect}" }
+
+        fraction_successful = (num_successful*1.0) / FailureIsolation.CurrentNodes.size
+        if fraction_successful < @@ping_success_threshold
+            Emailer.isolation_warning(%{Only #{fraction_successul} nodes have sane ping state data!\n #{ping_state_diagnostics.inspect})},
+                                     ["ikneaddough@gmail.com", "failures@cs.washington.edu"]).deliver
+        end
+
+        # nodes with problems at the source, stale target lists, etc. are excluded from node2targetstate
         node2targetstate
     end
 
