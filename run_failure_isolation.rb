@@ -109,12 +109,11 @@ rescue java.lang.OutOfMemoryError
    stacktraces = []
    if logger
         Thread.list.each do |t|
-            next if t == Thread.current
-
             begin
                 t.raise(Exception.new("trying to get backtrace"))
             rescue Exception => r
-                stacktrace = "Thread #{t} backtrace: #{r.backtrace.join("\n")}" 
+                stacktrace = "Thread #{t} "
+                stacktrace << "backtrace: #{r.backtrace.join("\n")}" unless r.bracktrace.nil?
                 logger.warn { stacktrace }
             end
         end
