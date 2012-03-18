@@ -103,7 +103,7 @@ begin
 
    # Loop infinitely
    monitor.start_pull_cycle()
-rescue java.lang.OutOfMemoryError
+rescue java.lang.OutOfMemoryError => e
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
    stacktraces = []
@@ -124,7 +124,6 @@ rescue Exception => e
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
 ensure
    # Send to log in case email doesn't go through
-   $stderr.puts " Fatal error: #{e} \n#{e.backtrace.join("\n")}"
    monitor.persist_state unless monitor.nil?
    logger.close unless logger.nil?
    # fail fast!
