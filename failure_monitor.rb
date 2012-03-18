@@ -262,7 +262,7 @@ class FailureMonitor
         num_successful = node2targetstate.size
         ping_state_diagnostics = {
             :successful => [num_successful, node2targetstate.keys],
-            :not_sshable => [@not_sshable.size, @not_sshable],
+            :not_sshable => [@not_sshable.size, @not_sshable.to_a],
             :problem_at_source => [num_source_problems, @problems_at_the_source],
             :behind_nodes => [num_behind_nodes, @outdated_nodes.to_a],
             :stale_nodes => [stale_nodes.size, stale_nodes]
