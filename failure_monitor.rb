@@ -264,16 +264,13 @@ class FailureMonitor
             :successful => [num_successful, node2targetstate.keys],
             :not_sshable => [@not_sshable.size, @not_sshable],
             :problem_at_source => [num_source_problems, @problems_at_the_source],
-            :behind_nodes => [num_behind_nodes, @outdated_nodes],
+            :behind_nodes => [num_behind_nodes, @outdated_nodes.to_a],
             :stale_nodes => [stale_nodes.size, stale_nodes]
         }
 
         @logger.info { "Ping state diagnostics: #{ping_state_diagnostics.inspect}" }
 
-        current_vps = []
-        ProbeController.issue_to_controller do |controller|
-            current_vps = controller.hosts.clone
-        end
+        current_vps = FailureIsolation.CurrentNodes + FailureIsolation.lowercase_poisoners
         fraction_successful = (num_successful*1.0) / current_vps.size
         if fraction_successful < @@ping_success_threshold
             message = "Only #{fraction_successful} nodes have sane ping state data!"

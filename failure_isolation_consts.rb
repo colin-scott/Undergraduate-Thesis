@@ -30,6 +30,10 @@ module FailureIsolation
                              "uwas.bgpmux", "prin.bgpmux", "wisc.bgpmux", "clem.bgpmux", "gate.bgpmux",
                              "UWAS.SENTINEL", "PRIN.SENTINEL", "WISC.SENTINEL", "CLEM.SENTINEL", "GATE.SENTINEL",
                              "uwas.sentinel", "prin.sentinel", "wisc.sentinel", "clem.sentinel", "gate.sentinel"])
+
+    def self.lowercase_poisoners()
+        return Set.new(PoisonersNames.to_a.map { |host| host.downcase })
+    end
     
     # Length of each isolation round
     DefaultPeriodSeconds = 360
