@@ -32,7 +32,7 @@ module FailureIsolation
                              "uwas.sentinel", "prin.sentinel", "wisc.sentinel", "clem.sentinel", "gate.sentinel"])
 
     def self.lowercase_poisoners()
-        return Set.new(PoisonersNames.to_a.map { |host| host.downcase })
+        return Set.new(PoisonerNames.to_a.map { |host| host.downcase })
     end
     
     # Length of each isolation round
