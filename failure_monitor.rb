@@ -276,7 +276,7 @@ class FailureMonitor
         end
         fraction_successful = (num_successful*1.0) / current_vps.size
         if fraction_successful < @@ping_success_threshold
-            message = "Only #{fraction_successul} nodes have sane ping state data!"
+            message = "Only #{fraction_successful} nodes have sane ping state data!"
             ping_state_diagnostics.each do |k,v|
                 messsage << "\n"
                 message << "   #{k.inspect} => #{v.inspect}" 
