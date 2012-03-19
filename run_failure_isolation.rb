@@ -113,19 +113,21 @@ rescue java.lang.OutOfMemoryError => e
                 t.raise(Exception.new("trying to get backtrace"))
             rescue Exception => r
                 stacktrace = "Thread #{t} "
-                stacktrace << "backtrace: #{r.backtrace.join("\n")}" unless r.bracktrace.nil?
+                stacktrace << "backtrace: #{r.backtrace.join("\n")}" unless r.backtrace.nil?
                 logger.warn { stacktrace }
             end
         end
    end
    Emailer.isolation_exception("Thrashing: \n#{stacktraces.join "\n"}")
+   # fail fast!
+   throw e unless e.nil?
 rescue Exception => e
    # TODO: if e has a cause, print it (until there are no more causes). 
    Emailer.isolation_exception("#{e} \n#{e.backtrace.join("<br />")}").deliver
+   # fail fast!
+   throw e unless e.nil?
 ensure
    # Send to log in case email doesn't go through
    monitor.persist_state unless monitor.nil?
    logger.close unless logger.nil?
-   # fail fast!
-   throw e
 end

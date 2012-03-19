@@ -49,22 +49,20 @@ class FailureMonitor
         # Persistent storage for { vp hostname -> [non-reachable target1, ... ]
         begin
             @vps_2_targets_never_seen = YAML.load_file(FailureIsolation::NonReachableTargetPath)
-            raise unless @vps_2_targets_never_seen
         rescue Errno::ENOENT
-            @vps_2_targets_never_seen = {}
-
             # unresponsive until proven otherwise
             FailureIsolation.CurrentNodes.each { |node| @vps_2_targets_never_seen[node.chomp] = FailureIsolation.TargetSet }
         end
+        @vps_2_targets_never_seen ||= {}
         
         # Persistent storage for { [vp hostname, target] -> date of last observed outage }
         begin
             # [node, target] -> last time outage was observed
             @nodetarget2lastoutage = (File.readable? FailureIsolation::LastObservedOutagePath) ? YAML.load_file(FailureIsolation::LastObservedOutagePath) : {}
-            raise unless @nodetarget2lastoutage.is_a?(Hash)
         rescue Errno::ENOENT
             @nodetarget2lastoutage = {}
         end
+        @nodetarget2lastoutage ||= {}
 
         # Nodes whose ping results are lagging
         @outdated_nodes = {}

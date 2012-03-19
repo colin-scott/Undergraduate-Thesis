@@ -869,7 +869,7 @@ class FailureDispatcher
           # We assign a unique id for each of today's filter stat objects
           # For now, we use t+src+dst
           srcdst2filter_tracker.each do |srcdst, filter_tracker|
-            second_key = "#{t}#{srcdst}"
+            key = "#{t}#{srcdst}"
             @filter_store[key] = { :time => t, :id => key, :filter_stats => stats }
           end
         end
@@ -923,3 +923,8 @@ end
     
 
 end
+
+if $0 == __FILE__
+    FailureDispatcher.new
+end
+
