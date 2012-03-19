@@ -870,7 +870,7 @@ class FailureDispatcher
           # For now, we use t+src+dst
           srcdst2filter_tracker.each do |srcdst, filter_tracker|
             key = "#{t}#{srcdst}"
-            @filter_store[key] = { :time => t, :id => key, :filter_stats => stats }
+            @filter_store[key] = { :time => t, :id => key, :filter_stats => filter_tracker }
           end
         end
     end
