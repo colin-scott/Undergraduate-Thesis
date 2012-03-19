@@ -140,7 +140,7 @@ module FailureIsolation
     def self.Host2Site()
         return @Host2Site unless @Host2Site.nil?
         @Host2Site = Hash.new { |h,k| k }
-        system "cut -d ' ' -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+        system "cut -d ' ' -f1 #{$DATADIR}/pl_hostnames_w_ips.txt > #{$DATADIR}/pl_hosts.txt"
         @Host2Site.merge!(`#{SiteMapper} #{$DATADIR}/pl_hosts.txt`\
                                           .split("\n").map { |line| line.split }.custom_to_hash)
     end
@@ -204,7 +204,7 @@ module FailureIsolation
     Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
     # Logs of filter (first level, registration, and second level) statistics
-    FilterStatsPath = "#{$DATADIR}/filter_stats"
+    FilterStatsPath = "#{$DATADIR}/filter_stats/filter_stats.tdb"
 
     # Web links
     WebDirectory = "/homes/network/revtr/www/isolation_graphs"
@@ -370,7 +370,7 @@ module FailureIsolation
 
         # push out targets to monitoring nodes! 
         system "#{FailureIsolation::PPTASKS} scp #{FailureIsolation::MonitorSlice} #{FailureIsolation::CurrentNodesPath} 100 100 \
-                    #{TargetSetPath} @:#{MonitorTargetSetPath}", :err => "#{$REV_TR_TOOL_DIR}/failure_isolation_consts.err"
+                    #{TargetSetPath} @:#{MonitorTargetSetPath}"
         
         # target list is pulled from toil
         

@@ -4,6 +4,8 @@ $: << "/homes/network/revtr/spoofed_traceroute/reverse_traceroute"
 
 # Module for iterating over isolation logs. 
 
+require 'rubygems'
+require 'rufus/tokyo'
 require 'fileutils'
 require 'yaml'
 require 'ip_info'
@@ -199,30 +201,20 @@ end
 
 module FilterTrackerIterator
     # Takes a block with filter tracker as arg
-    def self.iterate(options)
-        Dir.chdir FailureIsolation::FilterStatsPath do
-            files = Dir.glob("*").sort
-            
-            start_time = options[:time_start].strftime("%Y.%m.%d")
-            files.delete_if { |file| file < start_time }
-            
-            total = files.size
-            files.each do |file|
-                $stderr.puts "Processing #{file}"
+    def self.iterate(options, &block)
+        # http://rufus.rubyforge.org/rufus-tokyo/
+        table = Rufus::Tokyo::Table.new(FailureIsolation::FilterStatsPath,
+                                        :mode => 'r')
 
-                stats = []
-                store = PStore.new(file)
-                store.transaction(true) do
-                    store.roots.each do |key|
-                        stats << store[key]
-                    end
-                end
+        process_block = lambda do |k,val_hash|
+            filter_stats = val_hash[:filter_stats]
+            block.call(filter_stats) if options.passes_predicates? filter_stats
+        end
 
-                stats.each do |stat|
-                    next unless options.passes_predicates?(stat)
-                    yield stat
-                end
-            end
+        table.query do |q|
+            q.add 'time', :numge, options[:time_start].to_i
+            q.add 'time', :numle, options[:time_end].to_i
+            q.process process_block
         end
     end
 end

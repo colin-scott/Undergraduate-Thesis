@@ -25,6 +25,8 @@ require 'timeout'
 require 'house_cleaner'
 require 'isolation_issuer'
 require 'java'
+require 'rubygems'
+require 'rufus/tokyo'
 
 $TEST_THREADS = false
 if RUBY_PLATFORM == "java"
@@ -78,6 +80,9 @@ class FailureDispatcher
 	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
 
         @max_thread_wait_time_minutes = 15 # number of minutes to wait for measurement threads to complete
+         
+        @filter_store = Rufus::Tokyo::Table.new(FailureIsolation::FilterStatsPath,
+                                                :lcnum => 0, :ncnum => 0, :mutex => true)
     end
 
     # Connect to Dave's spoofed revtr DRB service
@@ -850,7 +855,7 @@ class FailureDispatcher
 
     # Helper method
     def log_outage(outage, path)
-        # TODO: use pstore instead of individual files
+        # TODO: use tokyo cabinet instead of individual files
         #       or MySQL
         filename = outage.file
         File.open(path+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
@@ -858,20 +863,14 @@ class FailureDispatcher
 
     # Log filter statistics
     def log_filter_trackers(srcdst2filter_tracker)
-        t = Time.new
+        t = Time.new.to_i
 
-        # We keep a PStore for each day, since PStore reads all data into
-        # memory (which clearly will not scale over time...). Would like to use
-        # Tokyo Cabinet (handles this transparently), but support won't
-        # install it on the networks cluster for us.
-        today_str = t.strftime("%Y.%m.%d")
-        name = FailureIsolation::FilterStatsPath+"/"+today_str
-        store = PStore.new(name, true)
-        store.transaction do
+        @filter_store.transaction do
           # We assign a unique id for each of today's filter stat objects
           # For now, we use t+src+dst
           srcdst2filter_tracker.each do |srcdst, filter_tracker|
-            store["#{t.to_i}#{srcdst}"] = filter_tracker
+            second_key = "#{t}#{srcdst}"
+            @filter_store[key] = { :time => t, :id => key, :filter_stats => stats }
           end
         end
     end
