@@ -331,6 +331,8 @@ class FailureDispatcher
 
        # nested helper closure
        allocate_merged_outage = lambda do |outage_list, merging_method|
+           id = nil
+           merged_outage = nil
            # Generate a unique id
            @merged_outage_store.transaction do
                id = @merged_outage_store.generate_unique_id 
@@ -866,7 +868,7 @@ class FailureDispatcher
     def log_merged_outage(merged_outage)
         t = Time.new.to_i
         @merged_outage_store.transaction do
-            @merged_outage_store[i] = { :id => merged_outage.id,
+            @merged_outage_store[t] = { :id => merged_outage.id,
                                         :merged_outage => merged_outage.marshal() } 
         end
     end
