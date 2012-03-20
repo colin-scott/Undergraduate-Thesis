@@ -107,6 +107,8 @@ class FailureAnalyzer
         
         # run the old isolation algorithm on individual (src, dst) pairs
         merged_outage.each do |outage|
+            # This is being invoked multiple times on outages that show up in
+            # multiple merged outages... oh well..
             identify_fault_single_outage(outage)
         end
 

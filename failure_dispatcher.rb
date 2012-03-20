@@ -320,6 +320,7 @@ class FailureDispatcher
     # 
     # TODO: use smarter merging heuristics?
     def merge_outages(srcdst2outage, srcdst2filter_tracker)
+       # TODO should freeze these objects
        outages = srcdst2outage.values
        # Assign unique ids to outages
        @outage_store.transaction do
@@ -347,14 +348,14 @@ class FailureDispatcher
        
        # Note: bidirectional will appear twice, in forward mergings and reverse
        # mergings
-       only_forward = deep_copy(outages).find_all { |o| o.direction.is_forward? }
+       only_forward = outages.find_all { |o| o.direction.is_forward? }
        dst2outages = only_forward.categorize_on_attr(:dst) 
        # Abuse of map... 
        forward_merged = dst2outages.values.map do |outage_list|
            allocate_merged_outage.call(outage_list, MergingMethod::FORWARD)
        end
 
-       only_reverse = deep_copy(outages).find_all { |o| o.direction.is_reverse? }
+       only_reverse = outages.find_all { |o| o.direction.is_reverse? }
        src2outages = only_reverse.categorize_on_attr(:src)
        # Abuse of map... 
        reverse_merged = src2outages.values.map do |outage_list|
@@ -451,6 +452,8 @@ class FailureDispatcher
         @failure_analyzer.identify_faults(merged_outage)
 
         merged_outage.each do |outage|
+            # This is happening redundantly for outages that appear in multiple merged
+            # outages... oh well
             outage.alternate_paths = @failure_analyzer.find_alternate_paths(outage.src, outage.dst, outage.direction, outage.tr,
                                                         outage.spoofed_tr, outage.historical_tr, outage.spoofed_revtr, outage.historical_revtr)
 
