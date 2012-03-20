@@ -215,7 +215,7 @@ module FilterTrackerIterator
         end
         
         result_set.each do |result_hash|
-            stats = result_hash["filter_stats"]
+            stats = Marshal.load(result_hash["filter_stats"])
             block.call(stats) if options.passes_predicates? stats
         end
     end
