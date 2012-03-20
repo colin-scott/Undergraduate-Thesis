@@ -201,7 +201,6 @@ module FailureIsolation
     # Outage logs
     IsolationResults = "#{$DATADIR}/isolation_results_final/outages.tdb"
     MergedIsolationResults = "#{$DATADIR}/merged_isolation_results/merged_outages.tdb"
-    Snapshot = "#{$DATADIR}/isolation_results_snapshot"
 
     # Logs of filter (first level, registration, and second level) statistics
     FilterStatsPath = "#{$DATADIR}/filter_stats/filter_stats.tdb"
