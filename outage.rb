@@ -23,6 +23,7 @@ class MergedOutage
        :pruner2incount_removed
 
    alias :log_name :file
+   alias :id :file
 
    # Behave as an array of Outages by delegating to @outages
    extend Forwardable
@@ -36,23 +37,16 @@ class MergedOutage
        :enum_slice,:enum_with_index,:find_all,:grep,:include?,:inject,:map,:max,:member?,:min,
        :partition,:reject,:select,:sort,:sort_by,:to_a,:to_set
 
-   # TODO the id argument should be optional -- keep a class variable @@id
-   # for ensure unique instances
-    def initialize(id, outages, merging_method=MergingMethod::REVERSE)
-        outages.each { |o| raise "Not an outage object!" if !o.is_a?(Outage) }
+    def initialize(id, outages, merging_method=MergingMethod::REVERSE,
+                   suspected_failures={}, initializer2suspectset={},
+                   pruner2incount_removed={})
+        # should be named id, not file (this is for backwards compatibility)
+        @file = id
         @outages = outages
-        @suspected_failures = {}
-        @initializer2suspectset = {}
-        @pruner2incount_removed = {}
+        @suspected_failures = suspected_failures
+        @initializer2suspectset = initializer2suspectset
+        @pruner2incount_removed = pruner2incount_removed
         @merging_method = merging_method
-        @file = get_uniq_filename(id)
-    end
-
-    # Log filenames should be unique for any given round
-    def get_uniq_filename(id)
-        t = Time.new
-        t_str = t.strftime("%Y%m%d%H%M%S")
-        @file = "#{id}_#{t_str}"
     end
 
     # Convert @pruner2incount_removed to just pruner2removed
@@ -109,6 +103,15 @@ class MergedOutage
     def time()
         return @outages.first.time
     end
+
+    def marshal()
+        # we turn outages into outage ids to save memory / storage
+        outage_ids = outages.map { |outage| outage.id }
+        flattened = MergedOutage.new(@file, outage_ids, @merging_method,
+                                     @suspected_failures, @initializer2suspectset,
+                                     @pruner2incount_removed)
+        return Marshal.dump(flattened)
+    end
 end
 
 # Encapsulate all measurement + analytic data for a single (src, dst) outage.
@@ -158,6 +161,7 @@ class Outage
   alias :dest :dst
   alias :additional_traceroutes :additional_traces 
   alias :log_name :file
+  alias :id :file
   
   def initialize(*args)
         @additional_traces = {}

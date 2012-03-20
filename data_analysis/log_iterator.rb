@@ -95,7 +95,7 @@ module LogIterator
                         next unless predicates.passes_predicates?(outage)
                         lock.synchronize { yield outage }
                         $stderr.print ".." if $debugging
-                    rescue EOFError #Errno::ENOENT, ArgumentError, TypeError 
+                    rescue EOFError, Errno::ENOENT, ArgumentError, TypeError 
                         $stderr.puts "failed to open #{file}, #{$!} #{$!.backtrace}"
                     rescue Errno::ENOENT
                         $stderr.puts "#{file} #{$!}"

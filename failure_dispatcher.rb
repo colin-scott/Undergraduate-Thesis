@@ -81,8 +81,17 @@ class FailureDispatcher
 
         @max_thread_wait_time_minutes = 15 # number of minutes to wait for measurement threads to complete
          
+        # See http://rufus.rubyforge.org/rufus-tokyo/ for information on Tokyo
+        # Cabinet + the Rufus FFI
         @filter_store = Rufus::Tokyo::Table.new(FailureIsolation::FilterStatsPath,
-                                                :lcnum => 0, :ncnum => 0, :mutex => true)
+                                                :lcnum => 1, :ncnum => 5)
+
+        @outage_store = Rufus::Tokyo::Table.new(FailureIsolation::IsolationResults,
+                                                :lcnum => 1, :ncnum => 5)
+
+        @merged_outage_store = Rufus::Tokyo::Table.new(FailureIsolation::MergedIsolationResults,
+                                                :lcnum => 1, :ncnum => 5)
+
     end
 
     # Connect to Dave's spoofed revtr DRB service
@@ -311,22 +320,25 @@ class FailureDispatcher
     # 
     # TODO: use smarter merging heuristics?
     def merge_outages(srcdst2outage, srcdst2filter_tracker)
-       # unique id for log filenames
-       id = 0
-
        outages = srcdst2outage.values
-
-       # TODO: possibly broken?
+       # Assign unique ids to outages
+       @outage_store.transaction do
+           outages.each do |outage|
+                outage.file = @outage_store.generate_unique_id
+           end
+       end
 
        # nested helper closure
        allocate_merged_outage = lambda do |outage_list, merging_method|
-           merged_outage_id = id
-           id += 1
-           merged_outage = MergedOutage.new(merged_outage_id, outage_list, merging_method)
+           # Generate a unique id
+           @merged_outage_store.transaction do
+               id = @merged_outage_store.generate_unique_id 
+               merged_outage = MergedOutage.new(id, outage_list, merging_method)
+           end
            outage_list.each do |outage|
                 src = outage.src
                 dst = outage.dst
-                srcdst2filter_tracker[[src,dst]].merged_outage_ids << merged_outage.file
+                srcdst2filter_tracker[[src,dst]].merged_outage_ids << id
            end
 
            # last statement is the map value
@@ -841,24 +853,19 @@ class FailureDispatcher
 
     # see outage.rb
     def log_srcdst_outage(outage)
-        # TODO: use pstore instead of individual files
-        #       or MySQL
-        log_outage(outage, FailureIsolation::IsolationResults)
+        @outage_store.transaction do
+            @outage_store[outage.time] = { :id => outage.id,
+                                           :outage => Marshal.dump(outage) } 
+        end
     end
 
     # see outage.rb
-    def log_merged_outage(outage)
-        # TODO: use pstore instead of individual files
-        #       or MySQL
-        log_outage(outage, FailureIsolation::MergedIsolationResults)
-    end
-
-    # Helper method
-    def log_outage(outage, path)
-        # TODO: use tokyo cabinet instead of individual files
-        #       or MySQL
-        filename = outage.file
-        File.open(path+"/"+filename+".bin", "w") { |f| f.write(Marshal.dump(outage)) }
+    def log_merged_outage(merged_outage)
+        t = Time.new.to_i
+        @merged_outage_store.transaction do
+            @merged_outage_store[i] = { :id => merged_outage.id,
+                                        :merged_outage => merged_outage.marshal() } 
+        end
     end
 
     # Log filter statistics
@@ -869,8 +876,9 @@ class FailureDispatcher
           # We assign a unique id for each of today's filter stat objects
           # For now, we use t+src+dst
           srcdst2filter_tracker.each do |srcdst, filter_tracker|
-            key = "#{t}#{srcdst}"
-            @filter_store[key] = { :time => t, :id => key, :filter_stats => filter_tracker }
+            id = @filter_store.generate_unique_id 
+            @filter_store[t] = { :id => id,
+                                 :filter_stats => Marshal.dump(filter_tracker) }
           end
         end
     end
