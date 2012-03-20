@@ -200,22 +200,38 @@ module MergedLogIterator
 end
 
 module FilterTrackerIterator
+    @@table = nil
+
     # Takes a block with filter tracker as arg
     def self.iterate(options, &block)
         # http://rufus.rubyforge.org/rufus-tokyo/
-        table = Rufus::Tokyo::Table.new(FailureIsolation::FilterStatsPath,
+        @@table ||= Rufus::Tokyo::Table.new(FailureIsolation::FilterStatsPath,
                                         :mode => 'r')
 
-        process_block = lambda do |k,val_hash|
-            filter_stats = val_hash[:filter_stats]
-            block.call(filter_stats) if options.passes_predicates? filter_stats
+        result_set = @@table.do_query do |q|
+            #     '' denotes primary key
+            q.add '', :numge, options[:time_start].to_i
+            q.add '', :numle, options[:time_end].to_i
         end
-
-        table.query do |q|
-            q.add 'time', :numge, options[:time_start].to_i
-            q.add 'time', :numle, options[:time_end].to_i
-            q.process process_block
+        
+        result_set.each do |result_hash|
+            stats = result_hash["filter_stats"]
+            block.call(stats) if options.passes_predicates? stats
         end
     end
 end
 
+
+if $0 ==  __FILE__ 
+    require 'log_filterer'
+    options = OptsParser.new
+    result_set = FilterTrackerIterator.iterate(options)
+    puts result_set.size
+    v2 = FilterTrackerIterator.iteratev2(options)
+    puts v2.size
+    leftovers = (v2.to_a - result_set.to_a)
+    if leftovers.size < v2.size
+        puts leftovers.inspect
+        puts leftovers.size
+    end
+end
