@@ -190,7 +190,13 @@ class FailureMonitor
         @problems_at_the_source = {}
         @outdated_nodes.delete_if { |k,v| not FailureIsolation.CurrentNodes.include? k }
 
-        Dir.glob("#{FailureIsolation::PingStatePath}*yml").each do |yaml|
+        yaml_files = Dir.glob("#{FailureIsolation::PingStatePath}*yml")
+        if yaml_files.size > 30
+            # OOM protection
+            raise "too many yaml files? #{yaml_files.size}"
+        end
+
+        yaml_files.each do |yaml|
             node, mtime = parse_filename(yaml)
             next if node.nil?
             
@@ -285,9 +291,13 @@ class FailureMonitor
 
     def parse_filename(yaml)
         begin
+            yaml = File.basename yaml
+            if yaml.size > "some_really_long_hostname_from_timbuktoo++YYYY.MM.DD.HH.MM.SS.yml".size
+                # OOM protection
+                raise "yaml is too long: #{yaml}}"
+            end
             # Format is: host_name++YYYY.MM.DD.HH.MM.SS.yml
             node, date = yaml.gsub(/.yml$/, "").split("++").map { |s| s.strip.downcase }
-            node = File.basename node
             # Parse doesn't get MM.SS quite right -- Need to convert MM.SS to MM:SS
             up_to_year_index = "YYYY.HH.DD".size
             clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
