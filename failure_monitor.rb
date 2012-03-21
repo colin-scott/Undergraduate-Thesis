@@ -303,6 +303,7 @@ class FailureMonitor
             clock = date[(up_to_year_index+1)..-1].gsub(/\./, ":")
             date = date[0...up_to_year_index]
             mtime = Time.parse(date + " " + clock)
+            # An OOM was thrown on this line:
             return [node, mtime]
         rescue java.lang.OutOfMemoryError => e
             raise "OOM here! #{e.backtrace.inspect}"

@@ -18,7 +18,7 @@ require 'timeout'
 require 'failure_analyzer'
 require 'isolation_mail'
 require 'isolation_utilities.rb'
-require 'poisoner'
+#require 'poisoner'
 require 'filters'
 require 'pstore'
 require 'timeout'
@@ -75,7 +75,7 @@ class FailureDispatcher
 
         @dot_generator = DotGenerator.new(@logger, $ASN_TO_ISP_MAP, @ip_info)
 
-        @poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
+        #@poisoner = Poisoner.new(@failure_analyzer, @db, @ipInfo, @logger)
 
 	    @node2emptypings = Hash.new{ |h,k| h[k] = EmptyStats.new(100) }
 
@@ -439,7 +439,7 @@ class FailureDispatcher
         @logger.debug { "got_past_log: #{merged_outage.sources}, #{merged_outage.destinations}" }
 
         # If one of the riot VPs, attempt to trigger a BGP poison
-        @poisoner.check_poisonability(merged_outage)
+        #@poisoner.check_poisonability(merged_outage)
         @logger.debug { "got_past_poisonability: #{merged_outage.sources}, #{merged_outage.destinations}" }
 
         if(merged_outage.is_interesting?)
