@@ -21,8 +21,8 @@ require 'house_cleaner'
 Thread.abort_on_exception = true
 
 module TestVars
-    IsolationResults = "/tmp/isolation_results"
-    MergedIsolationResults = "/tmp/merged_isolation_results"
+    IsolationResults = "/tmp/isolation_results.tdb"
+    MergedIsolationResults = "/tmp/merged_isolation_results.tdb"
     FilterStatsPath = "/tmp/filter_stats"
     DotFiles = "/tmp/dots"
     NonReachableTargetPath = "/tmp/targets_never_seen.yml"

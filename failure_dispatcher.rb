@@ -33,8 +33,8 @@ if RUBY_PLATFORM == "java"
     require 'java'
     java_import java.util.concurrent.Executors
     # TODO: HACK. Make me a platform-independant class variable
-    $executor = Executors.newFixedThreadPool(24)
-    $executor.setMaximumPoolSize(24)
+    $executor = Executors.newFixedThreadPool(5)
+    $executor.setMaximumPoolSize(5)
 end
 
 # This guy is just in charge of issuing measurements and logging/emailing results
@@ -265,6 +265,7 @@ class FailureDispatcher
       threads.each do |thread|
           remaining_time = (@max_thread_wait_time_minutes*60) - (Time.now.to_i-start_time)
           if remaining_time < 1 then remaining_time = 1 end
+          @logger.debug{"Thread #{thread}: Remaining time: #{remaining_time}"}
           begin 
               # thread.get will throw an exception if the underlying thread
               # threw an exception during execution
@@ -412,6 +413,7 @@ class FailureDispatcher
         gather_measurements(outage, filter_tracker)
 
         # turn into a linked list ( I think? )
+        @logger.debug { "process_srcdst_outage: building outage!: #{outage.src}, #{outage.dst}" }
         outage.build!
 
         if @failure_analyzer.passes_filtering_heuristics?(outage, filter_tracker)
@@ -480,6 +482,7 @@ class FailureDispatcher
         # HistoricalForwardHop objects
         outage.historical_tr, outage.historical_trace_timestamp = retrieve_historical_tr(outage.src, outage.dst)
 
+        @logger.debug { "Finding historical revtrs for #{outage.historical_tr.length} hops" }
         outage.historical_tr.each do |hop|
             # thread out on this to make it faster? Ask Dave for a faster
             # way?
@@ -664,6 +667,7 @@ class FailureDispatcher
         #
         # Each x is a failure reason
         path = path.to_s.split("\n").map { |x| ReverseHop.new(x, @ipInfo) } unless path.valid?
+        @logger.debug{ "Historical revtr path is #{path}"}
 
         HistoricalReversePath.new(src, dst, path)
     end

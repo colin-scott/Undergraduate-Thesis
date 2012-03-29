@@ -156,12 +156,16 @@ module FailureIsolation
     # Historical traceroutes from isolation VPs -> targets #
     # ====================================================== 
     def self.HistoricalTraceTimestamp
+        TraceDataMutex.synchronize{
         self.grab_historical_traces unless @HistoricalTraceTimestamp
+        }
         @HistoricalTraceTimestamp
     end
 
     def self.Node2Target2Trace
+        TraceDataMutex.synchronize{
         self.grab_historical_traces unless @Node2Target2Trace
+        }
         @Node2Target2Trace
     end
 
@@ -169,13 +173,11 @@ module FailureIsolation
     # signal is sent
     def self.grab_historical_traces
         # TODO: put traces in the DB
-        TraceDataMutex.synchronize{
         @HistoricalTraceTimestamp, node2target2trace = YAML.load_file FailureIsolation::HistoricalTraces
         @Node2Target2Trace = {}
         node2target2trace.each do |node, target2trace|
             @Node2Target2Trace[node.downcase] = target2trace 
         end
-        }
     end
     
     # ====================================

@@ -8,43 +8,50 @@ require 'failure_dispatcher'
 require 'outage'
 require 'isolation_utilities'
 
-require_relative 'unit_test_root'
+require 'unit_test_root'
 
 describe FailureDispatcher do
     let(:dispatcher) { FailureDispatcher.new } 
 
-    describe "#merge_outages" do
-        context "With only bidirectional" do    
-            it "produces the same # of (src,dst) pairs as it is given" do
-                input_outages = []
-                for dst in ["1.2.3.4", "2.3.4.5"]
-                    input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => dst, :direction => Direction.BOTH)
-                end
-                dispatcher.merge_outages(input_outages)
-            end 
-        end
-
-        context "With a mix" do
-            it "produces the same # of (src,dst) pairs as it is given" do
-                input_outages = []
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "1.2.3.4", :direction => Direction.FORWARD)
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "3.4.5.6", :direction => Direction.REVERSE)
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "7.6.5.3", :direction => Direction.BOTH)
-                dispatcher.merge_outages(input_outages)
-            end 
-        end
-
-        context "With a false positive" do
-            it "produces the same # of (src,dst) pairs as it is given" do
-                input_outages = []
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "1.2.3.4", :direction => Direction.FORWARD)
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "3.4.5.6", :direction => Direction.REVERSE)
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "7.6.5.3", :direction => Direction.BOTH)
-                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "244.244.244.244", :direction => Direction.FALSE_POSITIVE)
-                dispatcher.merge_outages(input_outages)
-            end 
+    describe "#log_srcdst_outage" do
+        it "doesn't crash" do
+            o = Outage.new(:src => "foobar.cs.uw.edu", :dst => "1.2.3.4", :direction => Direction.BOTH)
+            dispatcher.log_srcdst_outage(o)
         end
     end
+
+    #describe "#merge_outages" do
+    #    context "With only bidirectional" do    
+    #        it "produces the same # of (src,dst) pairs as it is given" do
+    #            input_outages = []
+    #            for dst in ["1.2.3.4", "2.3.4.5"]
+    #                input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => dst, :direction => Direction.BOTH)
+    #            end
+    #            dispatcher.merge_outages(input_outages)
+    #        end 
+    #    end
+
+    #    context "With a mix" do
+    #        it "produces the same # of (src,dst) pairs as it is given" do
+    #            input_outages = []
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "1.2.3.4", :direction => Direction.FORWARD)
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "3.4.5.6", :direction => Direction.REVERSE)
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "7.6.5.3", :direction => Direction.BOTH)
+    #            dispatcher.merge_outages(input_outages)
+    #        end 
+    #    end
+
+    #    context "With a false positive" do
+    #        it "produces the same # of (src,dst) pairs as it is given" do
+    #            input_outages = []
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "1.2.3.4", :direction => Direction.FORWARD)
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "3.4.5.6", :direction => Direction.REVERSE)
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "7.6.5.3", :direction => Direction.BOTH)
+    #            input_outages << Outage.new(:src => "foobar.cs.uw.edu", :dst => "244.244.244.244", :direction => Direction.FALSE_POSITIVE)
+    #            dispatcher.merge_outages(input_outages)
+    #        end 
+    #    end
+    #end
 end
 
 

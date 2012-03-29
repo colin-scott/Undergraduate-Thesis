@@ -63,7 +63,7 @@ end
 
 begin
    logger = LoggerLog.new('/homes/network/revtr/revtr_logs/isolation_logs/isolation.log')
-   logger.level = Logger::INFO
+   logger.level = Logger::DEBUG
    Emailer.set_logger(logger)
    monitor = allocate_modules(logger)
 
@@ -107,16 +107,14 @@ rescue java.lang.OutOfMemoryError => e
    # Catch all exceptions thrown at lower levels and send out an email with a
    # stacktrace
    stacktraces = []
-   if logger
-        Thread.list.each do |t|
-            begin
-                t.raise(Exception.new("trying to get backtrace"))
-            rescue Exception => r
-                stacktrace = "Thread #{t} "
-                stacktrace << "backtrace: #{r.backtrace.join("\n")}" unless r.backtrace.nil?
-                logger.warn { stacktrace }
-            end
-        end
+   Thread.list.each do |t|
+       begin
+           t.raise(Exception.new("trying to get backtrace"))
+       rescue Exception => r
+           stacktrace = "Thread #{t} "
+           stacktrace << "backtrace: #{r.backtrace.join("\n")}" unless r.backtrace.nil?
+           logger.warn { stacktrace }
+       end
    end
    Emailer.isolation_exception("Thrashing: \n#{stacktraces.join "\n"}")
    # fail fast!
